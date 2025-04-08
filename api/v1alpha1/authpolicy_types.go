@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	v1 "istio.io/api/security/v1"
-	"istio.io/api/type/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,7 +27,17 @@ type AuthPolicySpec struct {
 	JWTRules RequestAuthList `json:"jwtRules"`
 
 	// Selector specifies which workload the defined auth policy should be applied to.
-	Selector v1beta1.WorkloadSelector `json:"selector"`
+	Selector WorkloadSelector `json:"selector"`
+}
+
+type WorkloadSelector struct {
+	// One or more labels that indicate a specific set of pods/VMs
+	// on which a policy should be applied. The scope of label search is restricted to
+	// the configuration namespace in which the resource is present.
+	// +kubebuilder:validation:XValidation:message="wildcard not allowed in label key match",rule="self.all(key, !key.contains('*'))"
+	// +kubebuilder:validation:XValidation:message="key must not be empty",rule="self.all(key, key.size() != 0)"
+	// +kubebuilder:validation:MaxProperties=4096
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
 }
 
 type RequestAuthList []RequestAuth
@@ -233,7 +242,7 @@ func (ap *AuthPolicy) InitializeConditions() {
 
 func (r *RequestAuthList) ToIstioRequestAuthenticationJWTRules() []*v1.JWTRule {
 	var jwtRules []*v1.JWTRule
-	for _, rule := range *r {
+	for _ = range *r {
 		jwtRule := &v1.JWTRule{
 			Issuer:    "https://example-issuer.com",
 			Audiences: []string{"example-audience"},

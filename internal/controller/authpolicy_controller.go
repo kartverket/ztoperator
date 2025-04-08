@@ -21,6 +21,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	v3 "istio.io/api/security/v1"
 	"istio.io/api/security/v1beta1"
+	v1beta2 "istio.io/api/type/v1beta1"
 	v1 "istio.io/client-go/pkg/apis/security/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -196,7 +197,7 @@ func (r *AuthPolicyReconciler) reconcileRequestAuthentication(ctx context.Contex
 			Labels:    map[string]string{"type": "ztoperator.kartverket.no"},
 		},
 		Spec: v1beta1.RequestAuthentication{
-			Selector: &authPolicy.Spec.Selector,
+			Selector: &v1beta2.WorkloadSelector{MatchLabels: authPolicy.Spec.Selector.MatchLabels},
 			JwtRules: authPolicy.Spec.JWTRules.ToIstioRequestAuthenticationJWTRules(),
 		},
 	}
@@ -235,7 +236,7 @@ func (r *AuthPolicyReconciler) reconcileIgnoreAuthAuthorizationPolicy(ctx contex
 			Labels:    map[string]string{"type": "ztoperator.kartverket.no"},
 		},
 		Spec: v1beta1.AuthorizationPolicy{
-			Selector: &authPolicy.Spec.Selector,
+			Selector: &v1beta2.WorkloadSelector{MatchLabels: authPolicy.Spec.Selector.MatchLabels},
 			Rules: []*v3.Rule{
 				{
 					To: []*v1beta1.Rule_To{
@@ -284,7 +285,7 @@ func (r *AuthPolicyReconciler) reconcileRequireAuthAuthorizationPolicy(ctx conte
 			Labels:    map[string]string{"type": "ztoperator.kartverket.no"},
 		},
 		Spec: v1beta1.AuthorizationPolicy{
-			Selector: &authPolicy.Spec.Selector,
+			Selector: &v1beta2.WorkloadSelector{MatchLabels: authPolicy.Spec.Selector.MatchLabels},
 			Rules: []*v3.Rule{
 				{
 					To: []*v1beta1.Rule_To{
