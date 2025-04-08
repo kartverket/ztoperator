@@ -154,7 +154,7 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+	go build -o bin/ztoperator cmd/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
@@ -202,20 +202,20 @@ endif
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) --context $(ZTOPERATOR_CONTEXT) apply -f -
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) --context $(ZTOPERATOR_CONTEXT) delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build config/default | $(KUBECTL) --context $(ZTOPERATOR_CONTEXT) apply -f -
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/default | $(KUBECTL) --context $(ZTOPERATOR_CONTEXT) delete --ignore-not-found=$(ignore-not-found) -f -
 
 ##@ Dependencies
 
@@ -350,12 +350,12 @@ catalog-push: ## Push a catalog image.
 ### CUSTOM TARGETS ###
 
 .PHONY: run-local
-run-local: build install-ztoperator
-	kubectl --context ${ZTOPERATOR_CONTEXT} apply -f config/ --recursive
+run-local: build install
+	#kubectl --context ${ZTOPERATOR_CONTEXT} apply -f config/ --recursive
 	./bin/ztoperator
 
 .PHONY: setup-local
-setup-local: kind-cluster install-istio install-ztoperator
+setup-local: kind-cluster install-istio install
 	@echo "Cluster $(ZTOPERATOR_CONTEXT) is setup"
 
 

@@ -1,0 +1,19 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: application-auth
+  namespace: sample
+spec:
+  selector:
+    matchLabels:
+      app: application-auth
+  jwtRules:
+    - enabled: true
+      authRules:
+        - paths:
+            - /*
+          when:
+            - claim: "pid"
+              values:
+                - "*"
+      secretName: "idporten-secret"
