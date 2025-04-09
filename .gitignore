@@ -26,3 +26,6 @@ bin/
 .idea/
 istio-*
 !**/istio/
+
+# samples fodler
+/samples

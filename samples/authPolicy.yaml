@@ -1,12 +1,20 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lars
+  labels:
+    name: lars
+    istio.io/rev: default
+---
 apiVersion: ztoperator.kartverket.no/v1alpha1
 kind: AuthPolicy
 metadata:
-  name: application-auth
-  namespace: sample
+  name: test
+  namespace: lars
 spec:
   selector:
     matchLabels:
-      app: application-auth
+      app: an-application
   jwtRules:
     - enabled: true
       authRules:
