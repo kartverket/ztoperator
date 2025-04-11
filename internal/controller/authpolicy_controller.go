@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/pkg/log"
 	v3 "istio.io/api/security/v1"
 	"istio.io/api/security/v1beta1"
 	v1beta2 "istio.io/api/type/v1beta1"
@@ -13,6 +14,8 @@ import (
 	v2 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -23,7 +26,8 @@ import (
 // AuthPolicyReconciler reconciles a AuthPolicy object
 type AuthPolicyReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -56,27 +60,27 @@ type descendant[T client.Object] struct {
 // +kubebuilder:rbac:groups=ztoperator.kartverket.no,resources=authpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=ztoperator.kartverket.no,resources=authpolicies/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=ztoperator.kartverket.no,resources=authpolicies/finalizers,verbs=update
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies;requestauthentications,verbs=get;list;watch;create;update;patch;delete
 
 func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
+	rLog := log.GetLogger(ctx)
+
 	authPolicy := new(ztoperatorv1alpha1.AuthPolicy)
 
-	log.Info(fmt.Sprintf("Received reconcile request for AuthPolicy with name %s", req.NamespacedName.String()))
+	rLog.Info(fmt.Sprintf("Received reconcile request for AuthPolicy with name %s", req.NamespacedName.String()))
 
 	if err := r.Client.Get(ctx, req.NamespacedName, authPolicy); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Error(err, fmt.Sprintf("AuthPolicy with name %s not found", req.NamespacedName.String()))
+			rLog.Debug(fmt.Sprintf("AuthPolicy with name %s not found. Probably a delete.", req.NamespacedName.String()))
 			return reconcile.Result{}, nil
 		}
-		log.Error(err, fmt.Sprintf("Failed to get AuthPolicy with name %s", req.NamespacedName.String()))
+		rLog.Error(err, fmt.Sprintf("Failed to get AuthPolicy with name %s", req.NamespacedName.String()))
 		return reconcile.Result{}, err
 	}
 
-	log.Info(fmt.Sprintf("AuthPolicy with name %s found", req.NamespacedName.String()))
-
-	// TODO: Finalize object if it's being deleted
-	// TODO: Add finalizers + r.Client.Update() if missing
+	r.Recorder.Eventf(authPolicy, "Normal", "ReconcileStarted", fmt.Sprintf("AuthPolicy with name %s started.", req.NamespacedName.String()))
+	rLog.Debug(fmt.Sprintf("AuthPolicy with name %s found", req.NamespacedName.String()))
 
 	authPolicy.InitializeStatus()
 	originalAuthPolicy := authPolicy.DeepCopy()
@@ -101,26 +105,28 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		},
 	}
 
+	if !authPolicy.DeletionTimestamp.IsZero() {
+		rLog.Info(fmt.Sprintf("Deleting AuthPolicy with name %s", req.NamespacedName.String()))
+		return ctrl.Result{}, nil
+	}
+
 	defer func() {
 		r.updateStatus(ctx, s, originalAuthPolicy, reconcileFuncs)
 	}()
 
-	if !authPolicy.DeletionTimestamp.IsZero() {
-		log.Info(fmt.Sprintf("Deleting AuthPolicy with name %s", req.NamespacedName.String()))
-		reconcileFuncs = append(reconcileFuncs, reconcileFunc{
-			Func: r.reconcileRequestAuthentication,
-		})
-	}
-	return doReconcile(ctx, reconcileFuncs, s)
+	return r.doReconcile(ctx, reconcileFuncs, s)
 }
 
-func doReconcile(ctx context.Context, reconcileFuncs []reconcileFunc, s *scope) (ctrl.Result, error) {
+func (r *AuthPolicyReconciler) doReconcile(ctx context.Context, reconcileFuncs []reconcileFunc, s *scope) (ctrl.Result, error) {
 	result := ctrl.Result{}
 	var errs []error
-	for _, reconcileFunc := range reconcileFuncs {
-		reconcileResult, err := reconcileFunc.Func(ctx, s, reconcileFunc.ResourceKind, reconcileFunc.ResourceName)
+	for _, rf := range reconcileFuncs {
+		reconcileResult, err := rf.Func(ctx, s, rf.ResourceKind, rf.ResourceName)
 		if err != nil {
+			r.Recorder.Eventf(s.authPolicy, "Warning", fmt.Sprintf("%sReconcileFailed", rf.ResourceKind), fmt.Sprintf("%s with name %s failed during reconciliation.", rf.ResourceKind, rf.ResourceName))
 			errs = append(errs, err)
+		} else {
+			r.Recorder.Eventf(s.authPolicy, "Normal", fmt.Sprintf("%sReconciledSuccessfully", rf.ResourceKind), fmt.Sprintf("%s with name %s reconciled successfully.", rf.ResourceKind, rf.ResourceName))
 		}
 		if len(errs) > 0 {
 			continue
@@ -129,8 +135,10 @@ func doReconcile(ctx context.Context, reconcileFuncs []reconcileFunc, s *scope) 
 	}
 
 	if len(errs) > 0 {
+		r.Recorder.Eventf(s.authPolicy, "Warning", "ReconcileFailed", "AuthPolicy failed during reconciliation")
 		return ctrl.Result{}, errors.NewAggregate(errs)
 	}
+	r.Recorder.Eventf(s.authPolicy, "Normal", "ReconcileSuccess", "AuthPolicy reconciled successfully")
 	return result, nil
 }
 
@@ -153,8 +161,9 @@ func lowestNonZeroResult(i, j ctrl.Result) ctrl.Result {
 
 func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, s *scope, original *ztoperatorv1alpha1.AuthPolicy, reconcileFuncs []reconcileFunc) {
 	ap := s.authPolicy
-	log := ctrl.LoggerFrom(ctx)
-	log.Info(fmt.Sprintf("Updating AuthPolicy status for %s/%s", ap.Namespace, ap.Name))
+	rLog := log.GetLogger(ctx)
+	rLog.Debug(fmt.Sprintf("Updating AuthPolicy status for %s/%s", ap.Namespace, ap.Name))
+	r.Recorder.Eventf(s.authPolicy, "Normal", "StatusUpdateStarted", "Status update of AuthPolicy started.")
 
 	ap.Status.ObservedGeneration = ap.GetGeneration()
 	authPolicyCondition := v2.Condition{
@@ -228,12 +237,25 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, s *scope, origi
 	ap.Status.Conditions = append([]v2.Condition{authPolicyCondition}, conditions...)
 
 	if !equality.Semantic.DeepEqual(original.Status, ap.Status) {
-		log.Info(fmt.Sprintf("Patching AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
-		//TODO: Hadde .Patch() her før, men den feilet grunnet status.Ready: null
-		if err := r.Status().Update(ctx, ap); err != nil {
-			log.Error(err, fmt.Sprintf("Failed to patch AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
+		rLog.Debug(fmt.Sprintf("Updating AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
+		if err := r.updateStatusWithRetriesOnConflict(ctx, ap); err != nil {
+			rLog.Error(err, fmt.Sprintf("Failed to update AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
+			r.Recorder.Eventf(s.authPolicy, "Warning", "StatusUpdateFailed", "Status update of AuthPolicy failed.")
+		} else {
+			r.Recorder.Eventf(s.authPolicy, "Normal", "StatusUpdateSuccess", "Status update of AuthPolicy updated successfully.")
 		}
 	}
+}
+
+func (r *AuthPolicyReconciler) updateStatusWithRetriesOnConflict(ctx context.Context, ap *ztoperatorv1alpha1.AuthPolicy) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		latest := &ztoperatorv1alpha1.AuthPolicy{}
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(ap), latest); err != nil {
+			return err
+		}
+		latest.Status = ap.Status
+		return r.Status().Update(ctx, latest)
+	})
 }
 
 func (r *AuthPolicyReconciler) reconcileRequestAuthentication(ctx context.Context, scope *scope, resourceKind string, resourceName string) (ctrl.Result, error) {
@@ -257,15 +279,11 @@ func (r *AuthPolicyReconciler) reconcileRequestAuthentication(ctx context.Contex
 		desired,
 		func(current, desired *v1.RequestAuthentication) bool {
 			return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
-				!reflect.DeepEqual(current.Spec.JwtRules, desired.Spec.JwtRules) ||
-				!reflect.DeepEqual(current.Status.Conditions, desired.Status.Conditions) ||
-				!reflect.DeepEqual(current.Status.ValidationMessages, desired.Status.ValidationMessages)
+				!reflect.DeepEqual(current.Spec.JwtRules, desired.Spec.JwtRules)
 		},
 		func(current, desired *v1.RequestAuthentication) {
 			current.Spec.Selector = desired.Spec.Selector
 			current.Spec.JwtRules = desired.Spec.JwtRules
-			current.Status.Conditions = desired.Status.Conditions
-			current.Status.ValidationMessages = desired.Status.ValidationMessages
 		},
 	)
 }
@@ -291,7 +309,23 @@ func (r *AuthPolicyReconciler) reconcileIgnoreAuthAuthorizationPolicy(ctx contex
 		},
 	}
 
-	return reconcileAuthorizationPolicy(ctx, r.Client, r.Scheme, scope, desired, resourceKind, resourceName)
+	return reconcileAuthPolicy[*v1.AuthorizationPolicy](
+		ctx,
+		r.Client,
+		r.Scheme,
+		scope,
+		resourceKind,
+		resourceName,
+		desired,
+		func(current, desired *v1.AuthorizationPolicy) bool {
+			return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
+				!reflect.DeepEqual(current.Spec.Rules, desired.Spec.Rules)
+		},
+		func(current, desired *v1.AuthorizationPolicy) {
+			current.Spec.Selector = desired.Spec.Selector
+			current.Spec.Rules = desired.Spec.Rules
+		},
+	)
 }
 
 func (r *AuthPolicyReconciler) reconcileRequireAuthAuthorizationPolicy(ctx context.Context, scope *scope, resourceKind string, resourceName string) (ctrl.Result, error) {
@@ -321,33 +355,23 @@ func (r *AuthPolicyReconciler) reconcileRequireAuthAuthorizationPolicy(ctx conte
 		},
 	}
 
-	return reconcileAuthorizationPolicy(ctx, r.Client, r.Scheme, scope, desired, resourceKind, resourceName)
-}
-
-func (r *AuthPolicyReconciler) reconcileDelete(ctx context.Context, scope *scope) (ctrl.Result, error) {
-	authPolicy := scope.authPolicy
-
-	resources := []client.Object{
-		&v1.RequestAuthentication{
-			ObjectMeta: buildObjectMeta(authPolicy.Name, authPolicy.Namespace),
+	return reconcileAuthPolicy[*v1.AuthorizationPolicy](
+		ctx,
+		r.Client,
+		r.Scheme,
+		scope,
+		resourceKind,
+		resourceName,
+		desired,
+		func(current, desired *v1.AuthorizationPolicy) bool {
+			return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
+				!reflect.DeepEqual(current.Spec.Rules, desired.Spec.Rules)
 		},
-		&v1.AuthorizationPolicy{
-			ObjectMeta: buildObjectMeta(authPolicy.Name, authPolicy.Namespace),
+		func(current, desired *v1.AuthorizationPolicy) {
+			current.Spec.Selector = desired.Spec.Selector
+			current.Spec.Rules = desired.Spec.Rules
 		},
-	}
-
-	var errs []error
-	for _, resource := range resources {
-		if err := r.Client.Delete(ctx, resource); err != nil && !apierrors.IsNotFound(err) {
-			errs = append(errs, err)
-		}
-	}
-
-	// TODO: If we have finalizers, remove them (example: "ztoperator.kartverket.no/finalizer")
-	if len(errs) > 0 {
-		return ctrl.Result{}, errors.NewAggregate(errs)
-	}
-	return ctrl.Result{}, nil
+	)
 }
 
 func reconcileAuthPolicy[T client.Object](
@@ -360,23 +384,23 @@ func reconcileAuthPolicy[T client.Object](
 	shouldUpdate func(current, desired T) bool,
 	updateFields func(current, desired T),
 ) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
+	rLog := log.GetLogger(ctx)
 	kind := reflect.TypeOf(desired).Elem().Name()
 	current := reflect.New(reflect.TypeOf(desired).Elem()).Interface().(T)
 
-	log.Info(fmt.Sprintf("Generating %s %s/%s", kind, desired.GetNamespace(), desired.GetName()))
+	rLog.Info(fmt.Sprintf("Trying to generate %s %s/%s", kind, desired.GetNamespace(), desired.GetName()))
 
-	log.Info(fmt.Sprintf("Checking if %s %s/%s exists", kind, desired.GetNamespace(), desired.GetName()))
+	rLog.Debug(fmt.Sprintf("Checking if %s %s/%s exists", kind, desired.GetNamespace(), desired.GetName()))
 	err := k8sClient.Get(ctx, client.ObjectKeyFromObject(desired), current)
 	if apierrors.IsNotFound(err) {
-		log.Info(fmt.Sprintf("%s %s/%s does not exist", kind, desired.GetNamespace(), desired.GetName()))
+		rLog.Debug(fmt.Sprintf("%s %s/%s does not exist", kind, desired.GetNamespace(), desired.GetName()))
 		if err := ctrl.SetControllerReference(scope.authPolicy, desired, scheme); err != nil {
 			errorReason := fmt.Sprintf("Unable to set AuthPolicy ownerReference on %s %s/%s.", kind, desired.GetNamespace(), desired.GetName())
 			scope.ReplaceDescendant(desired, &errorReason, nil, resourceKind, resourceName)
 			return ctrl.Result{}, err
 		}
 
-		log.Info(fmt.Sprintf("Creating a %s %s/%s", kind, desired.GetNamespace(), desired.GetName()))
+		rLog.Info(fmt.Sprintf("Creating a %s %s/%s", kind, desired.GetNamespace(), desired.GetName()))
 		if err := k8sClient.Create(ctx, desired); err != nil {
 			errorReason := fmt.Sprintf("Unable to create %s %s/%s", kind, desired.GetNamespace(), desired.GetName())
 			scope.ReplaceDescendant(desired, &errorReason, nil, resourceKind, resourceName)
@@ -394,54 +418,28 @@ func reconcileAuthPolicy[T client.Object](
 		return ctrl.Result{}, err
 	}
 
-	log.Info(fmt.Sprintf("%s %s/%s exists", kind, desired.GetNamespace(), desired.GetName()))
-	log.Info(fmt.Sprintf("Determing if %s %s/%s should be updated", kind, desired.GetNamespace(), desired.GetName()))
+	rLog.Debug(fmt.Sprintf("%s %s/%s exists", kind, desired.GetNamespace(), desired.GetName()))
+	rLog.Debug(fmt.Sprintf("Determing if %s %s/%s should be updated", kind, desired.GetNamespace(), desired.GetName()))
 	if shouldUpdate(current, desired) {
-		log.Info(fmt.Sprintf("Current %s %s/%s != desired", kind, desired.GetNamespace(), desired.GetName()))
-		log.Info(fmt.Sprintf("Updating current %s %s/%s with desired", kind, desired.GetNamespace(), desired.GetName()))
+		rLog.Debug(fmt.Sprintf("Current %s %s/%s != desired", kind, desired.GetNamespace(), desired.GetName()))
+		rLog.Debug(fmt.Sprintf("Updating current %s %s/%s with desired", kind, desired.GetNamespace(), desired.GetName()))
 		updateFields(current, desired)
+
 		if err := k8sClient.Update(ctx, current); err != nil {
 			errorReason := fmt.Sprintf("Unable to update %s %s/%s.", kind, current.GetNamespace(), current.GetName())
 			scope.ReplaceDescendant(current, &errorReason, nil, resourceKind, resourceName)
 			return ctrl.Result{}, err
 		}
+
 	} else {
-		log.Info(fmt.Sprintf("Current %s %s/%s == desired. No update needed.", kind, desired.GetNamespace(), desired.GetName()))
+		rLog.Debug(fmt.Sprintf("Current %s %s/%s == desired. No update needed.", kind, desired.GetNamespace(), desired.GetName()))
 	}
 
-	successMessage := fmt.Sprintf("Successfully updated %s %s/%s", kind, current.GetNamespace(), current.GetName())
+	successMessage := fmt.Sprintf("Successfully generated %s %s/%s", kind, current.GetNamespace(), current.GetName())
+	rLog.Info(successMessage)
 	scope.ReplaceDescendant(current, nil, &successMessage, resourceKind, resourceName)
 
 	return ctrl.Result{}, nil
-}
-
-func reconcileAuthorizationPolicy(
-	ctx context.Context,
-	k8sClient client.Client,
-	scheme *runtime.Scheme,
-	scope *scope,
-	desired *v1.AuthorizationPolicy,
-	resourceKind, resourceName string,
-) (ctrl.Result, error) {
-	return reconcileAuthPolicy[*v1.AuthorizationPolicy](
-		ctx,
-		k8sClient,
-		scheme,
-		scope,
-		resourceKind,
-		resourceName,
-		desired,
-		func(current, desired *v1.AuthorizationPolicy) bool {
-			return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
-				!reflect.DeepEqual(current.Spec.Rules, desired.Spec.Rules) ||
-				!reflect.DeepEqual(current.Status.Conditions, desired.Status.Conditions)
-		},
-		func(current, desired *v1.AuthorizationPolicy) {
-			current.Spec.Selector = desired.Spec.Selector
-			current.Spec.Rules = desired.Spec.Rules
-			current.Status.Conditions = desired.Status.Conditions
-		},
-	)
 }
 
 func buildObjectMeta(name, namespace string) v2.ObjectMeta {

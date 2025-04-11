@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"go.uber.org/zap/zapcore"
 	"os"
 	"strings"
 
@@ -74,6 +75,7 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	opts := zap.Options{
 		Development: true,
+		Level:       zapcore.Level(-1),
 	}
 	opts.BindFlags(flag.CommandLine)
 	isDeployment := flag.Bool("d", false, "is deployed to a real cluster")
@@ -158,8 +160,9 @@ func main() {
 	}
 
 	if err = (&controller.AuthPolicyReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("authpolicy-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthPolicy")
 		os.Exit(1)

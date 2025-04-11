@@ -195,6 +195,7 @@ const (
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.phase`
 
 // AuthPolicy is the Schema for the authpolicies API
 type AuthPolicy struct {
@@ -222,10 +223,9 @@ func (ap *AuthPolicy) InitializeStatus() {
 	if ap.Status.Conditions == nil {
 		ap.Status.Conditions = []metav1.Condition{}
 	}
-	if ap.Status.ObservedGeneration == 0 {
-		ap.Status.ObservedGeneration = ap.GetGeneration()
-	}
+	ap.Status.ObservedGeneration = ap.GetGeneration()
 	ap.Status.Ready = false
+	ap.Status.Phase = PhasePending
 }
 
 func (r *RequestAuthList) ToIstioRequestAuthenticationJWTRules() []*v1.JWTRule {
