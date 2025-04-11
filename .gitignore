@@ -28,4 +28,4 @@ istio-*
 !**/istio/
 
 # samples fodler
-/samples
+samples/
