@@ -24,3 +24,8 @@ go.work.sum
 # env file
 bin/
 .idea/
+istio-*
+!**/istio/
+
+# samples fodler
+samples/

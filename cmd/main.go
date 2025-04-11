@@ -19,12 +19,19 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
+	"go.uber.org/zap/zapcore"
 	"os"
+	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/controller"
+	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
+	securityv1 "istio.io/client-go/pkg/apis/security/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -33,10 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
-
-	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -47,7 +50,8 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
+	utilruntime.Must(istionetworkingv1.AddToScheme(scheme))
+	utilruntime.Must(securityv1.AddToScheme(scheme))
 	utilruntime.Must(ztoperatorv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
@@ -71,8 +75,10 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	opts := zap.Options{
 		Development: true,
+		Level:       zapcore.Level(-1),
 	}
 	opts.BindFlags(flag.CommandLine)
+	isDeployment := flag.Bool("d", false, "is deployed to a real cluster")
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
@@ -92,9 +98,9 @@ func main() {
 		tlsOpts = append(tlsOpts, disableHTTP2)
 	}
 
-	webhookServer := webhook.NewServer(webhook.Options{
-		TLSOpts: tlsOpts,
-	})
+	//webhookServer := webhook.NewServer(webhook.Options{
+	//	TLSOpts: tlsOpts,
+	//})
 
 	// Metrics endpoint is enabled in 'config/default/kustomization.yaml'. The Metrics options configure the server.
 	// More info:
@@ -120,10 +126,19 @@ func main() {
 		metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
 	}
 
+	kubeconfig := ctrl.GetConfigOrDie()
+
+	if !*isDeployment && !strings.Contains(kubeconfig.Host, "https://127.0.0.1") {
+		setupLog.Info("Tried to start ztoperator with non-local kubecontext. Exiting to prevent havoc.")
+		os.Exit(1)
+	} else {
+		setupLog.Info(fmt.Sprintf("Starting ztoperator using kube-apiserver at %s", kubeconfig.Host))
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		Metrics:                metricsServerOptions,
-		WebhookServer:          webhookServer,
+		Scheme:  scheme,
+		Metrics: metricsServerOptions,
+		//WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "78810f72.kartverket.no",
@@ -145,8 +160,9 @@ func main() {
 	}
 
 	if err = (&controller.AuthPolicyReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("authpolicy-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthPolicy")
 		os.Exit(1)

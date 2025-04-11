@@ -72,6 +72,29 @@ CONTAINER_TOOL ?= docker
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+
+#### CUSTOM VARS ####
+ZTOPERATOR_CONTEXT         ?= kind-$(KIND_CLUSTER_NAME)
+KUBERNETES_VERSION          = 1.31.4
+KIND_IMAGE                 ?= kindest/node:v$(KUBERNETES_VERSION)
+KIND_CLUSTER_NAME          ?= ztoperator
+
+$(shell mkdir -p bin)
+export OS   := $(shell if [ "$(shell uname)" = "Darwin" ]; then echo "darwin"; else echo "linux"; fi)
+export ARCH := $(shell if [ "$(shell uname -m)" = "x86_64" ]; then echo "amd64"; else echo "arm64"; fi)
+
+# Extracts the version number for a given dependency found in go.mod.
+# Makes the test setup be in sync with what the operator itself uses.
+extract-version = $(shell cat go.mod | grep $(1) | awk '{$$1=$$1};1' | cut -d' ' -f2 | sed 's/^v//')
+
+#### TOOLS ####
+TOOLS_DIR                          := $(PWD)/.tools
+KIND                               := $(TOOLS_DIR)/kind
+KIND_VERSION                       := v0.26.0
+CHAINSAW_VERSION                   := $(call extract-version,github.com/kyverno/chainsaw)
+CONTROLLER_GEN_VERSION             := $(call extract-version,sigs.k8s.io/controller-tools)
+ISTIO_VERSION                      := $(call extract-version,istio.io/client-go)
+
 .PHONY: all
 all: build
 
@@ -131,7 +154,7 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 
 .PHONY: build
 build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+	go build -o bin/ztoperator cmd/main.go
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
@@ -179,20 +202,20 @@ endif
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) --context $(ZTOPERATOR_CONTEXT) apply -f -
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) --context $(ZTOPERATOR_CONTEXT) delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
+	$(KUSTOMIZE) build config/default | $(KUBECTL) --context $(ZTOPERATOR_CONTEXT) apply -f -
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/default | $(KUBECTL) --context $(ZTOPERATOR_CONTEXT) delete --ignore-not-found=$(ignore-not-found) -f -
 
 ##@ Dependencies
 
@@ -322,3 +345,54 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+
+### CUSTOM TARGETS ###
+
+.PHONY: run-local
+run-local: build install
+	#kubectl --context ${ZTOPERATOR_CONTEXT} apply -f config/ --recursive
+	./bin/ztoperator
+
+.PHONY: setup-local
+setup-local: kind-cluster install-istio install
+	@echo "Cluster $(ZTOPERATOR_CONTEXT) is setup"
+
+
+#### KIND ####
+
+.PHONY: kind-cluster check-kind
+check-kind:
+	@which kind >/dev/null || (echo "kind not installed, please install it to proceed"; exit 1)
+
+.PHONY: kind-cluster
+kind-cluster: check-kind
+	@echo Create kind cluster... >&2
+	@kind create cluster --image $(KIND_IMAGE) --name ${KIND_CLUSTER_NAME}
+
+
+#### ZTOPERATOR DEPENDENCIES ####
+
+.PHONY: install-istio
+install-istio:
+	@echo "Creating istio-gateways namespace..."
+	@kubectl create namespace istio-gateways --context $(ZTOPERATOR_CONTEXT) || true
+	@echo "Downloading Istio..."
+	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
+	@echo "Installing Istio on Kubernetes cluster..."
+	@./istio-$(ISTIO_VERSION)/bin/istioctl install -y --context $(ZTOPERATOR_CONTEXT) \
+		--set meshConfig.accessLogFile=/dev/stdout \
+		--set profile=minimal
+	@echo "Installing istio-gateways"
+	@helm --kube-context $(ZTOPERATOR_CONTEXT) install istio-ingressgateway istio/gateway -n istio-gateways --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	@echo "Istio installation complete."
+
+.PHONY: install-ztoperator
+install-ztoperator: generate
+	@kubectl create namespace ztoperator-system --context $(ZTOPERATOR_CONTEXT) || true
+	@kubectl apply -f config/ --recursive --context $(ZTOPERATOR_CONTEXT)
+	@kubectl apply -f tests/cluster-config/ --recursive --context $(ZTOPERATOR_CONTEXT) || true
+
+.PHONY: install-test-tools
+install-test-tools:
+	go install github.com/kyverno/chainsaw@v${CHAINSAW_VERSION}
