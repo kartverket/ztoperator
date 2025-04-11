@@ -6,15 +6,40 @@ metadata:
     name: lars
     istio.io/rev: default
 ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: http-echo
+  namespace: lars
+  labels:
+    app: http-echo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: http-echo
+  template:
+    metadata:
+      labels:
+        app: http-echo
+    spec:
+      containers:
+        - name: http-echo
+          image: hashicorp/http-echo:latest
+          args:
+            - "-text=Hello from http-echo"
+          ports:
+            - containerPort: 5678
+---
 apiVersion: ztoperator.kartverket.no/v1alpha1
 kind: AuthPolicy
 metadata:
-  name: test
+  name: auth-policy-http-echo
   namespace: lars
 spec:
   selector:
     matchLabels:
-      app: an-application
+      app: http-echo
   jwtRules:
     - enabled: true
       authRules:

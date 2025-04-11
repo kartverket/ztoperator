@@ -380,7 +380,9 @@ install-istio:
 	@echo "Downloading Istio..."
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
 	@echo "Installing Istio on Kubernetes cluster..."
-	@./istio-$(ISTIO_VERSION)/bin/istioctl install -y --context $(ZTOPERATOR_CONTEXT) --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal
+	@./istio-$(ISTIO_VERSION)/bin/istioctl install -y --context $(ZTOPERATOR_CONTEXT) \
+		--set meshConfig.accessLogFile=/dev/stdout \
+		--set profile=minimal
 	@echo "Installing istio-gateways"
 	@helm --kube-context $(ZTOPERATOR_CONTEXT) install istio-ingressgateway istio/gateway -n istio-gateways --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
 	@echo "Istio installation complete."
