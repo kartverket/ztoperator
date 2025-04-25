@@ -5,13 +5,13 @@ import (
 	"fmt"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/pkg/log"
-	v3 "istio.io/api/security/v1"
-	"istio.io/api/security/v1beta1"
-	v1beta2 "istio.io/api/type/v1beta1"
-	v1 "istio.io/client-go/pkg/apis/security/v1"
+	securityv1 "istio.io/api/security/v1"
+	istiotypev1beta1 "istio.io/api/type/v1beta1"
+	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	v2 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
@@ -34,8 +34,8 @@ type AuthPolicyReconciler struct {
 func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&ztoperatorv1alpha1.AuthPolicy{}).
-		Owns(&v1.RequestAuthentication{}).
-		Owns(&v1.AuthorizationPolicy{}).
+		Owns(&istioclientsecurityv1.RequestAuthentication{}).
+		Owns(&istioclientsecurityv1.AuthorizationPolicy{}).
 		Complete(r)
 }
 
@@ -95,13 +95,13 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		},
 		{
 			ResourceKind: "AuthorizationPolicy",
-			ResourceName: authPolicy.Name + "-allow",
+			ResourceName: authPolicy.Name + "-ignoreauth",
 			Func:         r.reconcileIgnoreAuthAuthorizationPolicy,
 		},
 		{
 			ResourceKind: "AuthorizationPolicy",
-			ResourceName: authPolicy.Name + "-auth",
-			Func:         r.reconcileRequireAuthAuthorizationPolicy,
+			ResourceName: authPolicy.Name + "-requireauth",
+			Func:         r.reconcileRequireJWTAuthorizationPolicy,
 		},
 	}
 
@@ -166,9 +166,9 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, s *scope, origi
 	r.Recorder.Eventf(s.authPolicy, "Normal", "StatusUpdateStarted", "Status update of AuthPolicy started.")
 
 	ap.Status.ObservedGeneration = ap.GetGeneration()
-	authPolicyCondition := v2.Condition{
+	authPolicyCondition := metav1.Condition{
 		Type:               GetID(strings.TrimPrefix(ap.Kind, "*"), ap.Name),
-		LastTransitionTime: v2.Now(),
+		LastTransitionTime: metav1.Now(),
 	}
 
 	switch {
@@ -176,7 +176,7 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, s *scope, origi
 		ap.Status.Phase = ztoperatorv1alpha1.PhasePending
 		ap.Status.Ready = false
 		ap.Status.Message = "AuthPolicy pending due to missing descendants."
-		authPolicyCondition.Status = v2.ConditionUnknown
+		authPolicyCondition.Status = metav1.ConditionUnknown
 		authPolicyCondition.Reason = "ReconciliationPending"
 		authPolicyCondition.Message = "Descendants of AuthPolicy are not yet reconciled."
 
@@ -184,7 +184,7 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, s *scope, origi
 		ap.Status.Phase = ztoperatorv1alpha1.PhaseFailed
 		ap.Status.Ready = false
 		ap.Status.Message = "AuthPolicy failed."
-		authPolicyCondition.Status = v2.ConditionFalse
+		authPolicyCondition.Status = metav1.ConditionFalse
 		authPolicyCondition.Reason = "ReconciliationFailed"
 		authPolicyCondition.Message = "Descendants of AuthPolicy failed during reconciliation."
 
@@ -192,30 +192,30 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, s *scope, origi
 		ap.Status.Phase = ztoperatorv1alpha1.PhaseReady
 		ap.Status.Ready = true
 		ap.Status.Message = "AuthPolicy ready."
-		authPolicyCondition.Status = v2.ConditionTrue
+		authPolicyCondition.Status = metav1.ConditionTrue
 		authPolicyCondition.Reason = "ReconciliationSuccess"
 		authPolicyCondition.Message = "Descendants of AuthPolicy reconciled successfully."
 	}
 
-	var conditions []v2.Condition
+	var conditions []metav1.Condition
 	descendantIDs := map[string]bool{}
 
 	for _, d := range s.descendants {
 		descendantIDs[d.ID] = true
-		cond := v2.Condition{
+		cond := metav1.Condition{
 			Type:               d.ID,
-			LastTransitionTime: v2.Now(),
+			LastTransitionTime: metav1.Now(),
 		}
 		if d.ErrorMessage != nil {
-			cond.Status = v2.ConditionFalse
+			cond.Status = metav1.ConditionFalse
 			cond.Reason = "Error"
 			cond.Message = *d.ErrorMessage
 		} else if d.SuccessMessage != nil {
-			cond.Status = v2.ConditionTrue
+			cond.Status = metav1.ConditionTrue
 			cond.Reason = "Success"
 			cond.Message = *d.SuccessMessage
 		} else {
-			cond.Status = v2.ConditionUnknown
+			cond.Status = metav1.ConditionUnknown
 			cond.Reason = "Unknown"
 			cond.Message = "No status message set"
 		}
@@ -224,17 +224,17 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, s *scope, origi
 	for _, rf := range reconcileFuncs {
 		expectedID := GetID(rf.ResourceKind, rf.ResourceName)
 		if !descendantIDs[expectedID] {
-			conditions = append(conditions, v2.Condition{
+			conditions = append(conditions, metav1.Condition{
 				Type:               expectedID,
-				Status:             v2.ConditionFalse,
+				Status:             metav1.ConditionFalse,
 				Reason:             "NotFound",
 				Message:            fmt.Sprintf("Expected resource %s of kind %s was not created", rf.ResourceName, rf.ResourceKind),
-				LastTransitionTime: v2.Now(),
+				LastTransitionTime: metav1.Now(),
 			})
 		}
 	}
 
-	ap.Status.Conditions = append([]v2.Condition{authPolicyCondition}, conditions...)
+	ap.Status.Conditions = append([]metav1.Condition{authPolicyCondition}, conditions...)
 
 	if !equality.Semantic.DeepEqual(original.Status, ap.Status) {
 		rLog.Debug(fmt.Sprintf("Updating AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
@@ -258,18 +258,54 @@ func (r *AuthPolicyReconciler) updateStatusWithRetriesOnConflict(ctx context.Con
 	})
 }
 
+func (r *AuthPolicyReconciler) fetchJWTSecrets(ctx context.Context, objectKey client.ObjectKey) (corev1.Secret, error) {
+	secretData := corev1.Secret{}
+
+	if err := r.Client.Get(ctx, objectKey, &secretData); err != nil {
+		if apierrors.IsNotFound(err) {
+			return secretData, fmt.Errorf("secret %s/%s not found", objectKey.Namespace, objectKey.Name)
+		}
+		return secretData, err
+	}
+	return secretData, nil
+}
+
 func (r *AuthPolicyReconciler) reconcileRequestAuthentication(ctx context.Context, scope *scope, resourceKind string, resourceName string) (ctrl.Result, error) {
 	authPolicy := scope.authPolicy
 
-	desired := &v1.RequestAuthentication{
+	var jwtRules []*securityv1.JWTRule
+
+	// Retrieve secrets from the authPolicy jwt rules using the secret name
+	for _, jwtRule := range authPolicy.Spec.JWTRules {
+		secretKey := client.ObjectKey{Namespace: authPolicy.Namespace, Name: jwtRule.SecretName}
+		jwtRuleSecrets, err := r.fetchJWTSecrets(ctx, secretKey)
+		if err != nil {
+			// TODO: HAndle better
+			return ctrl.Result{}, err
+		}
+
+		// Add prefix to keys from jwtRule.SecretPrefix
+		issuerKey := fmt.Sprintf("%sISSUER", jwtRule.SecretPrefix)
+		//clientIDKey := fmt.Sprintf("%sCLIENT_ID", jwtRule.SecretPrefix)
+		jwksUriKey := fmt.Sprintf("%sJWKS_URI", jwtRule.SecretPrefix)
+
+		jwtRule := &securityv1.JWTRule{
+			Issuer:    string(jwtRuleSecrets.Data[issuerKey]),
+			Audiences: jwtRule.AcceptedResources,
+			JwksUri:   string(jwtRuleSecrets.Data[jwksUriKey]),
+		}
+		jwtRules = append(jwtRules, jwtRule)
+	}
+
+	desired := &istioclientsecurityv1.RequestAuthentication{
 		ObjectMeta: buildObjectMeta(resourceName, authPolicy.Namespace),
-		Spec: v1beta1.RequestAuthentication{
-			Selector: &v1beta2.WorkloadSelector{MatchLabels: authPolicy.Spec.Selector.MatchLabels},
-			JwtRules: authPolicy.Spec.JWTRules.ToIstioRequestAuthenticationJWTRules(),
+		Spec: securityv1.RequestAuthentication{
+			Selector: &istiotypev1beta1.WorkloadSelector{MatchLabels: authPolicy.Spec.Selector.MatchLabels},
+			JwtRules: jwtRules,
 		},
 	}
 
-	return reconcileAuthPolicy[*v1.RequestAuthentication](
+	return reconcileAuthPolicy[*istioclientsecurityv1.RequestAuthentication](
 		ctx,
 		r.Client,
 		r.Scheme,
@@ -277,11 +313,11 @@ func (r *AuthPolicyReconciler) reconcileRequestAuthentication(ctx context.Contex
 		resourceKind,
 		resourceName,
 		desired,
-		func(current, desired *v1.RequestAuthentication) bool {
+		func(current, desired *istioclientsecurityv1.RequestAuthentication) bool {
 			return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
 				!reflect.DeepEqual(current.Spec.JwtRules, desired.Spec.JwtRules)
 		},
-		func(current, desired *v1.RequestAuthentication) {
+		func(current, desired *istioclientsecurityv1.RequestAuthentication) {
 			current.Spec.Selector = desired.Spec.Selector
 			current.Spec.JwtRules = desired.Spec.JwtRules
 		},
@@ -291,25 +327,33 @@ func (r *AuthPolicyReconciler) reconcileRequestAuthentication(ctx context.Contex
 func (r *AuthPolicyReconciler) reconcileIgnoreAuthAuthorizationPolicy(ctx context.Context, scope *scope, resourceKind string, resourceName string) (ctrl.Result, error) {
 	authPolicy := scope.authPolicy
 
-	desired := &v1.AuthorizationPolicy{
-		ObjectMeta: buildObjectMeta(resourceName, authPolicy.Namespace),
-		Spec: v1beta1.AuthorizationPolicy{
-			Selector: &v1beta2.WorkloadSelector{MatchLabels: authPolicy.Spec.Selector.MatchLabels},
-			Rules: []*v3.Rule{
-				{
-					To: []*v1beta1.Rule_To{
+	var rules []*securityv1.Rule
+	for _, jwtRule := range authPolicy.Spec.JWTRules {
+		if jwtRule.IgnoreAuthRules != nil {
+			for _, rule := range *jwtRule.IgnoreAuthRules {
+				rules = append(rules, &securityv1.Rule{
+					To: []*securityv1.Rule_To{
 						{
-							Operation: &v1beta1.Operation{
-								Paths: []string{"*"},
+							Operation: &securityv1.Operation{
+								Paths:   rule.Paths,
+								Methods: rule.Methods,
 							},
 						},
 					},
-				},
-			},
+				})
+			}
+		}
+	}
+
+	desired := &istioclientsecurityv1.AuthorizationPolicy{
+		ObjectMeta: buildObjectMeta(resourceName, authPolicy.Namespace),
+		Spec: securityv1.AuthorizationPolicy{
+			Selector: &istiotypev1beta1.WorkloadSelector{MatchLabels: authPolicy.Spec.Selector.MatchLabels},
+			Rules:    rules,
 		},
 	}
 
-	return reconcileAuthPolicy[*v1.AuthorizationPolicy](
+	return reconcileAuthPolicy[*istioclientsecurityv1.AuthorizationPolicy](
 		ctx,
 		r.Client,
 		r.Scheme,
@@ -317,45 +361,57 @@ func (r *AuthPolicyReconciler) reconcileIgnoreAuthAuthorizationPolicy(ctx contex
 		resourceKind,
 		resourceName,
 		desired,
-		func(current, desired *v1.AuthorizationPolicy) bool {
+		func(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
 			return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
 				!reflect.DeepEqual(current.Spec.Rules, desired.Spec.Rules)
 		},
-		func(current, desired *v1.AuthorizationPolicy) {
+		func(current, desired *istioclientsecurityv1.AuthorizationPolicy) {
 			current.Spec.Selector = desired.Spec.Selector
 			current.Spec.Rules = desired.Spec.Rules
 		},
 	)
 }
 
-func (r *AuthPolicyReconciler) reconcileRequireAuthAuthorizationPolicy(ctx context.Context, scope *scope, resourceKind string, resourceName string) (ctrl.Result, error) {
+func (r *AuthPolicyReconciler) reconcileRequireJWTAuthorizationPolicy(ctx context.Context, scope *scope, resourceKind string, resourceName string) (ctrl.Result, error) {
 	authPolicy := scope.authPolicy
 
-	desired := &v1.AuthorizationPolicy{
-		ObjectMeta: buildObjectMeta(resourceName, authPolicy.Namespace),
-		Spec: v1beta1.AuthorizationPolicy{
-			Selector: &v1beta2.WorkloadSelector{MatchLabels: authPolicy.Spec.Selector.MatchLabels},
-			Rules: []*v3.Rule{
-				{
-					To: []*v1beta1.Rule_To{
+	var rules []*securityv1.Rule
+	for _, jwtRule := range authPolicy.Spec.JWTRules {
+		if jwtRule.AuthRules != nil {
+			for _, rule := range *jwtRule.AuthRules {
+				rules = append(rules, &securityv1.Rule{
+					To: []*securityv1.Rule_To{
 						{
-							Operation: &v1beta1.Operation{
-								Paths: []string{"*"},
+							Operation: &securityv1.Operation{
+								Paths:   rule.Paths,
+								Methods: rule.Methods,
 							},
 						},
 					},
-					When: []*v1beta1.Condition{
-						{
-							Key:    "request.auth.claims[iss]",
-							Values: []string{"example-issuer"},
-						},
-					},
-				},
-			},
+					When: func() []*securityv1.Condition {
+						conditions := make([]*securityv1.Condition, len(rule.When))
+						for i := range rule.When {
+							conditions[i] = &securityv1.Condition{
+								Key:    fmt.Sprintf("request.auth.claims[%s]", rule.When[i].Claim),
+								Values: rule.When[i].Values,
+							}
+						}
+						return conditions
+					}(),
+				})
+			}
+		}
+	}
+
+	desired := &istioclientsecurityv1.AuthorizationPolicy{
+		ObjectMeta: buildObjectMeta(resourceName, authPolicy.Namespace),
+		Spec: securityv1.AuthorizationPolicy{
+			Selector: &istiotypev1beta1.WorkloadSelector{MatchLabels: authPolicy.Spec.Selector.MatchLabels},
+			Rules:    rules,
 		},
 	}
 
-	return reconcileAuthPolicy[*v1.AuthorizationPolicy](
+	return reconcileAuthPolicy[*istioclientsecurityv1.AuthorizationPolicy](
 		ctx,
 		r.Client,
 		r.Scheme,
@@ -363,11 +419,11 @@ func (r *AuthPolicyReconciler) reconcileRequireAuthAuthorizationPolicy(ctx conte
 		resourceKind,
 		resourceName,
 		desired,
-		func(current, desired *v1.AuthorizationPolicy) bool {
+		func(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
 			return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
 				!reflect.DeepEqual(current.Spec.Rules, desired.Spec.Rules)
 		},
-		func(current, desired *v1.AuthorizationPolicy) {
+		func(current, desired *istioclientsecurityv1.AuthorizationPolicy) {
 			current.Spec.Selector = desired.Spec.Selector
 			current.Spec.Rules = desired.Spec.Rules
 		},
@@ -442,8 +498,8 @@ func reconcileAuthPolicy[T client.Object](
 	return ctrl.Result{}, nil
 }
 
-func buildObjectMeta(name, namespace string) v2.ObjectMeta {
-	return v2.ObjectMeta{
+func buildObjectMeta(name, namespace string) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
 		Name:      name,
 		Namespace: namespace,
 		Labels:    map[string]string{"type": "ztoperator.kartverket.no"},

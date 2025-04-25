@@ -66,7 +66,7 @@ spec:
                         that must be met based on JWT claims.
 
 
-                        API endpoints not covered by AuthRules IgnoreAuth requires an authenticated JWT by default.
+                        API endpoints not covered by AuthRules IgnoreAuthRules requires an authenticated JWT by default.
                       items:
                         description: RequestAuthRule defines a rule for controlling
                           access to HTTP requests using JWT authentication.
@@ -155,12 +155,12 @@ spec:
                       items:
                         type: string
                       type: array
-                    ignoreAuth:
+                    ignoreAuthRules:
                       description: |-
-                        IgnoreAuth defines request matchers for HTTP requests that do not require JWT authentication.
+                        IgnoreAuthRules defines request matchers for HTTP requests that do not require JWT authentication.
 
 
-                        API endpoints not covered by AuthRules or IgnoreAuth requires an authenticated JWT by default.
+                        API endpoints not covered by AuthRules or IgnoreAuthRules requires an authenticated JWT by default.
                       items:
                         description: RequestMatcher defines paths and methods to match
                           incoming HTTP requests.
@@ -230,11 +230,19 @@ spec:
                         type: object
                       type: array
                     secretName:
-                      description: The name of the Kubernetes Secret containing OAuth2
-                        credentials.
+                      description: |-
+                        The name of the Kubernetes Secret containing OAuth2 credentials.
+                        Expected secret keys prefixed with optional SecretPrefix: CLIENT_ID, ISSUER, JWKS_URI, WELL_KNOWN_URL
+                      type: string
+                    secretPrefix:
+                      default: ""
+                      description: The prefix used for secret names in the Kubernetes
+                        Secret. Defaults to empty string.
+                      example: IDPORTEN_
                       type: string
                   required:
                   - enabled
+                  - secretName
                   type: object
                 type: array
               selector:

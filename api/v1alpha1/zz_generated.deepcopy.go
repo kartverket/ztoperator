@@ -197,8 +197,8 @@ func (in *RequestAuth) DeepCopyInto(out *RequestAuth) {
 			}
 		}
 	}
-	if in.IgnoreAuth != nil {
-		in, out := &in.IgnoreAuth, &out.IgnoreAuth
+	if in.IgnoreAuthRules != nil {
+		in, out := &in.IgnoreAuthRules, &out.IgnoreAuthRules
 		*out = new([]RequestMatcher)
 		if **in != nil {
 			in, out := *in, *out

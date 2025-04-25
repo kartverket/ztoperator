@@ -1,16 +1,17 @@
 package v1alpha1
 
 import (
-	v1 "istio.io/api/security/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // AuthPolicySpec defines the desired state of AuthPolicy.
 type AuthPolicySpec struct {
 	// JWTRules specifies how incoming requests should be allowed or denied based on the presence and validation of accompanying JWTs.
-	JWTRules RequestAuthList `json:"jwtRules"`
+	// +kubebuilder:validation:Required
+	JWTRules RequestAuthList `json:"jwtRules"` // TODO: Consider renaming to rules
 
 	// Selector specifies which workload the defined auth policy should be applied to.
+	// +kubebuilder:validation:Required
 	Selector WorkloadSelector `json:"selector"`
 }
 
@@ -35,9 +36,17 @@ type RequestAuth struct {
 	Enabled bool `json:"enabled"`
 
 	// The name of the Kubernetes Secret containing OAuth2 credentials.
+	// Expected secret keys prefixed with optional SecretPrefix: CLIENT_ID, ISSUER, JWKS_URI, WELL_KNOWN_URL
 	//
-	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Required
 	SecretName string `json:"secretName"`
+
+	// The prefix used for secret names in the Kubernetes Secret. Defaults to empty string.
+	//
+	// +kubebuilder:default=""
+	// +kubebuilder:example="IDPORTEN_"
+	// +kubebuilder:validation:Optional
+	SecretPrefix string `json:"secretPrefix"`
 
 	// If set to `true`, the original token will be kept for the upstream request. Defaults to `true`.
 	// +kubebuilder:default=true
@@ -77,17 +86,17 @@ type RequestAuth struct {
 	// AuthRules defines rules for allowing HTTP requests based on conditions
 	// that must be met based on JWT claims.
 	//
-	// API endpoints not covered by AuthRules IgnoreAuth requires an authenticated JWT by default.
+	// API endpoints not covered by AuthRules IgnoreAuthRules requires an authenticated JWT by default.
 	//
 	// +kubebuilder:validation:Optional
 	AuthRules *[]RequestAuthRule `json:"authRules,omitempty"`
 
-	// IgnoreAuth defines request matchers for HTTP requests that do not require JWT authentication.
+	// IgnoreAuthRules defines request matchers for HTTP requests that do not require JWT authentication.
 	//
-	// API endpoints not covered by AuthRules or IgnoreAuth requires an authenticated JWT by default.
+	// API endpoints not covered by AuthRules or IgnoreAuthRules requires an authenticated JWT by default.
 	//
 	// +kubebuilder:validation:Optional
-	IgnoreAuth *[]RequestMatcher `json:"ignoreAuth,omitempty"`
+	IgnoreAuthRules *[]RequestMatcher `json:"ignoreAuthRules,omitempty"` // TODO: Consider renaming to IgnoreAuthRules
 }
 
 // ClaimToHeader specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.
@@ -226,17 +235,4 @@ func (ap *AuthPolicy) InitializeStatus() {
 	ap.Status.ObservedGeneration = ap.GetGeneration()
 	ap.Status.Ready = false
 	ap.Status.Phase = PhasePending
-}
-
-func (r *RequestAuthList) ToIstioRequestAuthenticationJWTRules() []*v1.JWTRule {
-	var jwtRules []*v1.JWTRule
-	for _ = range *r {
-		jwtRule := &v1.JWTRule{
-			Issuer:    "https://example-issuer.com",
-			Audiences: []string{"example-audience"},
-			JwksUri:   "https://example-issuer.com/jwks",
-		}
-		jwtRules = append(jwtRules, jwtRule)
-	}
-	return jwtRules
 }
