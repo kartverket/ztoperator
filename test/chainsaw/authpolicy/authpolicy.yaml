@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: jwt-secret
+stringData:
+  CLIENT_ID: "my-client"
+  ISSUER: "http://localhost:8080/default"
+  JWKS_URI: "http://mock-oauth2.auth:8080/default/jwks"
+---
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+spec:
+  jwtRules:
+    - enabled: true
+      secretName: jwt-secret
+      ignoreAuthRules:
+        - paths:
+            - /robots.txt
+          methods:
+            - GET
+      authRules:
+        - paths:
+            - /
+            - /deny
+          methods:
+            - GET
+          when:
+            - claim: sub
+              values:
+                - "*"
+        - paths:
+            - /post
+          methods:
+            - POST
+          when:
+            - claim: sub
+              values:
+                - "*"
+  selector:
+    matchLabels:
+      app: application-auth

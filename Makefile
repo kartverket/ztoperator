@@ -1,58 +1,5 @@
-# VERSION defines the project version for the bundle.
-# Update this value when you upgrade the version of your project.
-# To re-generate a bundle for another specific version without changing the standard setup, you can:
-# - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
-# - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 0.0.1
-
-# CHANNELS define the bundle channels used in the bundle.
-# Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
-# To re-generate a bundle for other specific channels without changing the standard setup, you can:
-# - use the CHANNELS as arg of the bundle target (e.g make bundle CHANNELS=candidate,fast,stable)
-# - use environment variables to overwrite this value (e.g export CHANNELS="candidate,fast,stable")
-ifneq ($(origin CHANNELS), undefined)
-BUNDLE_CHANNELS := --channels=$(CHANNELS)
-endif
-
-# DEFAULT_CHANNEL defines the default channel used in the bundle.
-# Add a new line here if you would like to change its default config. (E.g DEFAULT_CHANNEL = "stable")
-# To re-generate a bundle for any other default channel without changing the default setup, you can:
-# - use the DEFAULT_CHANNEL as arg of the bundle target (e.g make bundle DEFAULT_CHANNEL=stable)
-# - use environment variables to overwrite this value (e.g export DEFAULT_CHANNEL="stable")
-ifneq ($(origin DEFAULT_CHANNEL), undefined)
-BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
-endif
-BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
-
-# IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
-# This variable is used to construct full image tags for bundle and catalog images.
-#
-# For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# kartverket.no/ztoperator-bundle:$VERSION and kartverket.no/ztoperator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= kartverket.no/ztoperator
-
-# BUNDLE_IMG defines the image:tag used for the bundle.
-# You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
-BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:v$(VERSION)
-
-# BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
-BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
-
-# USE_IMAGE_DIGESTS defines if images are resolved via tags or digests
-# You can enable this value if you would like to use SHA Based Digests
-# To enable set flag to true
-USE_IMAGE_DIGESTS ?= false
-ifeq ($(USE_IMAGE_DIGESTS), true)
-	BUNDLE_GEN_FLAGS += --use-image-digests
-endif
-
-# Set the Operator SDK version to use. By default, what is installed on the system is used.
-# This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
-OPERATOR_SDK_VERSION ?= v1.38.0
-# Image URL to use all building/pushing image targets
-IMG ?= controller:latest
-# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.30.0
+SHELL = /usr/bin/env bash -o pipefail
+.SHELLFLAGS = -ec
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -61,25 +8,6 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-# CONTAINER_TOOL defines the container tool to be used for building images.
-# Be aware that the target commands are only tested with Docker which is
-# scaffolded by default. However, you might want to replace it to use other
-# tools. (i.e. podman)
-CONTAINER_TOOL ?= docker
-
-# Setting SHELL to bash allows bash commands to be executed by recipes.
-# Options are set to exit when a recipe line exits non-zero or a piped command fails.
-SHELL = /usr/bin/env bash -o pipefail
-.SHELLFLAGS = -ec
-
-
-#### CUSTOM VARS ####
-ZTOPERATOR_CONTEXT         ?= kind-$(KIND_CLUSTER_NAME)
-KUBERNETES_VERSION          = 1.31.4
-KIND_IMAGE                 ?= kindest/node:v$(KUBERNETES_VERSION)
-KIND_CLUSTER_NAME          ?= ztoperator
-
-$(shell mkdir -p bin)
 export OS   := $(shell if [ "$(shell uname)" = "Darwin" ]; then echo "darwin"; else echo "linux"; fi)
 export ARCH := $(shell if [ "$(shell uname -m)" = "x86_64" ]; then echo "amd64"; else echo "arm64"; fi)
 
@@ -87,29 +15,40 @@ export ARCH := $(shell if [ "$(shell uname -m)" = "x86_64" ]; then echo "amd64";
 # Makes the test setup be in sync with what the operator itself uses.
 extract-version = $(shell cat go.mod | grep $(1) | awk '{$$1=$$1};1' | cut -d' ' -f2 | sed 's/^v//')
 
-#### TOOLS ####
-TOOLS_DIR                          := $(PWD)/.tools
-KIND                               := $(TOOLS_DIR)/kind
-KIND_VERSION                       := v0.26.0
-CHAINSAW_VERSION                   := $(call extract-version,github.com/kyverno/chainsaw)
-CONTROLLER_GEN_VERSION             := $(call extract-version,sigs.k8s.io/controller-tools)
-ISTIO_VERSION                      := $(call extract-version,istio.io/client-go)
+CONTAINER_TOOL             ?= docker
+OPERATOR_SDK_VERSION       ?= v1.38.0
+IMG                        ?= ztoperator:latest
+KIND_CLUSTER_NAME          ?= ztoperator
+KUBECONTEXT                ?= kind-$(KIND_CLUSTER_NAME)
+KUBERNETES_VERSION          = 1.31.4
+ENVTEST_K8S_VERSION         = $(KUBERNETES_VERSION)
+KIND_IMAGE                 ?= kindest/node:v$(KUBERNETES_VERSION)
+CHAINSAW_VERSION           := $(call extract-version,github.com/kyverno/chainsaw)
+CONTROLLER_GEN_VERSION     := $(call extract-version,sigs.k8s.io/controller-tools)
+ISTIO_VERSION              := $(call extract-version,istio.io/client-go)
+
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
+
+## Tool Binaries
+KUBECTL        ?= kubectl
+KUSTOMIZE      ?= $(LOCALBIN)/kustomize
+CHAINSAW       ?= $(LOCALBIN)/chainsaw
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+ENVTEST        ?= $(LOCALBIN)/setup-envtest
+GOLANGCI_LINT   = $(LOCALBIN)/golangci-lint
+
+## Tool Versions
+KUSTOMIZE_VERSION ?= v5.4.2
+CONTROLLER_TOOLS_VERSION ?= v0.15.0
+ENVTEST_VERSION ?= release-0.18
+GOLANGCI_LINT_VERSION ?= v1.59.1
+
 
 .PHONY: all
 all: build
-
-##@ General
-
-# The help target prints out all targets with their descriptions organized
-# beneath their categories. The categories are represented by '##@' and the
-# target descriptions by '##'. The awk command is responsible for reading the
-# entire set of makefiles included in this invocation, looking for lines of the
-# file as xyz: ## something, and then pretty-format the target and help. Then,
-# if there's a line with ##@ something, that gets pretty-printed as a category.
-# More info on the usage of ANSI control characters for terminal formatting:
-# https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_parameters
-# More info on the awk command:
-# http://linuxcommand.org/lc3_adv_awk.php
 
 .PHONY: help
 help: ## Display this help.
@@ -133,9 +72,9 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
-.PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+#.PHONY: test
+#test: manifests generate fmt vet envtest ## Run tests.
+#	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 # Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
 .PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
@@ -202,41 +141,22 @@ endif
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) --context $(ZTOPERATOR_CONTEXT) apply -f -
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) --context $(KUBECONTEXT) apply -f -
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) --context $(ZTOPERATOR_CONTEXT) delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) --context $(KUBECONTEXT) delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | $(KUBECTL) --context $(ZTOPERATOR_CONTEXT) apply -f -
+	$(KUSTOMIZE) build config/default | $(KUBECTL) --context $(KUBECONTEXT) apply -f -
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | $(KUBECTL) --context $(ZTOPERATOR_CONTEXT) delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/default | $(KUBECTL) --context $(KUBECONTEXT) delete --ignore-not-found=$(ignore-not-found) -f -
 
 ##@ Dependencies
-
-## Location to install dependencies to
-LOCALBIN ?= $(shell pwd)/bin
-$(LOCALBIN):
-	mkdir -p $(LOCALBIN)
-
-## Tool Binaries
-KUBECTL ?= kubectl
-KUSTOMIZE ?= $(LOCALBIN)/kustomize
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-ENVTEST ?= $(LOCALBIN)/setup-envtest
-GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
-
-## Tool Versions
-KUSTOMIZE_VERSION ?= v5.4.2
-CONTROLLER_TOOLS_VERSION ?= v0.15.0
-ENVTEST_VERSION ?= release-0.18
-GOLANGCI_LINT_VERSION ?= v1.59.1
-
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
@@ -257,6 +177,11 @@ golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 
+.PHONY: chainsaw
+chainsaw: $(CHAINSAW) ## Download chainsaw locally if necessary.
+$(CHAINSAW): $(LOCALBIN)
+	$(call go-install-tool,$(CHAINSAW),github.com/kyverno/chainsaw,v$(CHAINSAW_VERSION))
+
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
 # $2 - package url which can be installed
@@ -273,94 +198,17 @@ mv $(1) $(1)-$(3) ;\
 ln -sf $(1)-$(3) $(1)
 endef
 
-.PHONY: operator-sdk
-OPERATOR_SDK ?= $(LOCALBIN)/operator-sdk
-operator-sdk: ## Download operator-sdk locally if necessary.
-ifeq (,$(wildcard $(OPERATOR_SDK)))
-ifeq (, $(shell which operator-sdk 2>/dev/null))
-	@{ \
-	set -e ;\
-	mkdir -p $(dir $(OPERATOR_SDK)) ;\
-	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPERATOR_SDK) https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/operator-sdk_$${OS}_$${ARCH} ;\
-	chmod +x $(OPERATOR_SDK) ;\
-	}
-else
-OPERATOR_SDK = $(shell which operator-sdk)
-endif
-endif
-
-.PHONY: bundle
-bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metadata, then validate generated files.
-	$(OPERATOR_SDK) generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle $(BUNDLE_GEN_FLAGS)
-	$(OPERATOR_SDK) bundle validate ./bundle
-
-.PHONY: bundle-build
-bundle-build: ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
-
-.PHONY: bundle-push
-bundle-push: ## Push the bundle image.
-	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
-
-.PHONY: opm
-OPM = $(LOCALBIN)/opm
-opm: ## Download opm locally if necessary.
-ifeq (,$(wildcard $(OPM)))
-ifeq (,$(shell which opm 2>/dev/null))
-	@{ \
-	set -e ;\
-	mkdir -p $(dir $(OPM)) ;\
-	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.23.0/$${OS}-$${ARCH}-opm ;\
-	chmod +x $(OPM) ;\
-	}
-else
-OPM = $(shell which opm)
-endif
-endif
-
-# A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
-# These images MUST exist in a registry and be pull-able.
-BUNDLE_IMGS ?= $(BUNDLE_IMG)
-
-# The image tag given to the resulting catalog image (e.g. make catalog-build CATALOG_IMG=example.com/operator-catalog:v0.2.0).
-CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:v$(VERSION)
-
-# Set CATALOG_BASE_IMG to an existing catalog image tag to add $BUNDLE_IMGS to that image.
-ifneq ($(origin CATALOG_BASE_IMG), undefined)
-FROM_INDEX_OPT := --from-index $(CATALOG_BASE_IMG)
-endif
-
-# Build a catalog image by adding bundle images to an empty catalog using the operator package manager tool, 'opm'.
-# This recipe invokes 'opm' in 'semver' bundle add mode. For more information on add modes, see:
-# https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
-.PHONY: catalog-build
-catalog-build: opm ## Build a catalog image.
-	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
-
-# Push the catalog image.
-.PHONY: catalog-push
-catalog-push: ## Push a catalog image.
-	$(MAKE) docker-push IMG=$(CATALOG_IMG)
-
 
 ### CUSTOM TARGETS ###
-
 .PHONY: run-local
 run-local: build install
-	#kubectl --context ${ZTOPERATOR_CONTEXT} apply -f config/ --recursive
 	./bin/ztoperator
 
 .PHONY: setup-local
 setup-local: kind-cluster install-istio install
-	@echo "Cluster $(ZTOPERATOR_CONTEXT) is setup"
-
+	@echo "Cluster $(KUBECONTEXT) is setup"
 
 #### KIND ####
-
 .PHONY: kind-cluster check-kind
 check-kind:
 	@which kind >/dev/null || (echo "kind not installed, please install it to proceed"; exit 1)
@@ -371,28 +219,80 @@ kind-cluster: check-kind
 	@kind create cluster --image $(KIND_IMAGE) --name ${KIND_CLUSTER_NAME}
 
 
+.PHONY: install-skiperator
+install-skiperator:
+	@kubectl create namespace skiperator-system --context $(KUBECONTEXT) || true
+	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-skiperator.sh
+
 #### ZTOPERATOR DEPENDENCIES ####
 
 .PHONY: install-istio
 install-istio:
 	@echo "Creating istio-gateways namespace..."
-	@kubectl create namespace istio-gateways --context $(ZTOPERATOR_CONTEXT) || true
+	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) || true
 	@echo "Downloading Istio..."
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
 	@echo "Installing Istio on Kubernetes cluster..."
-	@./istio-$(ISTIO_VERSION)/bin/istioctl install -y --context $(ZTOPERATOR_CONTEXT) \
-		--set meshConfig.accessLogFile=/dev/stdout \
-		--set profile=minimal
+	@./istio-$(ISTIO_VERSION)/bin/istioctl install -y --context $(KUBECONTEXT) --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal
 	@echo "Installing istio-gateways"
-	@helm --kube-context $(ZTOPERATOR_CONTEXT) install istio-ingressgateway istio/gateway -n istio-gateways --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	@helm --kube-context $(KUBECONTEXT) install istio-ingressgateway istio/gateway -n istio-gateways --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
 	@echo "Istio installation complete."
 
-.PHONY: install-ztoperator
-install-ztoperator: generate
-	@kubectl create namespace ztoperator-system --context $(ZTOPERATOR_CONTEXT) || true
-	@kubectl apply -f config/ --recursive --context $(ZTOPERATOR_CONTEXT)
-	@kubectl apply -f tests/cluster-config/ --recursive --context $(ZTOPERATOR_CONTEXT) || true
+.PHONY: install-sample
+install-sample:
+	@kubectl apply -f samples/ --recursive --context $(KUBECONTEXT)
 
-.PHONY: install-test-tools
-install-test-tools:
-	go install github.com/kyverno/chainsaw@v${CHAINSAW_VERSION}
+#.PHONY: install-ztoperator
+#install-ztoperator: generate
+#	@kubectl create namespace ztoperator-system --context $(KUBECONTEXT) || true
+#	@kubectl apply -f config/ --recursive --context $(KUBECONTEXT)
+#	@kubectl apply -f tests/cluster-config/ --recursive --context $(KUBECONTEXT) || true
+
+#.PHONY: install-test-tools
+#install-test-tools:
+#	go install github.com/kyverno/chainsaw@v${CHAINSAW_VERSION}
+
+#### TESTS ####
+.PHONY: test-single
+test-single: chainsaw install
+	@./bin/chainsaw test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
+    echo "Test succeeded" || (echo "Test failed" && exit 1)
+
+.PHONY: test
+export IMAGE_PULL_0_REGISTRY := ghcr.io
+export IMAGE_PULL_1_REGISTRY := https://index.docker.io/v1/
+export IMAGE_PULL_0_TOKEN :=
+export IMAGE_PULL_1_TOKEN :=
+test: chainsaw install
+	@./bin/chainsaw test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir test/ && \
+    echo "Test succeeded" || (echo "Test failed" && exit 1)
+
+.PHONY: run-unit-tests
+run-unit-tests:
+	@failed_tests=$$(go test ./... 2>&1 | grep "^FAIL" | awk '{print $$2}'); \
+		if [ -n "$$failed_tests" ]; then \
+			echo -e "\033[31mFailed Unit Tests: [$$failed_tests]\033[0m" && exit 1; \
+		else \
+			echo -e "\033[32mAll unit tests passed\033[0m"; \
+		fi
+
+.PHONY: run-test
+export IMAGE_PULL_0_REGISTRY := ghcr.io
+export IMAGE_PULL_1_REGISTRY := https://index.docker.io/v1/
+export IMAGE_PULL_0_TOKEN :=
+export IMAGE_PULL_1_TOKEN :=
+run-test: build
+	@echo "Starting ztoperator in background..."
+	@LOG_FILE=$$(mktemp -t ztoperator-test.XXXXXXX); \
+	./bin/ztoperator -e error > "$$LOG_FILE" 2>&1 & \
+	PID=$$!; \
+	echo "ztoperator PID: $$PID"; \
+	echo "Log redirected to file: $$LOG_FILE"; \
+	( \
+		if [ -z "$(TEST_DIR)" ]; then \
+			$(MAKE) test; \
+		else \
+			$(MAKE) test-single dir=$(TEST_DIR); \
+		fi; \
+	) && \
+	(echo "Stopping ztoperator (PID $$PID)..." && kill $$PID && echo "running unit tests..." && $(MAKE) run-unit-tests)  || (echo "Test or ztoperator failed. Stopping ztoperator (PID $$PID)" && kill $$PID && exit 1)

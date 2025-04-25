@@ -1,0 +1,15 @@
+apiVersion: skiperator.kartverket.no/v1alpha1
+kind: Application
+metadata:
+  name: application-auth
+spec:
+  image: ghcr.io/mccutchen/go-httpbin:latest
+  port: 8080
+  replicas: 1
+  ingresses:
+    - foo.bar
+  accessPolicy:
+    outbound:
+      rules:
+        - application: mock-oauth2
+          namespace: auth

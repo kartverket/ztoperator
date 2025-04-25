@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: skiperator
+    app.kubernetes.io/name: application-auth
+    application.skiperator.no/app: application-auth
+    application.skiperator.no/app-name: application-auth
+    skiperator.kartverket.no/controller: application
+  name: application-auth
+spec:
+  selector:
+    matchLabels:
+      app: application-auth
+  template:
+    metadata:
+      labels:
+        app: application-auth
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: application-auth
+    security.istio.io/tlsMode: istio
+status:
+  phase: Running
