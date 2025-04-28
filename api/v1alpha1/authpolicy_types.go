@@ -6,11 +6,11 @@ import (
 
 // AuthPolicySpec defines the desired state of AuthPolicy.
 type AuthPolicySpec struct {
-	// JWTRules specifies how incoming requests should be allowed or denied based on the presence and validation of accompanying JWTs.
+	// Rules specifies how incoming requests should be allowed or denied based on the presence and validation of accompanying JWTs.
 	// +kubebuilder:validation:Required
-	JWTRules RequestAuthList `json:"jwtRules"` // TODO: Consider renaming to rules
+	Rules RequestAuthList `json:"rules"`
 
-	// Selector specifies which workload the defined auth policy should be applied to.
+	// The Selector specifies which workload the defined auth policy should be applied to.
 	// +kubebuilder:validation:Required
 	Selector WorkloadSelector `json:"selector"`
 }
@@ -76,7 +76,7 @@ type RequestAuth struct {
 	// AcceptedResources is used as a validation field following [RFC8707](https://datatracker.ietf.org/doc/html/rfc8707).
 	// It defines accepted audience resource indicators in the JWT token.
 	//
-	// Each resource indicator must be a valid URI and the indicator must be present as the `aud` claim in the JWT token.
+	// Each resource indicator must be a valid URI, and the indicator must be present as the `aud` claim in the JWT token.
 	//
 	// +kubebuilder:validation:Optional
 	// +listType=set
@@ -86,17 +86,17 @@ type RequestAuth struct {
 	// AuthRules defines rules for allowing HTTP requests based on conditions
 	// that must be met based on JWT claims.
 	//
-	// API endpoints not covered by AuthRules IgnoreAuthRules requires an authenticated JWT by default.
+	// API endpoints not covered by AuthRules and/or IgnoreAuthRules requires an authenticated JWT by default.
 	//
 	// +kubebuilder:validation:Optional
 	AuthRules *[]RequestAuthRule `json:"authRules,omitempty"`
 
 	// IgnoreAuthRules defines request matchers for HTTP requests that do not require JWT authentication.
 	//
-	// API endpoints not covered by AuthRules or IgnoreAuthRules requires an authenticated JWT by default.
+	// API endpoints not covered by AuthRules or IgnoreAuthRules require an authenticated JWT by default.
 	//
 	// +kubebuilder:validation:Optional
-	IgnoreAuthRules *[]RequestMatcher `json:"ignoreAuthRules,omitempty"` // TODO: Consider renaming to IgnoreAuthRules
+	IgnoreAuthRules *[]RequestMatcher `json:"ignoreAuthRules,omitempty"`
 }
 
 // ClaimToHeader specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.

@@ -12,7 +12,7 @@ kind: AuthPolicy
 metadata:
   name: auth-policy
 spec:
-  jwtRules:
+  rules:
     - enabled: true
       secretName: jwt-secret
       ignoreAuthRules:

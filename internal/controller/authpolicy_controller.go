@@ -276,7 +276,7 @@ func (r *AuthPolicyReconciler) reconcileRequestAuthentication(ctx context.Contex
 	var jwtRules []*securityv1.JWTRule
 
 	// Retrieve secrets from the authPolicy jwt rules using the secret name
-	for _, jwtRule := range authPolicy.Spec.JWTRules {
+	for _, jwtRule := range authPolicy.Spec.Rules {
 		secretKey := client.ObjectKey{Namespace: authPolicy.Namespace, Name: jwtRule.SecretName}
 		jwtRuleSecrets, err := r.fetchJWTSecrets(ctx, secretKey)
 		if err != nil {
@@ -328,7 +328,7 @@ func (r *AuthPolicyReconciler) reconcileIgnoreAuthAuthorizationPolicy(ctx contex
 	authPolicy := scope.authPolicy
 
 	var rules []*securityv1.Rule
-	for _, jwtRule := range authPolicy.Spec.JWTRules {
+	for _, jwtRule := range authPolicy.Spec.Rules {
 		if jwtRule.IgnoreAuthRules != nil {
 			for _, rule := range *jwtRule.IgnoreAuthRules {
 				rules = append(rules, &securityv1.Rule{
@@ -376,7 +376,7 @@ func (r *AuthPolicyReconciler) reconcileRequireJWTAuthorizationPolicy(ctx contex
 	authPolicy := scope.authPolicy
 
 	var rules []*securityv1.Rule
-	for _, jwtRule := range authPolicy.Spec.JWTRules {
+	for _, jwtRule := range authPolicy.Spec.Rules {
 		if jwtRule.AuthRules != nil {
 			for _, rule := range *jwtRule.AuthRules {
 				rules = append(rules, &securityv1.Rule{
