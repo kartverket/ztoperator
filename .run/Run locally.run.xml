@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Run locally" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="ztoperator" />
+    <working_directory value="$PROJECT_DIR$" />
+    <kind value="FILE" />
+    <package value="github.com/kartverket/ztoperator" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/cmd/main.go" />
+    <method v="2">
+      <option name="RunConfigurationTask" enabled="false" run_configuration_name="Build" run_configuration_type="MAKEFILE_TARGET_RUN_CONFIGURATION" />
+    </method>
+  </configuration>
+</component>
