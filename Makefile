@@ -37,13 +37,11 @@ KUBECTL        ?= kubectl
 KUSTOMIZE      ?= $(LOCALBIN)/kustomize
 CHAINSAW       ?= $(LOCALBIN)/chainsaw
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-ENVTEST        ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT   = $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.2
 CONTROLLER_TOOLS_VERSION ?= v0.15.0
-ENVTEST_VERSION ?= release-0.18
 GOLANGCI_LINT_VERSION ?= v1.59.1
 
 
@@ -71,15 +69,6 @@ fmt: ## Run go fmt against code.
 .PHONY: vet
 vet: ## Run go vet against code.
 	go vet ./...
-
-#.PHONY: test
-#test: manifests generate fmt vet envtest ## Run tests.
-#	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
-
-# Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
-.PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
-test-e2e:
-	go test ./test/e2e/ -v -ginkgo.v
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
@@ -127,12 +116,6 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	- $(CONTAINER_TOOL) buildx rm ztoperator-builder
 	rm Dockerfile.cross
 
-.PHONY: build-installer
-build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
-	mkdir -p dist
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default > dist/install.yaml
-
 ##@ Deployment
 
 ifndef ignore-not-found
@@ -166,11 +149,6 @@ $(KUSTOMIZE): $(LOCALBIN)
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
 $(CONTROLLER_GEN): $(LOCALBIN)
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
-
-.PHONY: envtest
-envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
-$(ENVTEST): $(LOCALBIN)
-	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
 
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
@@ -241,16 +219,6 @@ install-istio:
 .PHONY: install-sample
 install-sample:
 	@kubectl apply -f samples/ --recursive --context $(KUBECONTEXT)
-
-#.PHONY: install-ztoperator
-#install-ztoperator: generate
-#	@kubectl create namespace ztoperator-system --context $(KUBECONTEXT) || true
-#	@kubectl apply -f config/ --recursive --context $(KUBECONTEXT)
-#	@kubectl apply -f tests/cluster-config/ --recursive --context $(KUBECONTEXT) || true
-
-#.PHONY: install-test-tools
-#install-test-tools:
-#	go install github.com/kyverno/chainsaw@v${CHAINSAW_VERSION}
 
 #### TESTS ####
 .PHONY: test-single
