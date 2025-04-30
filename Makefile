@@ -28,6 +28,9 @@ CONTROLLER_GEN_VERSION     := $(call extract-version,sigs.k8s.io/controller-tool
 ISTIO_VERSION              := $(call extract-version,istio.io/client-go)
 
 ## Location to install dependencies to
+VENV := venv
+PYTHON := $(VENV)/bin/python
+PIP := $(VENV)/bin/pip
 LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
@@ -164,6 +167,13 @@ $(CHAINSAW): $(LOCALBIN)
 helm:
 	# Check if istio helm repo is installed and add if not
 	@helm repo list | grep istio || (echo "Adding istio helm repo..." && helm repo add istio https://istio-release.storage.googleapis.com/charts && helm repo update)
+
+.PHONY: virtualenv
+virtualenv:
+	@which python3 >/dev/null || (echo "Python3 not installed, please install it to proceed"; exit 1)
+	# Set up virtualenv, activate it and install required packages
+	@python3 -m venv $(VENV)
+	@$(PIP) install -r scripts/requirements.txt
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
