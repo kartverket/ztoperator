@@ -160,6 +160,11 @@ chainsaw: $(CHAINSAW) ## Download chainsaw locally if necessary.
 $(CHAINSAW): $(LOCALBIN)
 	$(call go-install-tool,$(CHAINSAW),github.com/kyverno/chainsaw,v$(CHAINSAW_VERSION))
 
+.PHONY: helm
+helm:
+	# Check if istio helm repo is installed and add if not
+	@helm repo list | grep istio || (echo "Adding istio helm repo..." && helm repo add istio https://istio-release.storage.googleapis.com/charts && helm repo update)
+
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
 # $2 - package url which can be installed
@@ -183,11 +188,11 @@ run-local: build install
 	./bin/ztoperator
 
 .PHONY: setup-local
-setup-local: kind-cluster install-istio install
+setup-local: kind-cluster install-istio-gateways install
 	@echo "Cluster $(KUBECONTEXT) is setup"
 
 #### KIND ####
-.PHONY: kind-cluster check-kind
+.PHONY: check-kind
 check-kind:
 	@which kind >/dev/null || (echo "kind not installed, please install it to proceed"; exit 1)
 
@@ -205,16 +210,20 @@ install-skiperator:
 #### ZTOPERATOR DEPENDENCIES ####
 
 .PHONY: install-istio
-install-istio:
-	@echo "Creating istio-gateways namespace..."
-	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) || true
+install-istio: helm
 	@echo "Downloading Istio..."
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
 	@echo "Installing Istio on Kubernetes cluster..."
 	@./istio-$(ISTIO_VERSION)/bin/istioctl install -y --context $(KUBECONTEXT) --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal
+	@echo "Istio installation complete."
+
+.PHONY: install-istio-gateways
+install-istio-gateways: install-istio helm
+	@echo "Creating istio-gateways namespace..."
+	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) || true
 	@echo "Installing istio-gateways"
 	@helm --kube-context $(KUBECONTEXT) install istio-ingressgateway istio/gateway -n istio-gateways --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
-	@echo "Istio installation complete."
+	@echo "Istio gateways installed."
 
 .PHONY: install-sample
 install-sample:
