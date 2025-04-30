@@ -5,6 +5,7 @@ import (
 	"fmt"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/pkg/log"
+	"github.com/nais/digdirator/pkg/secrets"
 	securityv1 "istio.io/api/security/v1"
 	istiotypev1beta1 "istio.io/api/type/v1beta1"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
@@ -13,6 +14,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -46,8 +48,8 @@ type reconcileFunc struct {
 }
 
 type scope struct {
-	authPolicy  *ztoperatorv1alpha1.AuthPolicy
-	descendants []descendant[client.Object]
+	resolvedAuthPolicy *resolvedAuthPolicy
+	descendants        []descendant[client.Object]
 }
 
 type descendant[T client.Object] struct {
@@ -55,6 +57,18 @@ type descendant[T client.Object] struct {
 	Object         T
 	ErrorMessage   *string
 	SuccessMessage *string
+}
+
+type resolvedAuthPolicy struct {
+	AuthPolicy    *ztoperatorv1alpha1.AuthPolicy
+	ResolvedRules []resolvedRule
+}
+
+type resolvedRule struct {
+	Rule      ztoperatorv1alpha1.RequestAuth
+	Audience  []string
+	JwksUri   string
+	IssuerUri string
 }
 
 // +kubebuilder:rbac:groups=ztoperator.kartverket.no,resources=authpolicies,verbs=get;list;watch;create;update;patch;delete
@@ -85,8 +99,6 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	authPolicy.InitializeStatus()
 	originalAuthPolicy := authPolicy.DeepCopy()
 
-	s := &scope{authPolicy: authPolicy}
-
 	reconcileFuncs := []reconcileFunc{
 		{
 			ResourceKind: "RequestAuthentication",
@@ -110,6 +122,14 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
+	resolved, err := r.getResolvedAuthPolicy(ctx, authPolicy)
+	if err != nil {
+		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.NamespacedName.String()))
+		return reconcile.Result{}, err
+	}
+
+	s := &scope{resolvedAuthPolicy: resolved}
+
 	defer func() {
 		r.updateStatus(ctx, s, originalAuthPolicy, reconcileFuncs)
 	}()
@@ -123,10 +143,10 @@ func (r *AuthPolicyReconciler) doReconcile(ctx context.Context, reconcileFuncs [
 	for _, rf := range reconcileFuncs {
 		reconcileResult, err := rf.Func(ctx, s, rf.ResourceKind, rf.ResourceName)
 		if err != nil {
-			r.Recorder.Eventf(s.authPolicy, "Warning", fmt.Sprintf("%sReconcileFailed", rf.ResourceKind), fmt.Sprintf("%s with name %s failed during reconciliation.", rf.ResourceKind, rf.ResourceName))
+			r.Recorder.Eventf(s.resolvedAuthPolicy.AuthPolicy, "Warning", fmt.Sprintf("%sReconcileFailed", rf.ResourceKind), fmt.Sprintf("%s with name %s failed during reconciliation.", rf.ResourceKind, rf.ResourceName))
 			errs = append(errs, err)
 		} else {
-			r.Recorder.Eventf(s.authPolicy, "Normal", fmt.Sprintf("%sReconciledSuccessfully", rf.ResourceKind), fmt.Sprintf("%s with name %s reconciled successfully.", rf.ResourceKind, rf.ResourceName))
+			r.Recorder.Eventf(s.resolvedAuthPolicy.AuthPolicy, "Normal", fmt.Sprintf("%sReconciledSuccessfully", rf.ResourceKind), fmt.Sprintf("%s with name %s reconciled successfully.", rf.ResourceKind, rf.ResourceName))
 		}
 		if len(errs) > 0 {
 			continue
@@ -135,10 +155,10 @@ func (r *AuthPolicyReconciler) doReconcile(ctx context.Context, reconcileFuncs [
 	}
 
 	if len(errs) > 0 {
-		r.Recorder.Eventf(s.authPolicy, "Warning", "ReconcileFailed", "AuthPolicy failed during reconciliation")
+		r.Recorder.Eventf(s.resolvedAuthPolicy.AuthPolicy, "Warning", "ReconcileFailed", "AuthPolicy failed during reconciliation")
 		return ctrl.Result{}, errors.NewAggregate(errs)
 	}
-	r.Recorder.Eventf(s.authPolicy, "Normal", "ReconcileSuccess", "AuthPolicy reconciled successfully")
+	r.Recorder.Eventf(s.resolvedAuthPolicy.AuthPolicy, "Normal", "ReconcileSuccess", "AuthPolicy reconciled successfully")
 	return result, nil
 }
 
@@ -160,10 +180,10 @@ func lowestNonZeroResult(i, j ctrl.Result) ctrl.Result {
 }
 
 func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, s *scope, original *ztoperatorv1alpha1.AuthPolicy, reconcileFuncs []reconcileFunc) {
-	ap := s.authPolicy
+	ap := s.resolvedAuthPolicy.AuthPolicy
 	rLog := log.GetLogger(ctx)
 	rLog.Debug(fmt.Sprintf("Updating AuthPolicy status for %s/%s", ap.Namespace, ap.Name))
-	r.Recorder.Eventf(s.authPolicy, "Normal", "StatusUpdateStarted", "Status update of AuthPolicy started.")
+	r.Recorder.Eventf(ap, "Normal", "StatusUpdateStarted", "Status update of AuthPolicy started.")
 
 	ap.Status.ObservedGeneration = ap.GetGeneration()
 	authPolicyCondition := metav1.Condition{
@@ -240,9 +260,9 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, s *scope, origi
 		rLog.Debug(fmt.Sprintf("Updating AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
 		if err := r.updateStatusWithRetriesOnConflict(ctx, ap); err != nil {
 			rLog.Error(err, fmt.Sprintf("Failed to update AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
-			r.Recorder.Eventf(s.authPolicy, "Warning", "StatusUpdateFailed", "Status update of AuthPolicy failed.")
+			r.Recorder.Eventf(ap, "Warning", "StatusUpdateFailed", "Status update of AuthPolicy failed.")
 		} else {
-			r.Recorder.Eventf(s.authPolicy, "Normal", "StatusUpdateSuccess", "Status update of AuthPolicy updated successfully.")
+			r.Recorder.Eventf(ap, "Normal", "StatusUpdateSuccess", "Status update of AuthPolicy updated successfully.")
 		}
 	}
 }
@@ -258,7 +278,7 @@ func (r *AuthPolicyReconciler) updateStatusWithRetriesOnConflict(ctx context.Con
 	})
 }
 
-func (r *AuthPolicyReconciler) fetchJWTSecrets(ctx context.Context, objectKey client.ObjectKey) (corev1.Secret, error) {
+func (r *AuthPolicyReconciler) fetchJWTSecret(ctx context.Context, objectKey client.ObjectKey) (corev1.Secret, error) {
 	secretData := corev1.Secret{}
 
 	if err := r.Client.Get(ctx, objectKey, &secretData); err != nil {
@@ -270,15 +290,78 @@ func (r *AuthPolicyReconciler) fetchJWTSecrets(ctx context.Context, objectKey cl
 	return secretData, nil
 }
 
+func (r *AuthPolicyReconciler) getResolvedAuthPolicy(ctx context.Context, authPolicy *ztoperatorv1alpha1.AuthPolicy) (*resolvedAuthPolicy, error) {
+	var resolvedRules []resolvedRule
+	for _, rule := range authPolicy.Spec.Rules {
+		resolvedAuthPolicyRule, err := r.resolveAuthPolicyRule(ctx, authPolicy.Namespace, rule)
+		if err != nil {
+			return nil, err
+		}
+		resolvedRules = append(resolvedRules, *resolvedAuthPolicyRule)
+	}
+	return &resolvedAuthPolicy{
+		AuthPolicy:    authPolicy,
+		ResolvedRules: resolvedRules,
+	}, nil
+}
+
+func (r *AuthPolicyReconciler) resolveAuthPolicyRule(ctx context.Context, namespace string, authPolicyRule ztoperatorv1alpha1.RequestAuth) (*resolvedRule, error) {
+	jwtSecret, err := r.fetchJWTSecret(ctx, types.NamespacedName{Namespace: namespace, Name: authPolicyRule.SecretName})
+	if err != nil {
+		return nil, err
+	}
+	resolvedAuthPolicyRule := &resolvedRule{
+		Rule: authPolicyRule,
+	}
+
+	switch jwtSecret.Annotations["type"] {
+	case "digdirator.nais.io":
+		{
+			// JWT-secret was created by IdPortenClient
+			resolvedAuthPolicyRule.Audience = append(authPolicyRule.AcceptedResources, string(jwtSecret.Data[secrets.IDPortenIssuerKey]))
+			resolvedAuthPolicyRule.JwksUri = string(jwtSecret.Data[secrets.IDPortenJwksUriKey])
+			resolvedAuthPolicyRule.IssuerUri = string(jwtSecret.Data[secrets.IDPortenIssuerKey])
+			return resolvedAuthPolicyRule, nil
+		}
+	case "maskinporten.digdirator.nais.io":
+		{
+			// JWT-secret was created by MaskinportenClient
+			resolvedAuthPolicyRule.Audience = append(authPolicyRule.AcceptedResources, string(jwtSecret.Data[secrets.MaskinportenClientIDKey]))
+			resolvedAuthPolicyRule.JwksUri = string(jwtSecret.Data[secrets.MaskinportenJwksUriKey])
+			resolvedAuthPolicyRule.IssuerUri = string(jwtSecret.Data[secrets.MaskinportenIssuerKey])
+			return resolvedAuthPolicyRule, nil
+		}
+	case "azurerator.nais.io":
+		{
+			// JWT-secret was created by AzureAdApplication
+			// AzureAdApplication supports Secret Key Prefix
+			secretKeyPrefix := "AZURE"
+			if authPolicyRule.SecretPrefix != "" {
+				secretKeyPrefix = authPolicyRule.SecretPrefix
+			}
+
+			// Entra ID does not implement RFC8707, which introduces resource indicator for OAuth 2.0
+			resolvedAuthPolicyRule.Audience = []string{string(jwtSecret.Data[fmt.Sprintf("%s_APP_CLIENT_ID", secretKeyPrefix)])}
+			resolvedAuthPolicyRule.JwksUri = string(jwtSecret.Data[fmt.Sprintf("%s_OPENID_CONFIG_JWKS_URI", secretKeyPrefix)])
+			resolvedAuthPolicyRule.IssuerUri = string(jwtSecret.Data[fmt.Sprintf("%s_OPENID_CONFIG_ISSUER", secretKeyPrefix)])
+			return resolvedAuthPolicyRule, nil
+		}
+	default:
+		{
+			return nil, fmt.Errorf("JWT secret annotated with unknown type %s", jwtSecret.Annotations["type"])
+		}
+	}
+}
+
 func (r *AuthPolicyReconciler) reconcileRequestAuthentication(ctx context.Context, scope *scope, resourceKind string, resourceName string) (ctrl.Result, error) {
-	authPolicy := scope.authPolicy
+	authPolicy := scope.resolvedAuthPolicy.AuthPolicy
 
 	var jwtRules []*securityv1.JWTRule
 
-	// Retrieve secrets from the authPolicy jwt rules using the secret name
+	// Retrieve secrets from the resolvedAuthPolicy jwt rules using the secret name
 	for _, jwtRule := range authPolicy.Spec.Rules {
 		secretKey := client.ObjectKey{Namespace: authPolicy.Namespace, Name: jwtRule.SecretName}
-		jwtRuleSecrets, err := r.fetchJWTSecrets(ctx, secretKey)
+		jwtRuleSecrets, err := r.fetchJWTSecret(ctx, secretKey)
 		if err != nil {
 			// TODO: HAndle better
 			return ctrl.Result{}, err
@@ -325,7 +408,7 @@ func (r *AuthPolicyReconciler) reconcileRequestAuthentication(ctx context.Contex
 }
 
 func (r *AuthPolicyReconciler) reconcileIgnoreAuthAuthorizationPolicy(ctx context.Context, scope *scope, resourceKind string, resourceName string) (ctrl.Result, error) {
-	authPolicy := scope.authPolicy
+	authPolicy := scope.resolvedAuthPolicy.AuthPolicy
 
 	var rules []*securityv1.Rule
 	for _, jwtRule := range authPolicy.Spec.Rules {
@@ -373,7 +456,7 @@ func (r *AuthPolicyReconciler) reconcileIgnoreAuthAuthorizationPolicy(ctx contex
 }
 
 func (r *AuthPolicyReconciler) reconcileRequireJWTAuthorizationPolicy(ctx context.Context, scope *scope, resourceKind string, resourceName string) (ctrl.Result, error) {
-	authPolicy := scope.authPolicy
+	authPolicy := scope.resolvedAuthPolicy.AuthPolicy
 
 	var rules []*securityv1.Rule
 	for _, jwtRule := range authPolicy.Spec.Rules {
@@ -450,7 +533,7 @@ func reconcileAuthPolicy[T client.Object](
 	err := k8sClient.Get(ctx, client.ObjectKeyFromObject(desired), current)
 	if apierrors.IsNotFound(err) {
 		rLog.Debug(fmt.Sprintf("%s %s/%s does not exist", kind, desired.GetNamespace(), desired.GetName()))
-		if err := ctrl.SetControllerReference(scope.authPolicy, desired, scheme); err != nil {
+		if err := ctrl.SetControllerReference(scope.resolvedAuthPolicy.AuthPolicy, desired, scheme); err != nil {
 			errorReason := fmt.Sprintf("Unable to set AuthPolicy ownerReference on %s %s/%s.", kind, desired.GetNamespace(), desired.GetName())
 			scope.ReplaceDescendant(desired, &errorReason, nil, resourceKind, resourceName)
 			return ctrl.Result{}, err
