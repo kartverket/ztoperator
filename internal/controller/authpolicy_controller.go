@@ -102,21 +102,26 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
+	rLog.Debug(fmt.Sprintf("Resolving AuthPolicy with name %s", req.NamespacedName.String()))
 	resolved, err := resolvers.ResolveAuthPolicy(ctx, r.Client, authPolicy)
 	if err != nil {
 		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.NamespacedName.String()))
 		return reconcile.Result{}, err
 	}
+	rLog.Debug(fmt.Sprintf("Successfully resolved AuthPolicy with name %s", req.NamespacedName.String()))
 
 	scope := &state.Scope{ResolvedAuthPolicy: resolved}
 
+	requestAuthenticationName := authPolicy.Name
+	ignoreAuthAuthorizationPolicyName := authPolicy.Name + "-ignore-auth"
+	requireAuthAuthorizationPolicyName := authPolicy.Name + "-require-auth"
 	reconcileFuncs := []reconciliation.ReconcileAction{
 		AuthPolicyAdapter[*istioclientsecurityv1.RequestAuthentication]{
 			reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.RequestAuthentication]{
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.RequestAuthentication]{
 					ResourceKind:    "RequestAuthentication",
-					ResourceName:    authPolicy.Name,
-					DesiredResource: requestauthentication.GetDesired(scope, utils.BuildObjectMeta(authPolicy.Name, authPolicy.Namespace)),
+					ResourceName:    requestAuthenticationName,
+					DesiredResource: requestauthentication.GetDesired(scope, utils.BuildObjectMeta(requestAuthenticationName, authPolicy.Namespace)),
 					Scope:           scope,
 					ShouldUpdate: func(current, desired *istioclientsecurityv1.RequestAuthentication) bool {
 						return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
@@ -133,8 +138,8 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
 					ResourceKind:    "AuthorizationPolicy",
-					ResourceName:    authPolicy.Name + "-ignore-auth",
-					DesiredResource: ignore_auth.GetDesired(scope, utils.BuildObjectMeta(authPolicy.Name, authPolicy.Namespace)),
+					ResourceName:    ignoreAuthAuthorizationPolicyName,
+					DesiredResource: ignore_auth.GetDesired(scope, utils.BuildObjectMeta(ignoreAuthAuthorizationPolicyName, authPolicy.Namespace)),
 					Scope:           scope,
 					ShouldUpdate: func(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
 						return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
@@ -151,8 +156,8 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
 					ResourceKind:    "AuthorizationPolicy",
-					ResourceName:    authPolicy.Name + "-require-auth",
-					DesiredResource: require_auth.GetDesired(scope, utils.BuildObjectMeta(authPolicy.Name, authPolicy.Namespace)),
+					ResourceName:    requireAuthAuthorizationPolicyName,
+					DesiredResource: require_auth.GetDesired(scope, utils.BuildObjectMeta(requireAuthAuthorizationPolicyName, authPolicy.Namespace)),
 					Scope:           scope,
 					ShouldUpdate: func(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
 						return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
@@ -324,7 +329,7 @@ func reconcileAuthPolicy[T client.Object](
 			return ctrl.Result{}, err
 		}
 
-		rLog.Info(fmt.Sprintf("Creating a %s %s/%s", kind, desired.GetNamespace(), desired.GetName()))
+		rLog.Info(fmt.Sprintf("Creating %s %s/%s", kind, desired.GetNamespace(), desired.GetName()))
 		if err := k8sClient.Create(ctx, desired); err != nil {
 			errorReason := fmt.Sprintf("Unable to create %s %s/%s", kind, desired.GetNamespace(), desired.GetName())
 			scope.ReplaceDescendant(desired, &errorReason, nil, resourceKind, resourceName)

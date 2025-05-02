@@ -64,7 +64,7 @@ func resolveAuthPolicyRule(ctx context.Context, k8sClient client.Client, namespa
 		Rule: authPolicyRule,
 	}
 
-	switch jwtSecret.Annotations["type"] {
+	switch jwtSecret.Labels["type"] {
 	case "digdirator.nais.io":
 		{
 			// JWT-secret was created by IdPortenClient
