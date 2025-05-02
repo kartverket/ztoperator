@@ -1,7 +1,10 @@
 package v1alpha1
 
 import (
+	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // AuthPolicySpec defines the desired state of AuthPolicy.
@@ -46,16 +49,16 @@ type RequestAuth struct {
 	// +kubebuilder:default=""
 	// +kubebuilder:example="IDPORTEN_"
 	// +kubebuilder:validation:Optional
-	SecretPrefix string `json:"secretPrefix"`
+	SecretPrefix *string `json:"secretPrefix,omitempty"`
 
 	// If set to `true`, the original token will be kept for the upstream request. Defaults to `true`.
 	// +kubebuilder:default=true
-	ForwardJwt bool `json:"forwardJwt,omitempty"`
+	ForwardJwt *bool `json:"forwardJwt,omitempty"`
 
 	// FromCookies denotes the cookies from which the auth policy will look for a JWT.
 	//
 	// +kubebuilder:validation:Optional
-	FromCookies []string `json:"fromCookies,omitempty"`
+	FromCookies *[]string `json:"fromCookies,omitempty"`
 
 	// OutputClaimsToHeaders specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.
 	// The header specified in each operation in the list must be unique. Nested claims of type string/int/bool is supported as well.
@@ -81,7 +84,7 @@ type RequestAuth struct {
 	// +kubebuilder:validation:Optional
 	// +listType=set
 	// +kubebuilder:validation:Items.Pattern=`^(https?):\/\/[^\s\/$.?#].[^\s]*$`
-	AcceptedResources []string `json:"acceptedResources,omitempty"`
+	AcceptedResources *[]string `json:"acceptedResources,omitempty"`
 
 	// AuthRules defines rules for allowing HTTP requests based on conditions
 	// that must be met based on JWT claims.
@@ -89,14 +92,14 @@ type RequestAuth struct {
 	// API endpoints not covered by AuthRules and/or IgnoreAuthRules requires an authenticated JWT by default.
 	//
 	// +kubebuilder:validation:Optional
-	AuthRules *[]RequestAuthRule `json:"authRules,omitempty"`
+	AuthRules *RequestAuthRules `json:"authRules,omitempty"`
 
 	// IgnoreAuthRules defines request matchers for HTTP requests that do not require JWT authentication.
 	//
 	// API endpoints not covered by AuthRules or IgnoreAuthRules require an authenticated JWT by default.
 	//
 	// +kubebuilder:validation:Optional
-	IgnoreAuthRules *[]RequestMatcher `json:"ignoreAuthRules,omitempty"`
+	IgnoreAuthRules *RequestMatcherList `json:"ignoreAuthRules,omitempty"`
 }
 
 // ClaimToHeader specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.
@@ -131,7 +134,7 @@ type RequestAuthRule struct {
 	When []Condition `json:"when"`
 }
 
-type RequestMatchers []RequestMatcher
+type RequestMatcherList []RequestMatcher
 
 // RequestMatcher defines paths and methods to match incoming HTTP requests.
 //
@@ -224,6 +227,37 @@ type AuthPolicyList struct {
 	Items           []AuthPolicy `json:"items"`
 }
 
+type Scope struct {
+	ResolvedAuthPolicy *ResolvedAuthPolicy
+	Descendants        []Descendant[client.Object]
+}
+
+type Descendant[T client.Object] struct {
+	ID             string
+	Object         T
+	ErrorMessage   *string
+	SuccessMessage *string
+}
+
+type ResolvedAuthPolicy struct {
+	AuthPolicy    *AuthPolicy
+	ResolvedRules ResolvedRuleList
+}
+
+type ResolvedRule struct {
+	Rule      RequestAuth
+	Audiences []string
+	JwksUri   string
+	IssuerUri string
+}
+
+type ResolvedRuleList []ResolvedRule
+
+type RequestMatchers struct {
+	IgnoreAuth  RequestMatcherList
+	RequireAuth RequestMatcherList
+}
+
 func init() {
 	SchemeBuilder.Register(&AuthPolicy{}, &AuthPolicyList{})
 }
@@ -235,4 +269,68 @@ func (ap *AuthPolicy) InitializeStatus() {
 	ap.Status.ObservedGeneration = ap.GetGeneration()
 	ap.Status.Ready = false
 	ap.Status.Phase = PhasePending
+}
+
+func (s *Scope) GetErrors() []string {
+	var errs []string
+	if s != nil {
+		for _, d := range s.Descendants {
+			if d.ErrorMessage != nil {
+				errs = append(errs, *d.ErrorMessage)
+			}
+		}
+	}
+	return errs
+}
+
+func (s *Scope) ReplaceDescendant(obj client.Object, errorMessage *string, successMessage *string, resourceKind, resourceName string) {
+	if s != nil {
+		for i, d := range s.Descendants {
+			if reflect.TypeOf(d) == reflect.TypeOf(obj) && d.ID == obj.GetName() {
+				s.Descendants[i] = Descendant[client.Object]{
+					Object:         obj,
+					ErrorMessage:   errorMessage,
+					SuccessMessage: successMessage,
+				}
+				return
+			}
+		}
+		s.Descendants = append(s.Descendants, Descendant[client.Object]{
+			ID:             GetID(resourceKind, resourceName),
+			Object:         obj,
+			ErrorMessage:   errorMessage,
+			SuccessMessage: successMessage,
+		})
+	}
+}
+
+func GetID(resourceKind, resourceName string) string {
+	return fmt.Sprintf("%s-%s", resourceKind, resourceName)
+}
+
+func (a *AuthPolicy) GetIgnoreAuthAndRequireAuthRequestMatchers() RequestMatchers {
+	var ignoreAuthRequestMatchers RequestMatcherList
+	var requireAuthRequestMatchers RequestMatcherList
+	for _, rule := range a.Spec.Rules {
+		if rule.IgnoreAuthRules != nil {
+			ignoreAuthRequestMatchers = append(ignoreAuthRequestMatchers, *rule.IgnoreAuthRules...)
+		}
+		if rule.AuthRules != nil {
+			requireAuthRequestMatchers = append(requireAuthRequestMatchers, rule.AuthRules.GetRequestMatchers()...)
+		}
+	}
+	return RequestMatchers{
+		IgnoreAuth:  ignoreAuthRequestMatchers,
+		RequireAuth: requireAuthRequestMatchers,
+	}
+}
+
+func (requestAuthRules *RequestAuthRules) GetRequestMatchers() RequestMatcherList {
+	var requestMatchers RequestMatcherList
+	if requestAuthRules != nil {
+		for _, authRule := range *requestAuthRules {
+			requestMatchers = append(requestMatchers, authRule.RequestMatcher)
+		}
+	}
+	return requestMatchers
 }
