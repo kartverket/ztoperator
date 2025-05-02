@@ -1,7 +1,7 @@
 package requestauthentication
 
 import (
-	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/state"
 	securityv1 "istio.io/api/security/v1"
 	"istio.io/api/security/v1beta1"
 	istiotypev1beta1 "istio.io/api/type/v1beta1"
@@ -9,7 +9,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetDesired(scope *ztoperatorv1alpha1.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.RequestAuthentication {
+func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.RequestAuthentication {
 	resolvedAp := scope.ResolvedAuthPolicy
 
 	var jwtRules []*securityv1.JWTRule

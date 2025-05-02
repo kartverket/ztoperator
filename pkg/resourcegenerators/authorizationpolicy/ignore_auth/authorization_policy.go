@@ -1,7 +1,7 @@
 package ignore_auth
 
 import (
-	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy"
 	"istio.io/api/security/v1beta1"
 	v1beta2 "istio.io/api/type/v1beta1"
@@ -9,7 +9,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetDesired(scope *ztoperatorv1alpha1.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
+func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
 	requestMatchers := scope.ResolvedAuthPolicy.AuthPolicy.GetIgnoreAuthAndRequireAuthRequestMatchers()
 	ruleToList := authorizationpolicy.GetApiSurfaceDiffAsRuleToList(requestMatchers.IgnoreAuth, requestMatchers.RequireAuth)
 	if len(ruleToList) > 0 {

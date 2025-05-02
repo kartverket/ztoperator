@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/utils"
 	"github.com/nais/digdirator/pkg/secrets"
 	"golang.org/x/exp/maps"
@@ -25,8 +26,8 @@ var AcceptedHttpMethods = []string{
 	"CONNECT",
 }
 
-func ResolveAuthPolicy(ctx context.Context, k8sClient client.Client, authPolicy *ztoperatorv1alpha1.AuthPolicy) (*ztoperatorv1alpha1.ResolvedAuthPolicy, error) {
-	var resolvedRules []ztoperatorv1alpha1.ResolvedRule
+func ResolveAuthPolicy(ctx context.Context, k8sClient client.Client, authPolicy *ztoperatorv1alpha1.AuthPolicy) (*state.ResolvedAuthPolicy, error) {
+	var resolvedRules []state.ResolvedRule
 	for _, rule := range authPolicy.Spec.Rules {
 		resolvedAuthPolicyRule, err := resolveAuthPolicyRule(ctx, k8sClient, authPolicy.Namespace, rule)
 		if err != nil {
@@ -34,24 +35,24 @@ func ResolveAuthPolicy(ctx context.Context, k8sClient client.Client, authPolicy 
 		}
 		resolvedRules = append(resolvedRules, *resolvedAuthPolicyRule)
 	}
-	return &ztoperatorv1alpha1.ResolvedAuthPolicy{
+	return &state.ResolvedAuthPolicy{
 		AuthPolicy:    authPolicy,
 		ResolvedRules: ignorePathsFromOtherRules(resolvedRules),
 	}, nil
 }
 
-func resolveAuthPolicyRule(ctx context.Context, k8sClient client.Client, namespace string, authPolicyRule ztoperatorv1alpha1.RequestAuth) (*ztoperatorv1alpha1.ResolvedRule, error) {
+func resolveAuthPolicyRule(ctx context.Context, k8sClient client.Client, namespace string, authPolicyRule ztoperatorv1alpha1.RequestAuth) (*state.ResolvedRule, error) {
 	jwtSecret, err := utils.GetSecret(ctx, k8sClient, types.NamespacedName{Namespace: namespace, Name: authPolicyRule.SecretName})
 	if err != nil {
 		return nil, err
 	}
-	var authRules ztoperatorv1alpha1.RequestAuthRules
+	var authRules []ztoperatorv1alpha1.RequestAuthRule
 	if authPolicyRule.AuthRules != nil {
 		for _, authRule := range *authPolicyRule.AuthRules {
 			authRules = append(authRules, authRule)
 		}
 	}
-	var ignoreAuthRules ztoperatorv1alpha1.RequestMatcherList
+	var ignoreAuthRules []ztoperatorv1alpha1.RequestMatcher
 	if authPolicyRule.IgnoreAuthRules != nil {
 		for _, ignoreAuthRule := range *authPolicyRule.IgnoreAuthRules {
 			ignoreAuthRules = append(ignoreAuthRules, ignoreAuthRule)
@@ -59,7 +60,7 @@ func resolveAuthPolicyRule(ctx context.Context, k8sClient client.Client, namespa
 	}
 	authPolicyRule.AuthRules = &authRules
 	authPolicyRule.IgnoreAuthRules = &ignoreAuthRules
-	resolvedAuthPolicyRule := &ztoperatorv1alpha1.ResolvedRule{
+	resolvedAuthPolicyRule := &state.ResolvedRule{
 		Rule: authPolicyRule,
 	}
 
@@ -102,16 +103,16 @@ func resolveAuthPolicyRule(ctx context.Context, k8sClient client.Client, namespa
 	}
 }
 
-func ignorePathsFromOtherRules(resolvedRules ztoperatorv1alpha1.ResolvedRuleList) ztoperatorv1alpha1.ResolvedRuleList {
+func ignorePathsFromOtherRules(resolvedRules state.ResolvedRuleList) state.ResolvedRuleList {
 	for index, resolvedRule := range resolvedRules {
 		jwtRule := resolvedRule.Rule
-		requireAuthRequestMatchers := jwtRule.AuthRules.GetRequestMatchers()
+		requireAuthRequestMatchers := ztoperatorv1alpha1.GetRequestMatchers(jwtRule.AuthRules)
 		ignoredRequestMatchers := flattenOnPaths(*jwtRule.IgnoreAuthRules)
 		authorizedRequestMatchers := flattenOnPaths(requireAuthRequestMatchers)
 		for otherIndex, otherResolvedRule := range resolvedRules {
 			if index != otherIndex {
 				otherJwtRule := otherResolvedRule.Rule
-				otherRequireAuthRequestMatchers := otherJwtRule.AuthRules.GetRequestMatchers()
+				otherRequireAuthRequestMatchers := ztoperatorv1alpha1.GetRequestMatchers(otherJwtRule.AuthRules)
 				otherAuthorizedRequestMatchers := flattenOnPaths(otherRequireAuthRequestMatchers)
 				for otherPath, otherRequestMapper := range otherAuthorizedRequestMatchers {
 					if !slices.Contains(maps.Keys(ignoredRequestMatchers), otherPath) &&
@@ -129,7 +130,7 @@ func ignorePathsFromOtherRules(resolvedRules ztoperatorv1alpha1.ResolvedRuleList
 	return resolvedRules
 }
 
-func flattenOnPaths(requestMatchers ztoperatorv1alpha1.RequestMatcherList) map[string]*v1beta1.Rule_To {
+func flattenOnPaths(requestMatchers []ztoperatorv1alpha1.RequestMatcher) map[string]*v1beta1.Rule_To {
 	requestMatchersMap := make(map[string]*v1beta1.Rule_To)
 	if requestMatchers != nil {
 		for _, requestMatcher := range requestMatchers {

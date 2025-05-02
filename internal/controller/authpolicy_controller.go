@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/kartverket/ztoperator/pkg/resolvers"
@@ -107,7 +108,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return reconcile.Result{}, err
 	}
 
-	scope := &ztoperatorv1alpha1.Scope{ResolvedAuthPolicy: resolved}
+	scope := &state.Scope{ResolvedAuthPolicy: resolved}
 
 	reconcileFuncs := []reconciliation.ReconcileAction{
 		AuthPolicyAdapter[*istioclientsecurityv1.RequestAuthentication]{
@@ -173,7 +174,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	return r.doReconcile(ctx, reconcileFuncs, scope)
 }
 
-func (r *AuthPolicyReconciler) doReconcile(ctx context.Context, reconcileFuncs []reconciliation.ReconcileAction, scope *ztoperatorv1alpha1.Scope) (ctrl.Result, error) {
+func (r *AuthPolicyReconciler) doReconcile(ctx context.Context, reconcileFuncs []reconciliation.ReconcileAction, scope *state.Scope) (ctrl.Result, error) {
 	result := ctrl.Result{}
 	var errs []error
 	for _, rf := range reconcileFuncs {
@@ -198,7 +199,7 @@ func (r *AuthPolicyReconciler) doReconcile(ctx context.Context, reconcileFuncs [
 	return result, nil
 }
 
-func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, scope *ztoperatorv1alpha1.Scope, original *ztoperatorv1alpha1.AuthPolicy, reconcileFuncs []reconciliation.ReconcileAction) {
+func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, scope *state.Scope, original *ztoperatorv1alpha1.AuthPolicy, reconcileFuncs []reconciliation.ReconcileAction) {
 	ap := scope.ResolvedAuthPolicy.AuthPolicy
 	rLog := log.GetLogger(ctx)
 	rLog.Debug(fmt.Sprintf("Updating AuthPolicy status for %s/%s", ap.Namespace, ap.Name))
@@ -206,7 +207,7 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, scope *ztoperat
 
 	ap.Status.ObservedGeneration = ap.GetGeneration()
 	authPolicyCondition := metav1.Condition{
-		Type:               ztoperatorv1alpha1.GetID(strings.TrimPrefix(ap.Kind, "*"), ap.Name),
+		Type:               state.GetID(strings.TrimPrefix(ap.Kind, "*"), ap.Name),
 		LastTransitionTime: metav1.Now(),
 	}
 
@@ -261,7 +262,7 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, scope *ztoperat
 		conditions = append(conditions, cond)
 	}
 	for _, rf := range reconcileFuncs {
-		expectedID := ztoperatorv1alpha1.GetID(rf.GetResourceKind(), rf.GetResourceName())
+		expectedID := state.GetID(rf.GetResourceKind(), rf.GetResourceName())
 		if !descendantIDs[expectedID] {
 			conditions = append(conditions, metav1.Condition{
 				Type:               expectedID,
@@ -301,7 +302,7 @@ func reconcileAuthPolicy[T client.Object](
 	ctx context.Context,
 	k8sClient client.Client,
 	scheme *runtime.Scheme,
-	scope *ztoperatorv1alpha1.Scope,
+	scope *state.Scope,
 	resourceKind, resourceName string,
 	desired T,
 	shouldUpdate func(current, desired T) bool,

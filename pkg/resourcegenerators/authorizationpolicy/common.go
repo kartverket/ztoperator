@@ -6,7 +6,7 @@ import (
 	"istio.io/api/security/v1beta1"
 )
 
-func GetApiSurfaceDiffAsRuleToList(requestMatchers, otherRequestMatchers v1alpha1.RequestMatcherList) []*v1beta1.Rule_To {
+func GetApiSurfaceDiffAsRuleToList(requestMatchers, otherRequestMatchers []v1alpha1.RequestMatcher) []*v1beta1.Rule_To {
 	var diff []*v1beta1.Rule_To
 	for _, requestMatcher := range requestMatchers {
 		ruleTo := &v1beta1.Rule_To{

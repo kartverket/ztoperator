@@ -1,10 +1,7 @@
 package v1alpha1
 
 import (
-	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // AuthPolicySpec defines the desired state of AuthPolicy.
@@ -92,14 +89,14 @@ type RequestAuth struct {
 	// API endpoints not covered by AuthRules and/or IgnoreAuthRules requires an authenticated JWT by default.
 	//
 	// +kubebuilder:validation:Optional
-	AuthRules *RequestAuthRules `json:"authRules,omitempty"`
+	AuthRules *[]RequestAuthRule `json:"authRules,omitempty"`
 
 	// IgnoreAuthRules defines request matchers for HTTP requests that do not require JWT authentication.
 	//
 	// API endpoints not covered by AuthRules or IgnoreAuthRules require an authenticated JWT by default.
 	//
 	// +kubebuilder:validation:Optional
-	IgnoreAuthRules *RequestMatcherList `json:"ignoreAuthRules,omitempty"`
+	IgnoreAuthRules *[]RequestMatcher `json:"ignoreAuthRules,omitempty"`
 }
 
 // ClaimToHeader specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.
@@ -120,8 +117,6 @@ type ClaimToHeader struct {
 	Claim string `json:"claim"`
 }
 
-type RequestAuthRules []RequestAuthRule
-
 // RequestAuthRule defines a rule for controlling access to HTTP requests using JWT authentication.
 //
 // +kubebuilder:object:generate=true
@@ -133,8 +128,6 @@ type RequestAuthRule struct {
 	// The request is permitted if at least one of the specified conditions is satisfied.
 	When []Condition `json:"when"`
 }
-
-type RequestMatcherList []RequestMatcher
 
 // RequestMatcher defines paths and methods to match incoming HTTP requests.
 //
@@ -227,35 +220,9 @@ type AuthPolicyList struct {
 	Items           []AuthPolicy `json:"items"`
 }
 
-type Scope struct {
-	ResolvedAuthPolicy *ResolvedAuthPolicy
-	Descendants        []Descendant[client.Object]
-}
-
-type Descendant[T client.Object] struct {
-	ID             string
-	Object         T
-	ErrorMessage   *string
-	SuccessMessage *string
-}
-
-type ResolvedAuthPolicy struct {
-	AuthPolicy    *AuthPolicy
-	ResolvedRules ResolvedRuleList
-}
-
-type ResolvedRule struct {
-	Rule      RequestAuth
-	Audiences []string
-	JwksUri   string
-	IssuerUri string
-}
-
-type ResolvedRuleList []ResolvedRule
-
 type RequestMatchers struct {
-	IgnoreAuth  RequestMatcherList
-	RequireAuth RequestMatcherList
+	IgnoreAuth  []RequestMatcher
+	RequireAuth []RequestMatcher
 }
 
 func init() {
@@ -271,52 +238,15 @@ func (ap *AuthPolicy) InitializeStatus() {
 	ap.Status.Phase = PhasePending
 }
 
-func (s *Scope) GetErrors() []string {
-	var errs []string
-	if s != nil {
-		for _, d := range s.Descendants {
-			if d.ErrorMessage != nil {
-				errs = append(errs, *d.ErrorMessage)
-			}
-		}
-	}
-	return errs
-}
-
-func (s *Scope) ReplaceDescendant(obj client.Object, errorMessage *string, successMessage *string, resourceKind, resourceName string) {
-	if s != nil {
-		for i, d := range s.Descendants {
-			if reflect.TypeOf(d) == reflect.TypeOf(obj) && d.ID == obj.GetName() {
-				s.Descendants[i] = Descendant[client.Object]{
-					Object:         obj,
-					ErrorMessage:   errorMessage,
-					SuccessMessage: successMessage,
-				}
-				return
-			}
-		}
-		s.Descendants = append(s.Descendants, Descendant[client.Object]{
-			ID:             GetID(resourceKind, resourceName),
-			Object:         obj,
-			ErrorMessage:   errorMessage,
-			SuccessMessage: successMessage,
-		})
-	}
-}
-
-func GetID(resourceKind, resourceName string) string {
-	return fmt.Sprintf("%s-%s", resourceKind, resourceName)
-}
-
 func (a *AuthPolicy) GetIgnoreAuthAndRequireAuthRequestMatchers() RequestMatchers {
-	var ignoreAuthRequestMatchers RequestMatcherList
-	var requireAuthRequestMatchers RequestMatcherList
+	var ignoreAuthRequestMatchers []RequestMatcher
+	var requireAuthRequestMatchers []RequestMatcher
 	for _, rule := range a.Spec.Rules {
 		if rule.IgnoreAuthRules != nil {
 			ignoreAuthRequestMatchers = append(ignoreAuthRequestMatchers, *rule.IgnoreAuthRules...)
 		}
 		if rule.AuthRules != nil {
-			requireAuthRequestMatchers = append(requireAuthRequestMatchers, rule.AuthRules.GetRequestMatchers()...)
+			requireAuthRequestMatchers = append(requireAuthRequestMatchers, GetRequestMatchers(rule.AuthRules)...)
 		}
 	}
 	return RequestMatchers{
@@ -325,8 +255,8 @@ func (a *AuthPolicy) GetIgnoreAuthAndRequireAuthRequestMatchers() RequestMatcher
 	}
 }
 
-func (requestAuthRules *RequestAuthRules) GetRequestMatchers() RequestMatcherList {
-	var requestMatchers RequestMatcherList
+func GetRequestMatchers(requestAuthRules *[]RequestAuthRule) []RequestMatcher {
+	var requestMatchers []RequestMatcher
 	if requestAuthRules != nil {
 		for _, authRule := range *requestAuthRules {
 			requestMatchers = append(requestMatchers, authRule.RequestMatcher)
