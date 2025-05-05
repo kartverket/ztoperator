@@ -8,7 +8,7 @@ import (
 type AuthPolicySpec struct {
 	// Rules specifies how incoming requests should be allowed or denied based on the presence and validation of accompanying JWTs.
 	// +kubebuilder:validation:Required
-	Rules RequestAuthList `json:"rules"`
+	Rules []RequestAuth `json:"rules"`
 
 	// The Selector specifies which workload the defined auth policy should be applied to.
 	// +kubebuilder:validation:Required
@@ -24,8 +24,6 @@ type WorkloadSelector struct {
 	// +kubebuilder:validation:MaxProperties=4096
 	MatchLabels map[string]string `json:"matchLabels,omitempty"`
 }
-
-type RequestAuthList []RequestAuth
 
 // RequestAuth specifies how incoming JWTs should be validated.
 //
