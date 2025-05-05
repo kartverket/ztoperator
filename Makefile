@@ -28,6 +28,9 @@ CONTROLLER_GEN_VERSION     := $(call extract-version,sigs.k8s.io/controller-tool
 ISTIO_VERSION              := $(call extract-version,istio.io/client-go)
 
 ## Location to install dependencies to
+VENV := venv
+PYTHON := $(VENV)/bin/python
+PIP := $(VENV)/bin/pip
 LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
@@ -160,6 +163,18 @@ chainsaw: $(CHAINSAW) ## Download chainsaw locally if necessary.
 $(CHAINSAW): $(LOCALBIN)
 	$(call go-install-tool,$(CHAINSAW),github.com/kyverno/chainsaw,v$(CHAINSAW_VERSION))
 
+.PHONY: helm
+helm:
+	# Check if istio helm repo is installed and add if not
+	@helm repo list | grep istio || (echo "Adding istio helm repo..." && helm repo add istio https://istio-release.storage.googleapis.com/charts && helm repo update)
+
+.PHONY: virtualenv
+virtualenv:
+	@which python3 >/dev/null || (echo "Python3 not installed, please install it to proceed"; exit 1)
+	# Set up virtualenv, activate it and install required packages
+	@python3 -m venv $(VENV)
+	@$(PIP) install -r scripts/requirements.txt
+
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
 # $2 - package url which can be installed
@@ -183,11 +198,11 @@ run-local: build install
 	./bin/ztoperator
 
 .PHONY: setup-local
-setup-local: kind-cluster install-istio install
+setup-local: kind-cluster install-istio-gateways install
 	@echo "Cluster $(KUBECONTEXT) is setup"
 
 #### KIND ####
-.PHONY: kind-cluster check-kind
+.PHONY: check-kind
 check-kind:
 	@which kind >/dev/null || (echo "kind not installed, please install it to proceed"; exit 1)
 
@@ -205,22 +220,32 @@ install-skiperator:
 #### ZTOPERATOR DEPENDENCIES ####
 
 .PHONY: install-istio
-install-istio:
-	@echo "Creating istio-gateways namespace..."
-	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) || true
+install-istio: helm
 	@echo "Downloading Istio..."
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
 	@echo "Installing Istio on Kubernetes cluster..."
 	@./istio-$(ISTIO_VERSION)/bin/istioctl install -y --context $(KUBECONTEXT) --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal
+	@echo "Istio installation complete."
+
+.PHONY: install-istio-gateways
+install-istio-gateways: install-istio helm
+	@echo "Creating istio-gateways namespace..."
+	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) || true
 	@echo "Installing istio-gateways"
 	@helm --kube-context $(KUBECONTEXT) install istio-ingressgateway istio/gateway -n istio-gateways --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
-	@echo "Istio installation complete."
+	@echo "Istio gateways installed."
 
 .PHONY: install-sample
 install-sample:
 	@kubectl apply -f samples/ --recursive --context $(KUBECONTEXT)
 
 #### TESTS ####
+.PHONY: expose-ingress
+expose-ingress:
+	@lsof -ni :8443 | grep LISTEN && (echo "Port 8443 is already in use. Trying to kill kubectl" && killall kubectl) || true
+	@echo "Exposing istio ingress gateway on localhost 8443"
+	@KUBECONTEXT=$(KUBECONTEXT) kubectl port-forward --context $(KUBECONTEXT) -n istio-gateways svc/istio-ingressgateway 8443:443 2>&1 & \
+
 .PHONY: test-single
 test-single: chainsaw install
 	@./bin/chainsaw test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \

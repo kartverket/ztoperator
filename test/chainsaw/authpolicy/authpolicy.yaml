@@ -4,7 +4,7 @@ metadata:
   name: jwt-secret
 stringData:
   CLIENT_ID: "my-client"
-  ISSUER: "http://localhost:8080/default"
+  ISSUER: "https://fake.auth/default"
   JWKS_URI: "http://mock-oauth2.auth:8080/default/jwks"
 ---
 apiVersion: ztoperator.kartverket.no/v1alpha1
