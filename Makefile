@@ -211,11 +211,14 @@ kind-cluster: check-kind
 	@echo Create kind cluster... >&2
 	@kind create cluster --image $(KIND_IMAGE) --name ${KIND_CLUSTER_NAME}
 
-
 .PHONY: install-skiperator
 install-skiperator:
 	@kubectl create namespace skiperator-system --context $(KUBECONTEXT) || true
 	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-skiperator.sh
+
+.PHONY: install-mock-oauth2
+install-mock-oauth2:
+	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-mock-oauth2.sh
 
 #### ZTOPERATOR DEPENDENCIES ####
 

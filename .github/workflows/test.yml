@@ -26,7 +26,7 @@ jobs:
           cluster_name: 'ztoperator'
 
       - name: Install dependencies
-        run: make install-istio install-skiperator expose-ingress
+        run: make install-istio install-skiperator install-mock-oauth2 expose-ingress
 
       - name: Install dependencies
         run: make virtualenv
