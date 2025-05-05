@@ -23,7 +23,7 @@ KUBECONTEXT                ?= kind-$(KIND_CLUSTER_NAME)
 KUBERNETES_VERSION          = 1.31.4
 ENVTEST_K8S_VERSION         = $(KUBERNETES_VERSION)
 KIND_IMAGE                 ?= kindest/node:v$(KUBERNETES_VERSION)
-CHAINSAW_VERSION           := $(call extract-version,github.com/kyverno/chainsaw)
+CHAINSAW_VERSION           := 0.2.12
 CONTROLLER_GEN_VERSION     := $(call extract-version,sigs.k8s.io/controller-tools)
 ISTIO_VERSION              := $(call extract-version,istio.io/client-go)
 
