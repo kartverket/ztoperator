@@ -24,6 +24,9 @@ for resource in "${SKIPERATOR_RESOURCES[@]}"; do
   kubectl apply --context "$KUBECONTEXT" -f "$resource"
 done
 
+echo "Waiting for cert-manager to be ready..."
+sleep 10
+
 # Configure cert-manager clusterissuer
 kubectl apply --context "$KUBECONTEXT" -f <(cat <<EOF
 apiVersion: cert-manager.io/v1

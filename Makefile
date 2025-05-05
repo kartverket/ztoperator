@@ -220,7 +220,7 @@ install-skiperator:
 #### ZTOPERATOR DEPENDENCIES ####
 
 .PHONY: install-istio
-install-istio: helm
+install-istio:
 	@echo "Downloading Istio..."
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
 	@echo "Installing Istio on Kubernetes cluster..."
@@ -228,7 +228,7 @@ install-istio: helm
 	@echo "Istio installation complete."
 
 .PHONY: install-istio-gateways
-install-istio-gateways: install-istio helm
+install-istio-gateways: helm install-istio
 	@echo "Creating istio-gateways namespace..."
 	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) || true
 	@echo "Installing istio-gateways"
