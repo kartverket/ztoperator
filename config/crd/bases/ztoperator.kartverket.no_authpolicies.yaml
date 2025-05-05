@@ -55,7 +55,7 @@ spec:
                         It defines accepted audience resource indicators in the JWT token.
 
 
-                        Each resource indicator must be a valid URI and the indicator must be present as the `aud` claim in the JWT token.
+                        Each resource indicator must be a valid URI, and the indicator must be present as the `aud` claim in the JWT token.
                       items:
                         type: string
                       type: array
@@ -160,7 +160,7 @@ spec:
                         IgnoreAuthRules defines request matchers for HTTP requests that do not require JWT authentication.
 
 
-                        API endpoints not covered by AuthRules or IgnoreAuthRules requires an authenticated JWT by default.
+                        API endpoints not covered by AuthRules or IgnoreAuthRules require an authenticated JWT by default.
                       items:
                         description: RequestMatcher defines paths and methods to match
                           incoming HTTP requests.

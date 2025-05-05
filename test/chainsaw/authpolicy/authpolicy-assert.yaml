@@ -6,7 +6,7 @@ metadata:
   name: auth-policy
 spec:
   jwtRules:
-    - issuer: http://localhost:8080/default
+    - issuer: https://fake.auth/default
       jwksUri: http://mock-oauth2.auth:8080/default/jwks
   selector:
     matchLabels:

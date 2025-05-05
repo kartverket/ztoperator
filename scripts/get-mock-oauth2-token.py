@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
-import requests
+import httpx
 
-# Discover OIDC configuration
-well_known_url = "http://localhost:8080/default/.well-known/openid-configuration"
-resp = requests.get(well_known_url)
-resp.raise_for_status()
-oidc_config = resp.json()
+hostname = "fake.auth"
+local_server = "127.0.0.1:8443"
+token_endpoint = f"https://{local_server}/default/token"
 
-token_endpoint = oidc_config["token_endpoint"]
-
-# Define client credentials
 client_id = "my-client"
 client_secret = "my-secret"
 
@@ -21,7 +16,17 @@ data = {
     "scope": "my-scope"  # Optional depending on mock server setup
 }
 
-token_resp = requests.post(token_endpoint, data=data)
+client = httpx.Client(verify=False)
+headers = {"Host": hostname}
+extensions = {"sni_hostname": hostname}
+
+token_resp = client.post(
+    token_endpoint,
+    headers=headers,
+    extensions=extensions,
+    data=data
+)
+
 token_resp.raise_for_status()
 
 access_token = token_resp.json()["access_token"]
