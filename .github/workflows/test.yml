@@ -26,10 +26,7 @@ jobs:
           cluster_name: 'ztoperator'
 
       - name: Install dependencies
-        run: make install-istio install-skiperator install-mock-oauth2 expose-ingress
-
-      - name: Install dependencies
-        run: make virtualenv
+        run: make install-istio-gateways install-skiperator install-mock-oauth2 virtualenv expose-ingress
 
       - name: Run chainsaw tests
-        run: dir=test/chainsaw/authpolicy make test-single
+        run: make run-test

@@ -280,7 +280,7 @@ export IMAGE_PULL_1_TOKEN :=
 run-test: build
 	@echo "Starting ztoperator in background..."
 	@LOG_FILE=$$(mktemp -t ztoperator-test.XXXXXXX); \
-	./bin/ztoperator -e error > "$$LOG_FILE" 2>&1 & \
+	./bin/ztoperator > "$$LOG_FILE" 2>&1 & \
 	PID=$$!; \
 	echo "ztoperator PID: $$PID"; \
 	echo "Log redirected to file: $$LOG_FILE"; \
