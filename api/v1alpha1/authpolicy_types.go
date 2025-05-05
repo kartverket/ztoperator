@@ -50,7 +50,7 @@ type RequestAuth struct {
 
 	// If set to `true`, the original token will be kept for the upstream request. Defaults to `true`.
 	// +kubebuilder:default=true
-	ForwardJwt *bool `json:"forwardJwt,omitempty"`
+	ForwardJwt bool `json:"forwardJwt,omitempty"`
 
 	// FromCookies denotes the cookies from which the auth policy will look for a JWT.
 	//

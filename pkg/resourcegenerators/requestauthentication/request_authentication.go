@@ -19,14 +19,11 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 			Issuer:               rule.IssuerUri,
 			Audiences:            rule.Audiences,
 			JwksUri:              rule.JwksUri,
-			ForwardOriginalToken: true,
+			ForwardOriginalToken: rule.Rule.ForwardJwt,
 		}
 
 		if rule.Rule.FromCookies != nil && len(*rule.Rule.FromCookies) > 0 {
 			jwtRule.FromCookies = *rule.Rule.FromCookies
-		}
-		if rule.Rule.ForwardJwt != nil {
-			jwtRule.ForwardOriginalToken = *rule.Rule.ForwardJwt
 		}
 		if rule.Rule.OutputClaimToHeaders != nil && len(*rule.Rule.OutputClaimToHeaders) > 0 {
 			claimsToHeaders := make([]*v1beta1.ClaimToHeader, len(*rule.Rule.OutputClaimToHeaders))
