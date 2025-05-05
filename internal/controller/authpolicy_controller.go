@@ -7,7 +7,6 @@ import (
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
-	"github.com/kartverket/ztoperator/pkg/resolvers"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore_auth"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/require_auth"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
@@ -102,19 +101,14 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
-	rLog.Debug(fmt.Sprintf("Resolving AuthPolicy with name %s", req.NamespacedName.String()))
-	resolved, err := resolvers.ResolveAuthPolicy(ctx, r.Client, authPolicy)
-	if err != nil {
-		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.NamespacedName.String()))
-		return reconcile.Result{}, err
-	}
-	rLog.Debug(fmt.Sprintf("Successfully resolved AuthPolicy with name %s", req.NamespacedName.String()))
+	resolved := ztoperatorv1alpha1.ResolveAuthPolicy(authPolicy)
 
-	scope := &state.Scope{ResolvedAuthPolicy: resolved}
+	scope := &state.Scope{AuthPolicy: resolved}
 
 	requestAuthenticationName := authPolicy.Name
 	ignoreAuthAuthorizationPolicyName := authPolicy.Name + "-ignore-auth"
 	requireAuthAuthorizationPolicyName := authPolicy.Name + "-require-auth"
+
 	reconcileFuncs := []reconciliation.ReconcileAction{
 		AuthPolicyAdapter[*istioclientsecurityv1.RequestAuthentication]{
 			reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.RequestAuthentication]{
@@ -185,10 +179,10 @@ func (r *AuthPolicyReconciler) doReconcile(ctx context.Context, reconcileFuncs [
 	for _, rf := range reconcileFuncs {
 		reconcileResult, err := rf.Reconcile(ctx, r.Client, r.Scheme)
 		if err != nil {
-			r.Recorder.Eventf(scope.ResolvedAuthPolicy.AuthPolicy, "Warning", fmt.Sprintf("%sReconcileFailed", rf.GetResourceKind()), fmt.Sprintf("%s with name %s failed during reconciliation.", rf.GetResourceKind(), rf.GetResourceName()))
+			r.Recorder.Eventf(scope.AuthPolicy, "Warning", fmt.Sprintf("%sReconcileFailed", rf.GetResourceKind()), fmt.Sprintf("%s with name %s failed during reconciliation.", rf.GetResourceKind(), rf.GetResourceName()))
 			errs = append(errs, err)
 		} else {
-			r.Recorder.Eventf(scope.ResolvedAuthPolicy.AuthPolicy, "Normal", fmt.Sprintf("%sReconciledSuccessfully", rf.GetResourceKind()), fmt.Sprintf("%s with name %s reconciled successfully.", rf.GetResourceKind(), rf.GetResourceName()))
+			r.Recorder.Eventf(scope.AuthPolicy, "Normal", fmt.Sprintf("%sReconciledSuccessfully", rf.GetResourceKind()), fmt.Sprintf("%s with name %s reconciled successfully.", rf.GetResourceKind(), rf.GetResourceName()))
 		}
 		if len(errs) > 0 {
 			continue
@@ -197,15 +191,15 @@ func (r *AuthPolicyReconciler) doReconcile(ctx context.Context, reconcileFuncs [
 	}
 
 	if len(errs) > 0 {
-		r.Recorder.Eventf(scope.ResolvedAuthPolicy.AuthPolicy, "Warning", "ReconcileFailed", "AuthPolicy failed during reconciliation")
+		r.Recorder.Eventf(scope.AuthPolicy, "Warning", "ReconcileFailed", "AuthPolicy failed during reconciliation")
 		return ctrl.Result{}, errors.NewAggregate(errs)
 	}
-	r.Recorder.Eventf(scope.ResolvedAuthPolicy.AuthPolicy, "Normal", "ReconcileSuccess", "AuthPolicy reconciled successfully")
+	r.Recorder.Eventf(scope.AuthPolicy, "Normal", "ReconcileSuccess", "AuthPolicy reconciled successfully")
 	return result, nil
 }
 
 func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, scope *state.Scope, original *ztoperatorv1alpha1.AuthPolicy, reconcileFuncs []reconciliation.ReconcileAction) {
-	ap := scope.ResolvedAuthPolicy.AuthPolicy
+	ap := scope.AuthPolicy
 	rLog := log.GetLogger(ctx)
 	rLog.Debug(fmt.Sprintf("Updating AuthPolicy status for %s/%s", ap.Namespace, ap.Name))
 	r.Recorder.Eventf(ap, "Normal", "StatusUpdateStarted", "Status update of AuthPolicy started.")
@@ -323,7 +317,7 @@ func reconcileAuthPolicy[T client.Object](
 	err := k8sClient.Get(ctx, client.ObjectKeyFromObject(desired), current)
 	if apierrors.IsNotFound(err) {
 		rLog.Debug(fmt.Sprintf("%s %s/%s does not exist", kind, desired.GetNamespace(), desired.GetName()))
-		if err := ctrl.SetControllerReference(scope.ResolvedAuthPolicy.AuthPolicy, desired, scheme); err != nil {
+		if err := ctrl.SetControllerReference(scope.AuthPolicy, desired, scheme); err != nil {
 			errorReason := fmt.Sprintf("Unable to set AuthPolicy ownerReference on %s %s/%s.", kind, desired.GetNamespace(), desired.GetName())
 			scope.ReplaceDescendant(desired, &errorReason, nil, resourceKind, resourceName)
 			return ctrl.Result{}, err

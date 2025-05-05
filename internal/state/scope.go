@@ -8,8 +8,8 @@ import (
 )
 
 type Scope struct {
-	ResolvedAuthPolicy *ResolvedAuthPolicy
-	Descendants        []Descendant[client.Object]
+	AuthPolicy  *ztoperatorv1alpha1.AuthPolicy
+	Descendants []Descendant[client.Object]
 }
 
 type Descendant[T client.Object] struct {
@@ -18,20 +18,6 @@ type Descendant[T client.Object] struct {
 	ErrorMessage   *string
 	SuccessMessage *string
 }
-
-type ResolvedAuthPolicy struct {
-	AuthPolicy    *ztoperatorv1alpha1.AuthPolicy
-	ResolvedRules ResolvedRuleList
-}
-
-type ResolvedRule struct {
-	Rule      ztoperatorv1alpha1.RequestAuth
-	Audiences []string
-	JwksUri   string
-	IssuerUri string
-}
-
-type ResolvedRuleList []ResolvedRule
 
 func (s *Scope) GetErrors() []string {
 	var errs []string

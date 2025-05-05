@@ -10,24 +10,22 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.RequestAuthentication {
-	resolvedAp := scope.ResolvedAuthPolicy
-
 	var jwtRules []*securityv1.JWTRule
 
-	for _, rule := range resolvedAp.ResolvedRules {
+	for _, rule := range scope.AuthPolicy.Spec.Rules {
 		jwtRule := &securityv1.JWTRule{
 			Issuer:               rule.IssuerUri,
-			Audiences:            rule.Audiences,
+			Audiences:            rule.Audience,
 			JwksUri:              rule.JwksUri,
-			ForwardOriginalToken: rule.Rule.ForwardJwt,
+			ForwardOriginalToken: rule.ForwardJwt,
 		}
 
-		if rule.Rule.FromCookies != nil && len(*rule.Rule.FromCookies) > 0 {
-			jwtRule.FromCookies = *rule.Rule.FromCookies
+		if rule.FromCookies != nil && len(*rule.FromCookies) > 0 {
+			jwtRule.FromCookies = *rule.FromCookies
 		}
-		if rule.Rule.OutputClaimToHeaders != nil && len(*rule.Rule.OutputClaimToHeaders) > 0 {
-			claimsToHeaders := make([]*v1beta1.ClaimToHeader, len(*rule.Rule.OutputClaimToHeaders))
-			for i, claimToHeader := range *rule.Rule.OutputClaimToHeaders {
+		if rule.OutputClaimToHeaders != nil && len(*rule.OutputClaimToHeaders) > 0 {
+			claimsToHeaders := make([]*v1beta1.ClaimToHeader, len(*rule.OutputClaimToHeaders))
+			for i, claimToHeader := range *rule.OutputClaimToHeaders {
 				claimsToHeaders[i] = &v1beta1.ClaimToHeader{
 					Header: claimToHeader.Header,
 					Claim:  claimToHeader.Claim,
@@ -35,12 +33,13 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 			}
 			jwtRule.OutputClaimToHeaders = claimsToHeaders
 		}
+		jwtRules = append(jwtRules, jwtRule)
 	}
 
 	return &istioclientsecurityv1.RequestAuthentication{
 		ObjectMeta: objectMeta,
 		Spec: securityv1.RequestAuthentication{
-			Selector: &istiotypev1beta1.WorkloadSelector{MatchLabels: scope.ResolvedAuthPolicy.AuthPolicy.Spec.Selector.MatchLabels},
+			Selector: &istiotypev1beta1.WorkloadSelector{MatchLabels: scope.AuthPolicy.Spec.Selector.MatchLabels},
 			JwtRules: jwtRules,
 		},
 	}

@@ -10,14 +10,15 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
-	requestMatchers := scope.ResolvedAuthPolicy.AuthPolicy.GetIgnoreAuthAndRequireAuthRequestMatchers()
-	ruleToList := authorizationpolicy.GetApiSurfaceDiffAsRuleToList(requestMatchers.IgnoreAuth, requestMatchers.RequireAuth)
+	requireAuthRequestMatchers := scope.AuthPolicy.GetRequireAuthRequestMatchers()
+	ignoreAuthRequestMatchers := scope.AuthPolicy.GetIgnoreAuthRequestMatchers()
+	ruleToList := authorizationpolicy.GetApiSurfaceDiffAsRuleToList(ignoreAuthRequestMatchers, requireAuthRequestMatchers)
 	if len(ruleToList) > 0 {
 		return &istioclientsecurityv1.AuthorizationPolicy{
 			ObjectMeta: objectMeta,
 			Spec: v1beta1.AuthorizationPolicy{
 				Selector: &v1beta2.WorkloadSelector{
-					MatchLabels: scope.ResolvedAuthPolicy.AuthPolicy.Spec.Selector.MatchLabels,
+					MatchLabels: scope.AuthPolicy.Spec.Selector.MatchLabels,
 				},
 				Rules: []*v1beta1.Rule{
 					{

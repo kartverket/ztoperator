@@ -13,9 +13,9 @@ import (
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
 	var authorizationPolicyRules []*v1beta1.Rule
-	for _, resolvedRule := range scope.ResolvedAuthPolicy.ResolvedRules {
-		baseConditions := getBaseConditions(resolvedRule)
-		if len(*resolvedRule.Rule.AuthRules)+len(*resolvedRule.Rule.IgnoreAuthRules) == 0 {
+	for _, jwtRule := range scope.AuthPolicy.Spec.Rules {
+		baseConditions := getBaseConditions(jwtRule)
+		if len(*jwtRule.AuthRules)+len(*jwtRule.IgnoreAuthRules) == 0 {
 			authorizationPolicyRules = append(authorizationPolicyRules, &v1beta1.Rule{
 				To: []*v1beta1.Rule_To{
 					{
@@ -35,10 +35,10 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 							Paths: []string{"*"},
 						},
 					},
-					append(ztoperatorv1alpha1.GetRequestMatchers(resolvedRule.Rule.AuthRules), *resolvedRule.Rule.IgnoreAuthRules...),
+					append(ztoperatorv1alpha1.GetRequestMatchers(jwtRule.AuthRules), *jwtRule.IgnoreAuthRules...),
 				),
 			})
-			for _, authRule := range *resolvedRule.Rule.AuthRules {
+			for _, authRule := range *jwtRule.AuthRules {
 				var authPolicyConditionsAsIstioConditions []*v1beta1.Condition
 				for _, condition := range authRule.When {
 					authPolicyConditionsAsIstioConditions = append(authPolicyConditionsAsIstioConditions, &v1beta1.Condition{
@@ -64,22 +64,29 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 		ObjectMeta: objectMeta,
 		Spec: v1beta1.AuthorizationPolicy{
 			Selector: &v1beta2.WorkloadSelector{
-				MatchLabels: scope.ResolvedAuthPolicy.AuthPolicy.Spec.Selector.MatchLabels,
+				MatchLabels: scope.AuthPolicy.Spec.Selector.MatchLabels,
 			},
 			Rules: authorizationPolicyRules,
 		},
 	}
 }
 
-func getBaseConditions(resolvedRule state.ResolvedRule) []*v1beta1.Condition {
-	return []*v1beta1.Condition{
+func getBaseConditions(jwtRule ztoperatorv1alpha1.RequestAuth) []*v1beta1.Condition {
+	conditions := []*v1beta1.Condition{
 		{
 			Key:    "request.auth.claims[iss]",
-			Values: []string{resolvedRule.IssuerUri},
+			Values: []string{jwtRule.IssuerUri},
 		},
 		{
 			Key:    "request.auth.claims[aud]",
-			Values: resolvedRule.Audiences,
+			Values: jwtRule.Audience,
 		},
 	}
+	if jwtRule.AcceptedResources != nil {
+		conditions = append(conditions, &v1beta1.Condition{
+			Key:    "request.auth.claims[aud]",
+			Values: *jwtRule.AcceptedResources,
+		})
+	}
+	return conditions
 }

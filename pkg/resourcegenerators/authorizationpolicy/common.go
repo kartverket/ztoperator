@@ -2,7 +2,6 @@ package authorizationpolicy
 
 import (
 	"github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/pkg/resolvers"
 	"istio.io/api/security/v1beta1"
 )
 
@@ -23,7 +22,7 @@ func GetApiSurfaceDiffAsRuleToList(requestMatchers, otherRequestMatchers []v1alp
 	for _, otherRequestMatcher := range otherRequestMatchers {
 		notMethods := otherRequestMatcher.Methods
 		if len(notMethods) == 0 {
-			notMethods = append(notMethods, resolvers.AcceptedHttpMethods...)
+			notMethods = append(notMethods, v1alpha1.AcceptedHttpMethods...)
 		}
 		diff = append(diff, &v1beta1.Rule_To{
 			Operation: &v1beta1.Operation{

@@ -2,7 +2,7 @@ package reconciliation
 
 import (
 	"context"
-	runtime2 "github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/internal/state"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,7 +22,7 @@ type ReconcileFunc[T client.Object] struct {
 	ResourceKind    string
 	ResourceName    string
 	DesiredResource T
-	Scope           *runtime2.Scope
+	Scope           *state.Scope
 	ShouldUpdate    func(current T, desired T) bool
 	UpdateFields    func(current T, desired T)
 }

@@ -1,6 +1,9 @@
 package v1alpha1
 
 import (
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
+	"istio.io/api/security/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -31,20 +34,27 @@ type WorkloadSelector struct {
 type RequestAuth struct {
 	// Whether to enable JWT validation.
 	// If enabled, incoming JWTs will be validated against the issuer specified in the app registration and the generated audience.
-	Enabled bool `json:"enabled"`
-
-	// The name of the Kubernetes Secret containing OAuth2 credentials.
-	// Expected secret keys prefixed with optional SecretPrefix: CLIENT_ID, ISSUER, JWKS_URI, WELL_KNOWN_URL
 	//
 	// +kubebuilder:validation:Required
-	SecretName string `json:"secretName"`
+	Enabled bool `json:"enabled"`
 
-	// The prefix used for secret names in the Kubernetes Secret. Defaults to empty string.
+	// IssuerUri specifies the expected issuer (`iss`) claim in the JWT.
+	// This should match the issuer identifier used when the token was generated.
 	//
-	// +kubebuilder:default=""
-	// +kubebuilder:example="IDPORTEN_"
-	// +kubebuilder:validation:Optional
-	SecretPrefix *string `json:"secretPrefix,omitempty"`
+	// +kubebuilder:validation:Required
+	IssuerUri string `json:"issuerURI"`
+
+	// JwksUri is the URI where the JSON Web Key Set (JWKS) can be fetched.
+	// It is used to validate the signature of incoming JWTs.
+	//
+	// +kubebuilder:validation:Required
+	JwksUri string `json:"jwksURI"`
+
+	// Audience defines the accepted audience (`aud`) values in the JWT.
+	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
+	//
+	// +kubebuilder:validation:Required
+	Audience []string `json:"audience"`
 
 	// If set to `true`, the original token will be kept for the upstream request. Defaults to `true`.
 	// +kubebuilder:default=true
@@ -193,7 +203,6 @@ const (
 	PhasePending Phase = "Pending"
 	PhaseReady   Phase = "Ready"
 	PhaseFailed  Phase = "Failed"
-	PhaseUnknown Phase = "Unknown"
 )
 
 // +kubebuilder:object:root=true
@@ -218,9 +227,16 @@ type AuthPolicyList struct {
 	Items           []AuthPolicy `json:"items"`
 }
 
-type RequestMatchers struct {
-	IgnoreAuth  []RequestMatcher
-	RequireAuth []RequestMatcher
+var AcceptedHttpMethods = []string{
+	"GET",
+	"POST",
+	"PUT",
+	"PATCH",
+	"DELETE",
+	"HEAD",
+	"OPTIONS",
+	"TRACE",
+	"CONNECT",
 }
 
 func init() {
@@ -236,21 +252,24 @@ func (ap *AuthPolicy) InitializeStatus() {
 	ap.Status.Phase = PhasePending
 }
 
-func (a *AuthPolicy) GetIgnoreAuthAndRequireAuthRequestMatchers() RequestMatchers {
-	var ignoreAuthRequestMatchers []RequestMatcher
+func (ap *AuthPolicy) GetRequireAuthRequestMatchers() []RequestMatcher {
 	var requireAuthRequestMatchers []RequestMatcher
-	for _, rule := range a.Spec.Rules {
-		if rule.IgnoreAuthRules != nil {
-			ignoreAuthRequestMatchers = append(ignoreAuthRequestMatchers, *rule.IgnoreAuthRules...)
-		}
+	for _, rule := range ap.Spec.Rules {
 		if rule.AuthRules != nil {
 			requireAuthRequestMatchers = append(requireAuthRequestMatchers, GetRequestMatchers(rule.AuthRules)...)
 		}
 	}
-	return RequestMatchers{
-		IgnoreAuth:  ignoreAuthRequestMatchers,
-		RequireAuth: requireAuthRequestMatchers,
+	return requireAuthRequestMatchers
+}
+
+func (ap *AuthPolicy) GetIgnoreAuthRequestMatchers() []RequestMatcher {
+	var ignoreAuthRequestMatchers []RequestMatcher
+	for _, rule := range ap.Spec.Rules {
+		if rule.IgnoreAuthRules != nil {
+			ignoreAuthRequestMatchers = append(ignoreAuthRequestMatchers, *rule.IgnoreAuthRules...)
+		}
 	}
+	return ignoreAuthRequestMatchers
 }
 
 func GetRequestMatchers(requestAuthRules *[]RequestAuthRule) []RequestMatcher {
@@ -261,4 +280,65 @@ func GetRequestMatchers(requestAuthRules *[]RequestAuthRule) []RequestMatcher {
 		}
 	}
 	return requestMatchers
+}
+
+func ResolveAuthPolicy(authPolicy *AuthPolicy) *AuthPolicy {
+	authPolicy.Spec.Rules = ignorePathsFromOtherRules(authPolicy.Spec.Rules)
+	return authPolicy
+}
+
+func ignorePathsFromOtherRules(rules []RequestAuth) []RequestAuth {
+	for index, jwtRule := range rules {
+		requireAuthRequestMatchers := GetRequestMatchers(jwtRule.AuthRules)
+		ignoredRequestMatchers := flattenOnPaths(*jwtRule.IgnoreAuthRules)
+		authorizedRequestMatchers := flattenOnPaths(requireAuthRequestMatchers)
+		for otherIndex, otherJwtRule := range rules {
+			if index != otherIndex {
+				otherRequireAuthRequestMatchers := GetRequestMatchers(otherJwtRule.AuthRules)
+				otherAuthorizedRequestMatchers := flattenOnPaths(otherRequireAuthRequestMatchers)
+				for otherPath, otherRequestMapper := range otherAuthorizedRequestMatchers {
+					if !slices.Contains(maps.Keys(ignoredRequestMatchers), otherPath) &&
+						!slices.Contains(maps.Keys(authorizedRequestMatchers), otherPath) {
+						*jwtRule.IgnoreAuthRules = append(*jwtRule.IgnoreAuthRules, RequestMatcher{
+							Paths:   otherRequestMapper.Operation.Paths,
+							Methods: otherRequestMapper.Operation.Methods,
+						})
+					}
+				}
+			}
+		}
+		rules[index] = jwtRule
+	}
+	return rules
+}
+
+func flattenOnPaths(requestMatchers []RequestMatcher) map[string]*v1beta1.Rule_To {
+	requestMatchersMap := make(map[string]*v1beta1.Rule_To)
+	if requestMatchers != nil {
+		for _, requestMatcher := range requestMatchers {
+			for _, path := range requestMatcher.Paths {
+				if existingMatcher, exists := requestMatchersMap[path]; exists {
+					// Combine methods if the path key already exists and remove duplicates
+					uniqueMethods := make(map[string]struct{})
+					for _, method := range append(existingMatcher.Operation.Methods, requestMatcher.Methods...) {
+						uniqueMethods[method] = struct{}{}
+					}
+					existingMatcher.Operation.Methods = maps.Keys(uniqueMethods)
+					requestMatchersMap[path] = existingMatcher
+				} else {
+					methods := requestMatcher.Methods
+					if len(methods) == 0 {
+						methods = AcceptedHttpMethods
+					}
+					requestMatchersMap[path] = &v1beta1.Rule_To{
+						Operation: &v1beta1.Operation{
+							Paths:   []string{path},
+							Methods: methods,
+						},
+					}
+				}
+			}
+		}
+	}
+	return requestMatchersMap
 }
