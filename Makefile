@@ -23,7 +23,7 @@ KUBECONTEXT                ?= kind-$(KIND_CLUSTER_NAME)
 KUBERNETES_VERSION          = 1.31.4
 ENVTEST_K8S_VERSION         = $(KUBERNETES_VERSION)
 KIND_IMAGE                 ?= kindest/node:v$(KUBERNETES_VERSION)
-CHAINSAW_VERSION           := $(call extract-version,github.com/kyverno/chainsaw)
+CHAINSAW_VERSION           := 0.2.12
 CONTROLLER_GEN_VERSION     := $(call extract-version,sigs.k8s.io/controller-tools)
 ISTIO_VERSION              := $(call extract-version,istio.io/client-go)
 
@@ -243,8 +243,9 @@ install-sample:
 .PHONY: expose-ingress
 expose-ingress:
 	@lsof -ni :8443 | grep LISTEN && (echo "Port 8443 is already in use. Trying to kill kubectl" && killall kubectl) || true
-	@echo "Exposing istio ingress gateway on localhost 8443"
-	@KUBECONTEXT=$(KUBECONTEXT) kubectl port-forward --context $(KUBECONTEXT) -n istio-gateways svc/istio-ingressgateway 8443:443 2>&1 & \
+	@lsof -ni :5678 | grep LISTEN && (echo "Port 5678 is already in use. Trying to kill kubectl" && killall kubectl) || true
+	@echo "Exposing istio ingress gateway on localhost 8443 and 5678"
+	@KUBECONTEXT=$(KUBECONTEXT) kubectl port-forward --context $(KUBECONTEXT) -n istio-gateways svc/istio-ingressgateway 8443:443 5678:443 2>&1 & \
 
 .PHONY: test-single
 test-single: chainsaw install
@@ -259,6 +260,10 @@ export IMAGE_PULL_1_TOKEN :=
 test: chainsaw install
 	@./bin/chainsaw test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir test/ && \
     echo "Test succeeded" || (echo "Test failed" && exit 1)
+
+.PHONY: install-mock-oauth2
+install-mock-oauth2:
+	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-mock-oauth2.sh --config ./scripts/mock-oauth2-server-config.json
 
 .PHONY: run-unit-tests
 run-unit-tests:

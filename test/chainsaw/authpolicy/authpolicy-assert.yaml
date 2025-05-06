@@ -1,13 +1,14 @@
 apiVersion: security.istio.io/v1
 kind: RequestAuthentication
 metadata:
-  labels:
-    type: ztoperator.kartverket.no
   name: auth-policy
 spec:
   jwtRules:
-    - issuer: https://fake.auth/default
-      jwksUri: http://mock-oauth2.auth:8080/default/jwks
+    - audiences:
+        - idporten_server
+      forwardOriginalToken: true
+      issuer: https://fake.auth/idporten
+      jwksUri: http://mock-oauth2.auth:8080/idporten/jwks
   selector:
     matchLabels:
       app: application-auth
@@ -15,50 +16,43 @@ spec:
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
-  labels:
-    type: ztoperator.kartverket.no
-  name: auth-policy-requireauth
+  name: auth-policy-ignore-auth
 spec:
   rules:
     - to:
         - operation:
-            methods:
-              - GET
             paths:
-              - /
-              - /deny
-      when:
-        - key: request.auth.claims[sub]
-          values:
-            - '*'
+              - /public
+  selector:
+    matchLabels:
+      app: application-auth
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-require-auth
+spec:
+  rules:
     - to:
         - operation:
-            methods:
+            notPaths:
+              - /public
+            paths:
+              - '*'
+        - operation:
+            notMethods:
+              - GET
               - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
             paths:
-              - /post
-      when:
-        - key: request.auth.claims[sub]
-          values:
-            - '*'
+              - /public
   selector:
     matchLabels:
       app: application-auth
----
-apiVersion: security.istio.io/v1
-kind: AuthorizationPolicy
-metadata:
-  labels:
-    type: ztoperator.kartverket.no
-  name: auth-policy-ignoreauth
-spec:
-  rules:
-    - to:
-        - operation:
-            methods:
-              - GET
-            paths:
-              - /robots.txt
-  selector:
-    matchLabels:
-      app: application-auth
+

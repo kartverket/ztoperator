@@ -3,8 +3,8 @@ kind: Application
 metadata:
   name: application-auth
 spec:
-  image: ghcr.io/mccutchen/go-httpbin:latest
-  port: 8080
+  image: hashicorp/http-echo:latest
+  port: 5678
   replicas: 1
   ingresses:
     - foo.bar

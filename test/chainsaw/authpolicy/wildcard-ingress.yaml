@@ -60,4 +60,4 @@ spec:
         - destination:
             host: application-auth
             port:
-              number: 8080
+              number: 5678

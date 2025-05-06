@@ -1,0 +1,50 @@
+{
+  "interactiveLogin": false,
+  "tokenCallbacks": [
+    {
+      "issuerId": "idporten",
+      "requestMappings": [
+        {
+          "requestParam": "code",
+          "match": "idporten_code",
+          "claims": {
+            "sub": "idporten_client",
+            "aud": [
+              "idporten_server"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "issuerId": "maskinporten",
+      "requestMappings": [
+        {
+          "requestParam": "code",
+          "match": "maskinporten_code",
+          "claims": {
+            "sub": "maskinporten_client",
+            "aud": [
+              "maskinporten_server"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "issuerId": "entraid",
+      "requestMappings": [
+        {
+          "requestParam": "code",
+          "match": "entraid_code",
+          "claims": {
+            "sub": "entraid_client",
+            "aud": [
+              "entraid_server"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

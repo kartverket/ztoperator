@@ -289,6 +289,14 @@ func ResolveAuthPolicy(authPolicy *AuthPolicy) *AuthPolicy {
 
 func ignorePathsFromOtherRules(rules []RequestAuth) []RequestAuth {
 	for index, jwtRule := range rules {
+		if jwtRule.AuthRules == nil {
+			var empty []RequestAuthRule
+			jwtRule.AuthRules = &empty
+		}
+		if jwtRule.IgnoreAuthRules == nil {
+			var empty []RequestMatcher
+			jwtRule.IgnoreAuthRules = &empty
+		}
 		requireAuthRequestMatchers := GetRequestMatchers(jwtRule.AuthRules)
 		ignoredRequestMatchers := flattenOnPaths(*jwtRule.IgnoreAuthRules)
 		authorizedRequestMatchers := flattenOnPaths(requireAuthRequestMatchers)

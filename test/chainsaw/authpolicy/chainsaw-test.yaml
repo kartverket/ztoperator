@@ -25,4 +25,4 @@ spec:
         - script:
             content: sleep 10
         - script:
-            content: hurl --error-format long --variable token="$(../../../venv/bin/python ./../../../scripts/get-mock-oauth2-token.py)" --insecure --test tests.hurl
+            content: hurl --error-format long --variable idporten_token="$(../../../venv/bin/python ./../../../scripts/get-mock-oauth2-token.py --issuer idporten --code idporten_code)" --insecure --test tests.hurl

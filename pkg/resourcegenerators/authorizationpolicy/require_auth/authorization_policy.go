@@ -37,6 +37,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 					},
 					append(ztoperatorv1alpha1.GetRequestMatchers(jwtRule.AuthRules), *jwtRule.IgnoreAuthRules...),
 				),
+				When: baseConditions,
 			})
 			for _, authRule := range *jwtRule.AuthRules {
 				var authPolicyConditionsAsIstioConditions []*v1beta1.Condition
