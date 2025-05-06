@@ -9,6 +9,7 @@
           "match": "idporten_code",
           "claims": {
             "sub": "idporten_client",
+            "role": "idporten_role",
             "aud": [
               "idporten_server"
             ]
@@ -24,6 +25,7 @@
           "match": "maskinporten_code",
           "claims": {
             "sub": "maskinporten_client",
+            "role": "maskinporten_role",
             "aud": [
               "maskinporten_server"
             ]
@@ -39,6 +41,7 @@
           "match": "entraid_code",
           "claims": {
             "sub": "entraid_client",
+            "role": "entraid_role",
             "aud": [
               "entraid_server"
             ]

@@ -58,6 +58,6 @@ spec:
     - name: default-app-route
       route:
         - destination:
-            host: application-auth
+            host: application
             port:
               number: 5678

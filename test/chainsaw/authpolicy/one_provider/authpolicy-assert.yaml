@@ -1,0 +1,110 @@
+# RequestAuthentication
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: auth-policy
+spec:
+  jwtRules:
+    - audiences:
+        - entraid_server
+      forwardOriginalToken: true
+      issuer: https://fake.auth/entraid
+      jwksUri: http://mock-oauth2.auth:8080/entraid/jwks
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (ignore-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-ignore-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            notPaths:
+              - /entraid/secure
+            paths:
+              - /entraid/public
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/secure
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (require-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-require-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            notPaths:
+              - /entraid/secure
+              - /entraid/public
+            paths:
+              - '*'
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/public
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+    - to:
+        - operation:
+            paths:
+              - /entraid/secure
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+        - key: request.auth.claims[role]
+          values:
+            - entraid_role
+  selector:
+    matchLabels:
+      app: application

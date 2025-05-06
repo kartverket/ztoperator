@@ -243,9 +243,8 @@ install-sample:
 .PHONY: expose-ingress
 expose-ingress:
 	@lsof -ni :8443 | grep LISTEN && (echo "Port 8443 is already in use. Trying to kill kubectl" && killall kubectl) || true
-	@lsof -ni :5678 | grep LISTEN && (echo "Port 5678 is already in use. Trying to kill kubectl" && killall kubectl) || true
-	@echo "Exposing istio ingress gateway on localhost 8443 and 5678"
-	@KUBECONTEXT=$(KUBECONTEXT) kubectl port-forward --context $(KUBECONTEXT) -n istio-gateways svc/istio-ingressgateway 8443:443 5678:443 2>&1 & \
+	@echo "Exposing istio ingress gateway on localhost 8443"
+	@KUBECONTEXT=$(KUBECONTEXT) kubectl port-forward --context $(KUBECONTEXT) -n istio-gateways svc/istio-ingressgateway 8443:443 2>&1 & \
 
 .PHONY: test-single
 test-single: chainsaw install

@@ -1,0 +1,54 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+spec:
+  rules:
+    - enabled: true
+      ignoreAuthRules:
+        - paths:
+            - /idporten/public
+      authRules:
+        - paths:
+            - /idporten/secure
+          when:
+            - claim: "role"
+              values:
+                - "idporten_role"
+      audience:
+        - idporten_server
+      issuerURI: https://fake.auth/idporten
+      jwksURI: http://mock-oauth2.auth:8080/idporten/jwks
+    - enabled: true
+      ignoreAuthRules:
+        - paths:
+            - /maskinporten/public
+      authRules:
+        - paths:
+            - /maskinporten/secure
+          when:
+            - claim: "role"
+              values:
+                - "maskinporten_role"
+      audience:
+        - maskinporten_server
+      issuerURI: https://fake.auth/maskinporten
+      jwksURI: http://mock-oauth2.auth:8080/maskinporten/jwks
+    - enabled: true
+      ignoreAuthRules:
+        - paths:
+            - /entraid/public
+      authRules:
+        - paths:
+            - /entraid/secure
+          when:
+            - claim: "role"
+              values:
+                - "entraid_role"
+      audience:
+        - entraid_server
+      issuerURI: https://fake.auth/entraid
+      jwksURI: http://mock-oauth2.auth:8080/entraid/jwks
+  selector:
+    matchLabels:
+      app: application
