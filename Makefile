@@ -288,10 +288,16 @@ run-test: build
 	echo "ztoperator PID: $$PID"; \
 	echo "Log redirected to file: $$LOG_FILE"; \
 	( \
-		if [ -z "$(TEST_DIR)" ]; then \
-			$(MAKE) test; \
-		else \
-			$(MAKE) test-single dir=$(TEST_DIR); \
-		fi; \
-	) && \
-	(echo "Stopping ztoperator (PID $$PID)..." && kill $$PID && echo "running unit tests..." && $(MAKE) run-unit-tests)  || (echo "Test or ztoperator failed. Stopping ztoperator (PID $$PID)" && kill $$PID && exit 1)
+		for dir in test/chainsaw/authpolicy/*/ ; do \
+			echo "Running test in $$dir"; \
+			if ! $(MAKE) test-single dir=$$dir; then \
+				echo "Test in $$dir failed. Stopping ztoperator (PID $$PID)"; \
+				kill $$PID; \
+				exit 1; \
+			fi; \
+		done; \
+		echo "Stopping ztoperator (PID $$PID)..."; \
+		kill $$PID; \
+		echo "running unit tests..."; \
+		$(MAKE) run-unit-tests; \
+	) || (echo "Test or ztoperator failed." && exit 1)
