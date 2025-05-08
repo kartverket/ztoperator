@@ -218,7 +218,10 @@ install-skiperator:
 
 .PHONY: install-mock-oauth2
 install-mock-oauth2:
-	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-mock-oauth2.sh
+	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-mock-oauth2.sh --config ./scripts/mock-oauth2-server-config.json
+
+.PHONY: setup-local-test
+setup-local-test: install-skiperator install-mock-oauth2 expose-ingress virtualenv
 
 #### ZTOPERATOR DEPENDENCIES ####
 
@@ -262,10 +265,6 @@ export IMAGE_PULL_1_TOKEN :=
 test: chainsaw install
 	@./bin/chainsaw test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir test/ && \
     echo "Test succeeded" || (echo "Test failed" && exit 1)
-
-.PHONY: install-mock-oauth2
-install-mock-oauth2:
-	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-mock-oauth2.sh --config ./scripts/mock-oauth2-server-config.json
 
 .PHONY: run-unit-tests
 run-unit-tests:

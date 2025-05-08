@@ -1,8 +1,13 @@
-# ztoperator
-Ztoperator is a Kubernetes operator for managing zero trust through authentication and authorization in a Kubernetes cluster utilizing Istio as service mesh.
+<p>
+  <img src="ztoperator_logo.png" alt="Architecture Diagram" width="600"/>
+</p>
+
+ztoperator is a Kubernetes operator that simplifies and enforces zero trust security for workloads using Istio and OAuth 2.0. 
+At the core of ztoperator is the custom resource definition (CRD) AuthPolicy, which provides an abstraction layer for specifying authentication and authorization rules based on OAuth 2 tokens.
+
 
 # Core functionality
-Provides a CRD, AuthPolicy, for configuring valid JWT issuers and authorization rules using Istio RequestAuthentication and AuthorizationPolicy.
+Ztoperator provides one CRD, AuthPolicy, which configures valid JWT issuers and authorization rules using Istio RequestAuthentication and AuthorizationPolicy.
 
 Example AuthPolicy:
 ```yaml
@@ -18,7 +23,10 @@ spec:
     - enabled: true
       issuerURI: https://example.com
       jwksURI: https://example.com/jwks
-      audience: example-audience
+      audience: 
+        - example-audience
+      acceptedResources:
+        - https://some-app.com
       authRules:
         - paths:
             - /api
@@ -48,7 +56,7 @@ spec:
 ## Running integration tests locally
 Set up a local kind cluster and install dependencies:
 ```bash
-make setup-local install-skiperator install-mock-oauth2 virtualenv expose-ingress
+make setup-local setup-local-test
 ```
 Then run all tests:
 ```bash
@@ -60,4 +68,5 @@ You can also run specific tests. This will require you to run the ztoperator con
 make run-local
 
 # Run specific test
-dir=test/chainsaw/authpolicy make test-single
+make test-single dir=test/chainsaw/authpolicy/<TEST FOLDER>
+```
