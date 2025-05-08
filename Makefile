@@ -211,16 +211,19 @@ kind-cluster: check-kind
 	@echo Create kind cluster... >&2
 	@kind create cluster --image $(KIND_IMAGE) --name ${KIND_CLUSTER_NAME}
 
-
 .PHONY: install-skiperator
 install-skiperator:
 	@kubectl create namespace skiperator-system --context $(KUBECONTEXT) || true
 	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-skiperator.sh
 
+.PHONY: install-mock-oauth2
+install-mock-oauth2:
+	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-mock-oauth2.sh
+
 #### ZTOPERATOR DEPENDENCIES ####
 
 .PHONY: install-istio
-install-istio: helm
+install-istio:
 	@echo "Downloading Istio..."
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
 	@echo "Installing Istio on Kubernetes cluster..."
@@ -228,7 +231,7 @@ install-istio: helm
 	@echo "Istio installation complete."
 
 .PHONY: install-istio-gateways
-install-istio-gateways: install-istio helm
+install-istio-gateways: helm install-istio
 	@echo "Creating istio-gateways namespace..."
 	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) || true
 	@echo "Installing istio-gateways"
@@ -281,7 +284,7 @@ export IMAGE_PULL_1_TOKEN :=
 run-test: build
 	@echo "Starting ztoperator in background..."
 	@LOG_FILE=$$(mktemp -t ztoperator-test.XXXXXXX); \
-	./bin/ztoperator -e error > "$$LOG_FILE" 2>&1 & \
+	./bin/ztoperator > "$$LOG_FILE" 2>&1 & \
 	PID=$$!; \
 	echo "ztoperator PID: $$PID"; \
 	echo "Log redirected to file: $$LOG_FILE"; \
