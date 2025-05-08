@@ -24,6 +24,64 @@ spec:
     matchLabels:
       app: application
 ---
+# AuthorizationPolicy (deny-auth-rules)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-deny-auth-rules
+spec:
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            methods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /idporten/secure
+      when:
+        - key: request.auth.claims[iss]
+          notValues:
+            - https://fake.auth/idporten
+        - key: request.auth.claims[aud]
+          notValues:
+            - idporten_server
+        - key: request.auth.claims[role]
+          notValues:
+            - idporten_role
+    - to:
+        - operation:
+            paths:
+              - /maskinporten/secure
+      when:
+        - key: request.auth.claims[iss]
+          notValues:
+            - https://fake.auth/maskinporten
+        - key: request.auth.claims[aud]
+          notValues:
+            - maskinporten_server
+        - key: request.auth.claims[role]
+          notValues:
+            - maskinporten_role
+    - to:
+        - operation:
+            paths:
+              - /entraid/*
+      when:
+        - key: request.auth.claims[iss]
+          notValues:
+            - https://fake.auth/entraid
+        - key: request.auth.claims[aud]
+          notValues:
+            - entraid_server
+        - key: request.auth.claims[role]
+          notValues:
+            - entraid_role
+  selector:
+    matchLabels:
+      app: application
+---
 # AuthorizationPolicy (ignore-auth)
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
@@ -33,167 +91,16 @@ spec:
   rules:
     - to:
         - operation:
-            notPaths:
-              - /idporten/secure
-              - /maskinporten/secure
-              - /entraid/secure
             paths:
               - /idporten/public
         - operation:
             methods:
               - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            notPaths:
-              - /idporten/secure
-              - /maskinporten/secure
-              - /entraid/secure
-            paths:
-              - /maskinporten/secure
-        - operation:
-            methods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            notPaths:
-              - /idporten/secure
-              - /maskinporten/secure
-              - /entraid/secure
-            paths:
-              - /entraid/secure
-        - operation:
-            notPaths:
-              - /idporten/secure
-              - /maskinporten/secure
-              - /entraid/secure
             paths:
               - /maskinporten/public
         - operation:
-            methods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            notPaths:
-              - /idporten/secure
-              - /maskinporten/secure
-              - /entraid/secure
-            paths:
-              - /idporten/secure
-        - operation:
-            methods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            notPaths:
-              - /idporten/secure
-              - /maskinporten/secure
-              - /entraid/secure
-            paths:
-              - /entraid/secure
-        - operation:
-            notPaths:
-              - /idporten/secure
-              - /maskinporten/secure
-              - /entraid/secure
             paths:
               - /entraid/public
-        - operation:
-            methods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            notPaths:
-              - /idporten/secure
-              - /maskinporten/secure
-              - /entraid/secure
-            paths:
-              - /idporten/secure
-        - operation:
-            methods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            notPaths:
-              - /idporten/secure
-              - /maskinporten/secure
-              - /entraid/secure
-            paths:
-              - /maskinporten/secure
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /idporten/secure
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /maskinporten/secure
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /entraid/secure
   selector:
     matchLabels:
       app: application
@@ -207,65 +114,79 @@ spec:
   rules:
     - to:
         - operation:
+            notMethods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /idporten/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /maskinporten/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/*
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /idporten/public
+        - operation:
+            notMethods:
+              - GET
+            paths:
+              - /maskinporten/public
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/public
+        - operation:
             notPaths:
               - /idporten/secure
-              - /idporten/public
               - /maskinporten/secure
-              - /entraid/secure
+              - /entraid/*
+              - /idporten/public
+              - /maskinporten/public
+              - /entraid/public
             paths:
               - '*'
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /idporten/secure
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /idporten/public
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /maskinporten/secure
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /entraid/secure
       when:
         - key: request.auth.claims[iss]
           values:
@@ -275,6 +196,174 @@ spec:
             - idporten_server
     - to:
         - operation:
+            notMethods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /idporten/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /maskinporten/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/*
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /idporten/public
+        - operation:
+            notMethods:
+              - GET
+            paths:
+              - /maskinporten/public
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/public
+        - operation:
+            notPaths:
+              - /idporten/secure
+              - /maskinporten/secure
+              - /entraid/*
+              - /idporten/public
+              - /maskinporten/public
+              - /entraid/public
+            paths:
+              - '*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/maskinporten
+        - key: request.auth.claims[aud]
+          values:
+            - maskinporten_server
+    - to:
+        - operation:
+            notMethods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /idporten/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /maskinporten/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/*
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /idporten/public
+        - operation:
+            notMethods:
+              - GET
+            paths:
+              - /maskinporten/public
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/public
+        - operation:
+            notPaths:
+              - /idporten/secure
+              - /maskinporten/secure
+              - /entraid/*
+              - /idporten/public
+              - /maskinporten/public
+              - /entraid/public
+            paths:
+              - '*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+    - to:
+        - operation:
+            methods:
+              - POST
+              - PUT
+              - DELETE
             paths:
               - /idporten/secure
       when:
@@ -287,74 +376,6 @@ spec:
         - key: request.auth.claims[role]
           values:
             - idporten_role
-    - to:
-        - operation:
-            notPaths:
-              - /maskinporten/secure
-              - /maskinporten/public
-              - /idporten/secure
-              - /entraid/secure
-            paths:
-              - '*'
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /maskinporten/secure
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /maskinporten/public
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /idporten/secure
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /entraid/secure
-      when:
-        - key: request.auth.claims[iss]
-          values:
-            - https://fake.auth/maskinporten
-        - key: request.auth.claims[aud]
-          values:
-            - maskinporten_server
     - to:
         - operation:
             paths:
@@ -371,76 +392,8 @@ spec:
             - maskinporten_role
     - to:
         - operation:
-            notPaths:
-              - /entraid/secure
-              - /entraid/public
-              - /idporten/secure
-              - /maskinporten/secure
             paths:
-              - '*'
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /entraid/secure
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /entraid/public
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /idporten/secure
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /maskinporten/secure
-      when:
-        - key: request.auth.claims[iss]
-          values:
-            - https://fake.auth/entraid
-        - key: request.auth.claims[aud]
-          values:
-            - entraid_server
-    - to:
-        - operation:
-            paths:
-              - /entraid/secure
+              - /entraid/*
       when:
         - key: request.auth.claims[iss]
           values:

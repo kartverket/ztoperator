@@ -14,6 +14,32 @@ spec:
     matchLabels:
       app: application
 ---
+# AuthorizationPolicy (deny-auth-rules)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-deny-auth-rules
+spec:
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            paths:
+              - /entraid/secure
+      when:
+        - key: request.auth.claims[iss]
+          notValues:
+            - https://fake.auth/entraid
+        - key: request.auth.claims[aud]
+          notValues:
+            - entraid_server
+        - key: request.auth.claims[role]
+          notValues:
+            - entraid_role
+  selector:
+    matchLabels:
+      app: application
+---
 # AuthorizationPolicy (ignore-auth)
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
@@ -23,23 +49,8 @@ spec:
   rules:
     - to:
         - operation:
-            notPaths:
-              - /entraid/secure
             paths:
               - /entraid/public
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /entraid/secure
   selector:
     matchLabels:
       app: application
@@ -53,37 +64,37 @@ spec:
   rules:
     - to:
         - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/public
+        - operation:
             notPaths:
               - /entraid/secure
               - /entraid/public
             paths:
               - '*'
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /entraid/secure
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - /entraid/public
       when:
         - key: request.auth.claims[iss]
           values:

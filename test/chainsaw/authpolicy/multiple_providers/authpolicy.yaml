@@ -11,6 +11,10 @@ spec:
       authRules:
         - paths:
             - /idporten/secure
+          methods:
+            - POST
+            - PUT
+            - DELETE
           when:
             - claim: "role"
               values:
@@ -23,6 +27,8 @@ spec:
       ignoreAuthRules:
         - paths:
             - /maskinporten/public
+          methods:
+            - GET
       authRules:
         - paths:
             - /maskinporten/secure
@@ -40,7 +46,7 @@ spec:
             - /entraid/public
       authRules:
         - paths:
-            - /entraid/secure
+            - /entraid/*
           when:
             - claim: "role"
               values:

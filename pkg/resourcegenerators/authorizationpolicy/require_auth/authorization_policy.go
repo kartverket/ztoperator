@@ -2,7 +2,7 @@ package require_auth
 
 import (
 	"fmt"
-	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy"
 	"istio.io/api/security/v1beta1"
@@ -13,8 +13,44 @@ import (
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
 	var authorizationPolicyRules []*v1beta1.Rule
+
 	for _, jwtRule := range scope.AuthPolicy.Spec.Rules {
-		baseConditions := getBaseConditions(jwtRule)
+		baseConditions := authorizationpolicy.GetBaseConditions(jwtRule, false)
+
+		var toList []*v1beta1.Rule_To
+		var mentionedPaths []string
+		for _, matcher := range append(
+			scope.AuthPolicy.GetRequireAuthRequestMatchers(),
+			scope.AuthPolicy.GetIgnoreAuthRequestMatchers()...,
+		) {
+			mentionedPaths = append(mentionedPaths, matcher.Paths...)
+			methods := matcher.Methods
+			if len(matcher.Methods) == 0 {
+				methods = v1alpha1.AcceptedHttpMethods
+			}
+			toList = append(toList, &v1beta1.Rule_To{
+				Operation: &v1beta1.Operation{
+					Paths:      matcher.Paths,
+					NotMethods: methods,
+				},
+			})
+		}
+
+		toList = append(toList, &v1beta1.Rule_To{
+			Operation: &v1beta1.Operation{
+				Paths:    []string{"*"},
+				NotPaths: mentionedPaths,
+			},
+		})
+
+		authorizationPolicyRules = append(authorizationPolicyRules, &v1beta1.Rule{
+			To:   toList,
+			When: baseConditions,
+		})
+	}
+
+	for _, jwtRule := range scope.AuthPolicy.Spec.Rules {
+		baseConditions := authorizationpolicy.GetBaseConditions(jwtRule, false)
 		if len(*jwtRule.AuthRules)+len(*jwtRule.IgnoreAuthRules) == 0 {
 			authorizationPolicyRules = append(authorizationPolicyRules, &v1beta1.Rule{
 				To: []*v1beta1.Rule_To{
@@ -27,18 +63,6 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 				When: baseConditions,
 			})
 		} else {
-			// The first rule requires auth on all methods/paths combinations not covered by the provided rules by default.
-			authorizationPolicyRules = append(authorizationPolicyRules, &v1beta1.Rule{
-				To: authorizationpolicy.GetApiSurfaceDiffAsRuleToList(
-					[]ztoperatorv1alpha1.RequestMatcher{
-						{
-							Paths: []string{"*"},
-						},
-					},
-					append(ztoperatorv1alpha1.GetRequestMatchers(jwtRule.AuthRules), *jwtRule.IgnoreAuthRules...),
-				),
-				When: baseConditions,
-			})
 			for _, authRule := range *jwtRule.AuthRules {
 				var authPolicyConditionsAsIstioConditions []*v1beta1.Condition
 				for _, condition := range authRule.When {
@@ -70,24 +94,4 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 			Rules: authorizationPolicyRules,
 		},
 	}
-}
-
-func getBaseConditions(jwtRule ztoperatorv1alpha1.RequestAuth) []*v1beta1.Condition {
-	conditions := []*v1beta1.Condition{
-		{
-			Key:    "request.auth.claims[iss]",
-			Values: []string{jwtRule.IssuerUri},
-		},
-		{
-			Key:    "request.auth.claims[aud]",
-			Values: jwtRule.Audience,
-		},
-	}
-	if jwtRule.AcceptedResources != nil {
-		conditions = append(conditions, &v1beta1.Condition{
-			Key:    "request.auth.claims[aud]",
-			Values: *jwtRule.AcceptedResources,
-		})
-	}
-	return conditions
 }

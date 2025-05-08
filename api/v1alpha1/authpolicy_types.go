@@ -283,7 +283,7 @@ func GetRequestMatchers(requestAuthRules *[]RequestAuthRule) []RequestMatcher {
 }
 
 func ResolveAuthPolicy(authPolicy *AuthPolicy) *AuthPolicy {
-	authPolicy.Spec.Rules = ignorePathsFromOtherRules(authPolicy.Spec.Rules)
+	//authPolicy.Spec.Rules = ignorePathsFromOtherRules(authPolicy.Spec.Rules)
 	return authPolicy
 }
 

@@ -2,7 +2,6 @@ package ignore_auth
 
 import (
 	"github.com/kartverket/ztoperator/internal/state"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy"
 	"istio.io/api/security/v1beta1"
 	v1beta2 "istio.io/api/type/v1beta1"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
@@ -10,9 +9,20 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
-	requireAuthRequestMatchers := scope.AuthPolicy.GetRequireAuthRequestMatchers()
 	ignoreAuthRequestMatchers := scope.AuthPolicy.GetIgnoreAuthRequestMatchers()
-	ruleToList := authorizationpolicy.GetApiSurfaceDiffAsRuleToList(ignoreAuthRequestMatchers, requireAuthRequestMatchers)
+
+	var ruleToList []*v1beta1.Rule_To
+
+	for _, ignoreAuthRequestMatcher := range ignoreAuthRequestMatchers {
+		ruleTo := &v1beta1.Rule_To{
+			Operation: &v1beta1.Operation{
+				Paths:   ignoreAuthRequestMatcher.Paths,
+				Methods: ignoreAuthRequestMatcher.Methods,
+			},
+		}
+		ruleToList = append(ruleToList, ruleTo)
+	}
+
 	if len(ruleToList) > 0 {
 		return &istioclientsecurityv1.AuthorizationPolicy{
 			ObjectMeta: objectMeta,

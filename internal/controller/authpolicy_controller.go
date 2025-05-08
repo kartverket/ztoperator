@@ -7,6 +7,7 @@ import (
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/deny"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore_auth"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/require_auth"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
@@ -106,6 +107,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	scope := &state.Scope{AuthPolicy: resolved}
 
 	requestAuthenticationName := authPolicy.Name
+	denyAuthorizationPolicyName := authPolicy.Name + "-deny-auth-rules"
 	ignoreAuthAuthorizationPolicyName := authPolicy.Name + "-ignore-auth"
 	requireAuthAuthorizationPolicyName := authPolicy.Name + "-require-auth"
 
@@ -124,6 +126,24 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					UpdateFields: func(current, desired *istioclientsecurityv1.RequestAuthentication) {
 						current.Spec.Selector = desired.Spec.Selector
 						current.Spec.JwtRules = desired.Spec.JwtRules
+					},
+				},
+			},
+		},
+		AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
+			reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
+				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
+					ResourceKind:    "AuthorizationPolicy",
+					ResourceName:    denyAuthorizationPolicyName,
+					DesiredResource: deny.GetDesired(scope, utils.BuildObjectMeta(denyAuthorizationPolicyName, authPolicy.Namespace)),
+					Scope:           scope,
+					ShouldUpdate: func(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
+						return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
+							!reflect.DeepEqual(current.Spec.Rules, desired.Spec.Rules)
+					},
+					UpdateFields: func(current, desired *istioclientsecurityv1.AuthorizationPolicy) {
+						current.Spec.Selector = desired.Spec.Selector
+						current.Spec.Rules = desired.Spec.Rules
 					},
 				},
 			},

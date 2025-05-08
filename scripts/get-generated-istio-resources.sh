@@ -27,10 +27,57 @@ fi
 KUBECONTEXT="kind-ztoperator"
 
 echo "# RequestAuthentication"
-kubectl get requestauthentication "$NAME" -n "$NAMESPACE" --context "$KUBECONTEXT" -o yaml || echo "RequestAuthentication $NAME not found in namespace $NAMESPACE"
+kubectl get requestauthentication "$NAME" -n "$NAMESPACE" --context "$KUBECONTEXT" -o yaml | \
+yq eval '
+  del(
+    .metadata.creationTimestamp,
+    .metadata.generation,
+    .metadata.labels,
+    .metadata.namespace,
+    .metadata.ownerReferences,
+    .metadata.resourceVersion,
+    .metadata.uid
+  )
+' -
+
+echo -e "---\n# AuthorizationPolicy (deny-auth-rules)"
+kubectl get authorizationpolicy "${NAME}-deny-auth-rules" -n "$NAMESPACE" --context "$KUBECONTEXT" -o yaml | \
+yq eval '
+  del(
+    .metadata.creationTimestamp,
+    .metadata.generation,
+    .metadata.labels,
+    .metadata.namespace,
+    .metadata.ownerReferences,
+    .metadata.resourceVersion,
+    .metadata.uid
+  )
+' -
 
 echo -e "---\n# AuthorizationPolicy (ignore-auth)"
-kubectl get authorizationpolicy "${NAME}-ignore-auth" -n "$NAMESPACE" --context "$KUBECONTEXT" -o yaml || echo "AuthorizationPolicy ${NAME}-ignore-auth not found in namespace $NAMESPACE"
+kubectl get authorizationpolicy "${NAME}-ignore-auth" -n "$NAMESPACE" --context "$KUBECONTEXT" -o yaml | \
+yq eval '
+  del(
+    .metadata.creationTimestamp,
+    .metadata.generation,
+    .metadata.labels,
+    .metadata.namespace,
+    .metadata.ownerReferences,
+    .metadata.resourceVersion,
+    .metadata.uid
+  )
+' -
 
 echo -e "---\n# AuthorizationPolicy (require-auth)"
-kubectl get authorizationpolicy "${NAME}-require-auth" -n "$NAMESPACE" --context "$KUBECONTEXT" -o yaml || echo "AuthorizationPolicy ${NAME}-require-auth not found in namespace $NAMESPACE"
+kubectl get authorizationpolicy "${NAME}-require-auth" -n "$NAMESPACE" --context "$KUBECONTEXT" -o yaml | \
+yq eval '
+  del(
+    .metadata.creationTimestamp,
+    .metadata.generation,
+    .metadata.labels,
+    .metadata.namespace,
+    .metadata.ownerReferences,
+    .metadata.resourceVersion,
+    .metadata.uid
+  )
+' -

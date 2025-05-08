@@ -1,35 +1,31 @@
 package authorizationpolicy
 
 import (
-	"github.com/kartverket/ztoperator/api/v1alpha1"
+	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"istio.io/api/security/v1beta1"
 )
 
-func GetApiSurfaceDiffAsRuleToList(requestMatchers, otherRequestMatchers []v1alpha1.RequestMatcher) []*v1beta1.Rule_To {
-	var diff []*v1beta1.Rule_To
-	for _, requestMatcher := range requestMatchers {
-		ruleTo := &v1beta1.Rule_To{
-			Operation: &v1beta1.Operation{
-				Paths:   requestMatcher.Paths,
-				Methods: requestMatcher.Methods,
-			},
+func GetBaseConditions(jwtRule ztoperatorv1alpha1.RequestAuth, notValues bool) []*v1beta1.Condition {
+	makeCondition := func(key string, values []string) *v1beta1.Condition {
+		if notValues {
+			return &v1beta1.Condition{
+				Key:       key,
+				NotValues: values,
+			}
 		}
-		for _, otherRequestMatcher := range otherRequestMatchers {
-			ruleTo.Operation.NotPaths = append(ruleTo.Operation.NotPaths, otherRequestMatcher.Paths...)
+		return &v1beta1.Condition{
+			Key:    key,
+			Values: values,
 		}
-		diff = append(diff, ruleTo)
 	}
-	for _, otherRequestMatcher := range otherRequestMatchers {
-		notMethods := otherRequestMatcher.Methods
-		if len(notMethods) == 0 {
-			notMethods = append(notMethods, v1alpha1.AcceptedHttpMethods...)
-		}
-		diff = append(diff, &v1beta1.Rule_To{
-			Operation: &v1beta1.Operation{
-				Paths:      otherRequestMatcher.Paths,
-				NotMethods: notMethods,
-			},
-		})
+
+	conditions := []*v1beta1.Condition{
+		makeCondition("request.auth.claims[iss]", []string{jwtRule.IssuerUri}),
+		makeCondition("request.auth.claims[aud]", jwtRule.Audience),
 	}
-	return diff
+
+	if jwtRule.AcceptedResources != nil {
+		conditions = append(conditions, makeCondition("request.auth.claims[aud]", *jwtRule.AcceptedResources))
+	}
+	return conditions
 }
