@@ -58,8 +58,8 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+manifests: controller-gen ## Generate ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) rbac:roleName=ztoperator crd paths="./..." output:crd:artifacts:config=config/crd/bases
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -132,15 +132,6 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/crd | $(KUBECTL) --context $(KUBECONTEXT) delete --ignore-not-found=$(ignore-not-found) -f -
-
-.PHONY: deploy
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | $(KUBECTL) --context $(KUBECONTEXT) apply -f -
-
-.PHONY: undeploy
-undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | $(KUBECTL) --context $(KUBECONTEXT) delete --ignore-not-found=$(ignore-not-found) -f -
 
 ##@ Dependencies
 .PHONY: kustomize
@@ -218,7 +209,10 @@ install-skiperator:
 
 .PHONY: install-mock-oauth2
 install-mock-oauth2:
-	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-mock-oauth2.sh
+	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-mock-oauth2.sh --config ./scripts/mock-oauth2-server-config.json
+
+.PHONY: setup-local-test
+setup-local-test: install-skiperator install-mock-oauth2 expose-ingress virtualenv
 
 #### ZTOPERATOR DEPENDENCIES ####
 
@@ -265,12 +259,12 @@ test: chainsaw install
 
 .PHONY: run-unit-tests
 run-unit-tests:
-	@failed_tests=$$(go test ./... 2>&1 | grep "^FAIL" | awk '{print $$2}'); \
-		if [ -n "$$failed_tests" ]; then \
-			echo -e "\033[31mFailed Unit Tests: [$$failed_tests]\033[0m" && exit 1; \
-		else \
-			echo -e "\033[32mAll unit tests passed\033[0m"; \
-		fi
+	@if [ -z "$$(find . -name '*_test.go')" ]; then \
+		echo "No unit tests found. Skipping."; \
+	else \
+		echo "Running unit tests..."; \
+		go test ./... -v || (echo "Unit tests failed" && exit 1); \
+	fi
 
 .PHONY: run-test
 export IMAGE_PULL_0_REGISTRY := ghcr.io
@@ -285,10 +279,16 @@ run-test: build
 	echo "ztoperator PID: $$PID"; \
 	echo "Log redirected to file: $$LOG_FILE"; \
 	( \
-		if [ -z "$(TEST_DIR)" ]; then \
-			$(MAKE) test; \
-		else \
-			$(MAKE) test-single dir=$(TEST_DIR); \
-		fi; \
-	) && \
-	(echo "Stopping ztoperator (PID $$PID)..." && kill $$PID && echo "running unit tests..." && $(MAKE) run-unit-tests)  || (echo "Test or ztoperator failed. Stopping ztoperator (PID $$PID)" && kill $$PID && exit 1)
+		for dir in test/chainsaw/authpolicy/*/ ; do \
+			echo "Running test in $$dir"; \
+			if ! $(MAKE) test-single dir=$$dir; then \
+				echo "Test in $$dir failed. Stopping ztoperator (PID $$PID)"; \
+				kill $$PID; \
+				exit 1; \
+			fi; \
+		done; \
+		echo "Stopping ztoperator (PID $$PID)..."; \
+		kill $$PID; \
+		echo "running unit tests..."; \
+		$(MAKE) run-unit-tests; \
+	) || (echo "Test or ztoperator failed." && exit 1)

@@ -1,9 +1,0 @@
-apiVersion: ztoperator.kartverket.no/v1alpha1
-kind: AuthPolicy
-metadata:
-  labels:
-    app.kubernetes.io/name: ztoperator
-    app.kubernetes.io/managed-by: kustomize
-  name: authpolicy-sample
-spec:
-  # TODO(user): Add fields here

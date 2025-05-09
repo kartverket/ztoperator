@@ -1,0 +1,409 @@
+# RequestAuthentication
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: auth-policy
+spec:
+  jwtRules:
+    - audiences:
+        - idporten_server
+      forwardOriginalToken: true
+      issuer: https://fake.auth/idporten
+      jwksUri: http://mock-oauth2.auth:8080/idporten/jwks
+    - audiences:
+        - maskinporten_server
+      forwardOriginalToken: true
+      issuer: https://fake.auth/maskinporten
+      jwksUri: http://mock-oauth2.auth:8080/maskinporten/jwks
+    - audiences:
+        - entraid_server
+      forwardOriginalToken: true
+      issuer: https://fake.auth/entraid
+      jwksUri: http://mock-oauth2.auth:8080/entraid/jwks
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (deny-auth-rules)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-deny-auth-rules
+spec:
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            methods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /idporten/secure
+      when:
+        - key: request.auth.claims[iss]
+          notValues:
+            - https://fake.auth/idporten
+        - key: request.auth.claims[aud]
+          notValues:
+            - idporten_server
+        - key: request.auth.claims[role]
+          notValues:
+            - idporten_role
+    - to:
+        - operation:
+            paths:
+              - /maskinporten/secure
+      when:
+        - key: request.auth.claims[iss]
+          notValues:
+            - https://fake.auth/maskinporten
+        - key: request.auth.claims[aud]
+          notValues:
+            - maskinporten_server
+        - key: request.auth.claims[role]
+          notValues:
+            - maskinporten_role
+    - to:
+        - operation:
+            paths:
+              - /entraid/*
+      when:
+        - key: request.auth.claims[iss]
+          notValues:
+            - https://fake.auth/entraid
+        - key: request.auth.claims[aud]
+          notValues:
+            - entraid_server
+        - key: request.auth.claims[role]
+          notValues:
+            - entraid_role
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (ignore-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-ignore-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            paths:
+              - /idporten/public
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /maskinporten/public
+        - operation:
+            paths:
+              - /entraid/public
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (require-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-require-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            notMethods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /idporten/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /maskinporten/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/*
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /idporten/public
+        - operation:
+            notMethods:
+              - GET
+            paths:
+              - /maskinporten/public
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/public
+        - operation:
+            notPaths:
+              - /idporten/secure
+              - /maskinporten/secure
+              - /entraid/*
+              - /idporten/public
+              - /maskinporten/public
+              - /entraid/public
+            paths:
+              - '*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/idporten
+        - key: request.auth.claims[aud]
+          values:
+            - idporten_server
+    - to:
+        - operation:
+            notMethods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /idporten/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /maskinporten/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/*
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /idporten/public
+        - operation:
+            notMethods:
+              - GET
+            paths:
+              - /maskinporten/public
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/public
+        - operation:
+            notPaths:
+              - /idporten/secure
+              - /maskinporten/secure
+              - /entraid/*
+              - /idporten/public
+              - /maskinporten/public
+              - /entraid/public
+            paths:
+              - '*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/maskinporten
+        - key: request.auth.claims[aud]
+          values:
+            - maskinporten_server
+    - to:
+        - operation:
+            notMethods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /idporten/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /maskinporten/secure
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/*
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /idporten/public
+        - operation:
+            notMethods:
+              - GET
+            paths:
+              - /maskinporten/public
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /entraid/public
+        - operation:
+            notPaths:
+              - /idporten/secure
+              - /maskinporten/secure
+              - /entraid/*
+              - /idporten/public
+              - /maskinporten/public
+              - /entraid/public
+            paths:
+              - '*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+    - to:
+        - operation:
+            methods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /idporten/secure
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/idporten
+        - key: request.auth.claims[aud]
+          values:
+            - idporten_server
+        - key: request.auth.claims[role]
+          values:
+            - idporten_role
+    - to:
+        - operation:
+            paths:
+              - /maskinporten/secure
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/maskinporten
+        - key: request.auth.claims[aud]
+          values:
+            - maskinporten_server
+        - key: request.auth.claims[role]
+          values:
+            - maskinporten_role
+    - to:
+        - operation:
+            paths:
+              - /entraid/*
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+        - key: request.auth.claims[role]
+          values:
+            - entraid_role
+  selector:
+    matchLabels:
+      app: application

@@ -1,4 +1,0 @@
-## Append samples of your project ##
-resources:
-- ztoperator_v1alpha1_authpolicy.yaml
-# +kubebuilder:scaffold:manifestskustomizesamples

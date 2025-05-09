@@ -60,6 +60,13 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
+                    audience:
+                      description: |-
+                        Audience defines the accepted audience (`aud`) values in the JWT.
+                        At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
+                      items:
+                        type: string
+                      type: array
                     authRules:
                       description: |-
                         AuthRules defines rules for allowing HTTP requests based on conditions
@@ -198,6 +205,16 @@ spec:
                         - paths
                         type: object
                       type: array
+                    issuerURI:
+                      description: |-
+                        IssuerUri specifies the expected issuer (`iss`) claim in the JWT.
+                        This should match the issuer identifier used when the token was generated.
+                      type: string
+                    jwksURI:
+                      description: |-
+                        JwksUri is the URI where the JSON Web Key Set (JWKS) can be fetched.
+                        It is used to validate the signature of incoming JWTs.
+                      type: string
                     outputClaimToHeaders:
                       description: "OutputClaimsToHeaders specifies a list of operations
                         to copy the claim to HTTP headers on a successfully verified
@@ -229,20 +246,11 @@ spec:
                         - header
                         type: object
                       type: array
-                    secretName:
-                      description: |-
-                        The name of the Kubernetes Secret containing OAuth2 credentials.
-                        Expected secret keys prefixed with optional SecretPrefix: CLIENT_ID, ISSUER, JWKS_URI, WELL_KNOWN_URL
-                      type: string
-                    secretPrefix:
-                      default: ""
-                      description: The prefix used for secret names in the Kubernetes
-                        Secret. Defaults to empty string.
-                      example: IDPORTEN_
-                      type: string
                   required:
+                  - audience
                   - enabled
-                  - secretName
+                  - issuerURI
+                  - jwksURI
                   type: object
                 type: array
               selector:
