@@ -268,12 +268,12 @@ test: chainsaw install
 
 .PHONY: run-unit-tests
 run-unit-tests:
-	@failed_tests=$$(go test ./... 2>&1 | grep "^FAIL" | awk '{print $$2}'); \
-		if [ -n "$$failed_tests" ]; then \
-			echo -e "\033[31mFailed Unit Tests: [$$failed_tests]\033[0m" && exit 1; \
-		else \
-			echo -e "\033[32mAll unit tests passed\033[0m"; \
-		fi
+	@if [ -z "$$(find . -name '*_test.go')" ]; then \
+		echo "No unit tests found. Skipping."; \
+	else \
+		echo "Running unit tests..."; \
+		go test ./... -v || (echo "Unit tests failed" && exit 1); \
+	fi
 
 .PHONY: run-test
 export IMAGE_PULL_0_REGISTRY := ghcr.io
