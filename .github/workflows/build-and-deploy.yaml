@@ -63,22 +63,22 @@ jobs:
     outputs:
       image_digest: ${{ steps.build-docker.outputs.digest }}
 
-#  pharos-scan:
-#    if: (!github.event.pull_request.draft)
-#    name: Run Pharos Security Scan
-#    needs: build
-#    runs-on: ubuntu-latest
-#    permissions:
-#      contents: read
-#      packages: read
-#      actions: read
-#      security-events: write
-#    steps:
-#      - name: Run Pharos
-#        uses: kartverket/pharos@v0.3.1
-#        with:
-#          image_url: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{needs.build.outputs.image_digest}}"
-#          tfsec: false
+  pharos-scan:
+    if: (!github.event.pull_request.draft)
+    name: Run Pharos Security Scan
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      actions: read
+      security-events: write
+    steps:
+      - name: Run Pharos
+        uses: kartverket/pharos@v0.3.1
+        with:
+          image_url: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{needs.build.outputs.image_digest}}"
+          tfsec: false
 #
 #  generate:
 #    if: (!github.event.pull_request.draft)
