@@ -30,3 +30,5 @@ istio-*
 
 # samples fodler
 samples/
+# Added by goreleaser init:
+dist/
