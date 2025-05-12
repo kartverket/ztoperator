@@ -55,6 +55,7 @@ dockers:
   - image_templates:
       - "ghcr.io/kartverket/ztoperator:{{ .Tag }}-linux-amd64"
     use: buildx
+    dockerfile: Dockerfile.goreleaser
     build_flag_templates:
       - "--pull"
       - "--platform=linux/amd64"
@@ -63,6 +64,7 @@ dockers:
   - image_templates:
       - "ghcr.io/kartverket/ztoperator:{{ .Tag }}-linux-arm64"
     use: buildx
+    dockerfile: Dockerfile.goreleaser
     build_flag_templates:
       - "--pull"
       - "--platform=linux/arm64"
