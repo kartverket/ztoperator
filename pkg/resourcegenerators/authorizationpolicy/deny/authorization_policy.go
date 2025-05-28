@@ -24,17 +24,19 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 						NotValues: condition.Values,
 					})
 				}
-				denyRules = append(denyRules, &v1beta1.Rule{
-					To: []*v1beta1.Rule_To{
-						{
-							Operation: &v1beta1.Operation{
-								Paths:   rule.Paths,
-								Methods: rule.Methods,
+				for _, istioCondition := range authPolicyConditionsAsIstioConditions {
+					denyRules = append(denyRules, &v1beta1.Rule{
+						To: []*v1beta1.Rule_To{
+							{
+								Operation: &v1beta1.Operation{
+									Paths:   rule.Paths,
+									Methods: rule.Methods,
+								},
 							},
 						},
-					},
-					When: authPolicyConditionsAsIstioConditions,
-				})
+						When: []*v1beta1.Condition{istioCondition},
+					})
+				}
 			}
 		}
 	}

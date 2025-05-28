@@ -7,14 +7,27 @@ spec:
     - enabled: true
       ignoreAuthRules:
         - paths:
-            - /entraid/public
+            - /api-docs*
+          methods:
+            - GET
       authRules:
         - paths:
-            - /entraid/secure
+            - /api/update*
+          methods:
+            - POST
+            - DELETE
           when:
-            - claim: "role"
+            - claim: role
               values:
-                - "entraid_role"
+                - entra_user_role
+        - paths:
+            - /api/*
+          methods:
+            - GET
+          when:
+            - claim: role
+              values:
+                - entra_user_role
       audience:
         - entraid_server
       issuerURI: https://fake.auth/entraid

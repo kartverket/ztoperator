@@ -1,9 +1,6 @@
 package v1alpha1
 
 import (
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
-	"istio.io/api/security/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -272,6 +269,16 @@ func (ap *AuthPolicy) GetIgnoreAuthRequestMatchers() []RequestMatcher {
 	return ignoreAuthRequestMatchers
 }
 
+func (ap *AuthPolicy) GetAuthorizedPaths() []string {
+	var authorizedPaths []string
+	for _, requestMatcher := range ap.GetRequireAuthRequestMatchers() {
+		for _, path := range requestMatcher.Paths {
+			authorizedPaths = append(authorizedPaths, path)
+		}
+	}
+	return authorizedPaths
+}
+
 func GetRequestMatchers(requestAuthRules *[]RequestAuthRule) []RequestMatcher {
 	var requestMatchers []RequestMatcher
 	if requestAuthRules != nil {
@@ -280,73 +287,4 @@ func GetRequestMatchers(requestAuthRules *[]RequestAuthRule) []RequestMatcher {
 		}
 	}
 	return requestMatchers
-}
-
-func ResolveAuthPolicy(authPolicy *AuthPolicy) *AuthPolicy {
-	//authPolicy.Spec.Rules = ignorePathsFromOtherRules(authPolicy.Spec.Rules)
-	return authPolicy
-}
-
-func ignorePathsFromOtherRules(rules []RequestAuth) []RequestAuth {
-	for index, jwtRule := range rules {
-		if jwtRule.AuthRules == nil {
-			var empty []RequestAuthRule
-			jwtRule.AuthRules = &empty
-		}
-		if jwtRule.IgnoreAuthRules == nil {
-			var empty []RequestMatcher
-			jwtRule.IgnoreAuthRules = &empty
-		}
-		requireAuthRequestMatchers := GetRequestMatchers(jwtRule.AuthRules)
-		ignoredRequestMatchers := flattenOnPaths(*jwtRule.IgnoreAuthRules)
-		authorizedRequestMatchers := flattenOnPaths(requireAuthRequestMatchers)
-		for otherIndex, otherJwtRule := range rules {
-			if index != otherIndex {
-				otherRequireAuthRequestMatchers := GetRequestMatchers(otherJwtRule.AuthRules)
-				otherAuthorizedRequestMatchers := flattenOnPaths(otherRequireAuthRequestMatchers)
-				for otherPath, otherRequestMapper := range otherAuthorizedRequestMatchers {
-					if !slices.Contains(maps.Keys(ignoredRequestMatchers), otherPath) &&
-						!slices.Contains(maps.Keys(authorizedRequestMatchers), otherPath) {
-						*jwtRule.IgnoreAuthRules = append(*jwtRule.IgnoreAuthRules, RequestMatcher{
-							Paths:   otherRequestMapper.Operation.Paths,
-							Methods: otherRequestMapper.Operation.Methods,
-						})
-					}
-				}
-			}
-		}
-		rules[index] = jwtRule
-	}
-	return rules
-}
-
-func flattenOnPaths(requestMatchers []RequestMatcher) map[string]*v1beta1.Rule_To {
-	requestMatchersMap := make(map[string]*v1beta1.Rule_To)
-	if requestMatchers != nil {
-		for _, requestMatcher := range requestMatchers {
-			for _, path := range requestMatcher.Paths {
-				if existingMatcher, exists := requestMatchersMap[path]; exists {
-					// Combine methods if the path key already exists and remove duplicates
-					uniqueMethods := make(map[string]struct{})
-					for _, method := range append(existingMatcher.Operation.Methods, requestMatcher.Methods...) {
-						uniqueMethods[method] = struct{}{}
-					}
-					existingMatcher.Operation.Methods = maps.Keys(uniqueMethods)
-					requestMatchersMap[path] = existingMatcher
-				} else {
-					methods := requestMatcher.Methods
-					if len(methods) == 0 {
-						methods = AcceptedHttpMethods
-					}
-					requestMatchersMap[path] = &v1beta1.Rule_To{
-						Operation: &v1beta1.Operation{
-							Paths:   []string{path},
-							Methods: methods,
-						},
-					}
-				}
-			}
-		}
-	}
-	return requestMatchersMap
 }

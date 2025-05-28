@@ -51,7 +51,9 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 
 	for _, jwtRule := range scope.AuthPolicy.Spec.Rules {
 		baseConditions := authorizationpolicy.GetBaseConditions(jwtRule, false)
-		if len(*jwtRule.AuthRules)+len(*jwtRule.IgnoreAuthRules) == 0 {
+
+		if (jwtRule.AuthRules == nil || len(*jwtRule.AuthRules) == 0) &&
+			(jwtRule.IgnoreAuthRules == nil || len(*jwtRule.IgnoreAuthRules) == 0) {
 			authorizationPolicyRules = append(authorizationPolicyRules, &v1beta1.Rule{
 				To: []*v1beta1.Rule_To{
 					{

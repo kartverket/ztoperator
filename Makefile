@@ -249,13 +249,21 @@ test-single: chainsaw install
     echo "Test succeeded" || (echo "Test failed" && exit 1)
 
 .PHONY: test
-export IMAGE_PULL_0_REGISTRY := ghcr.io
-export IMAGE_PULL_1_REGISTRY := https://index.docker.io/v1/
-export IMAGE_PULL_0_TOKEN :=
-export IMAGE_PULL_1_TOKEN :=
-test: chainsaw install
-	@./bin/chainsaw test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir test/ && \
-    echo "Test succeeded" || (echo "Test failed" && exit 1)
+test:
+	@echo "Checking if ztoperator is running..."
+	@pgrep -f "ztoperator" > /dev/null || (echo "ztoperator is not running. Please start it first." && exit 1)
+	@echo "ztoperator is running. Proceeding with tests..."
+	@bash -ec ' \
+		for dir in test/chainsaw/authpolicy/*/ ; do \
+			echo "Running test in $$dir"; \
+			if ! $(MAKE) test-single dir=$$dir; then \
+				echo "Test in $$dir failed."; \
+				exit 1; \
+			fi; \
+		done; \
+		echo "running unit tests..."; \
+		$(MAKE) run-unit-tests; \
+	' || (echo "Test(s) failed." && exit 1)
 
 .PHONY: run-unit-tests
 run-unit-tests:
