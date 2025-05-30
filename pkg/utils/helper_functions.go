@@ -29,3 +29,7 @@ func BuildObjectMeta(name, namespace string) metav1.ObjectMeta {
 		Labels:    map[string]string{"type": "ztoperator.kartverket.no"},
 	}
 }
+
+func Ptr[T any](v T) *T {
+	return &v
+}

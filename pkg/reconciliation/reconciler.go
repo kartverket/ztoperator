@@ -12,6 +12,7 @@ type ReconcileAction interface {
 	Reconcile(ctx context.Context, k8sClient client.Client, scheme *runtime.Scheme) (ctrl.Result, error)
 	GetResourceKind() string
 	GetResourceName() string
+	IsResourceNil() bool
 }
 
 type ReconcileFuncAdapter[T client.Object] struct {
@@ -21,8 +22,18 @@ type ReconcileFuncAdapter[T client.Object] struct {
 type ReconcileFunc[T client.Object] struct {
 	ResourceKind    string
 	ResourceName    string
-	DesiredResource T
+	DesiredResource *T
 	Scope           *state.Scope
 	ShouldUpdate    func(current T, desired T) bool
 	UpdateFields    func(current T, desired T)
+}
+
+func CountReconciledResources(rfs []ReconcileAction) int {
+	count := 0
+	for _, rf := range rfs {
+		if !rf.IsResourceNil() {
+			count++
+		}
+	}
+	return count
 }

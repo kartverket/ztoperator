@@ -53,20 +53,5 @@ spec:
             - GET
 ```
 
-## Running integration tests locally
-Set up a local kind cluster and install dependencies:
-```bash
-make setup-local setup-local-test
-```
-Then run all tests:
-```bash
-make run-test
-```
-You can also run specific tests. This will require you to run the ztoperator controller seperately in another terminal or in your IDE.
-```bash
-# Run ztoperator in IDE or on another terminal
-make run-local
-
-# Run specific test
-make test-single dir=test/chainsaw/authpolicy/<TEST FOLDER>
-```
+## Local development
+Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) on how to run and test ztoperator locally.

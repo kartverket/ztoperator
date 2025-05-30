@@ -60,6 +60,10 @@ func (a AuthPolicyAdapter[T]) GetResourceName() string {
 	return a.Func.ResourceName
 }
 
+func (a AuthPolicyAdapter[T]) IsResourceNil() bool {
+	return a.Func.DesiredResource == nil || reflect.ValueOf(*a.Func.DesiredResource).IsNil()
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -102,9 +106,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
-	resolved := ztoperatorv1alpha1.ResolveAuthPolicy(authPolicy)
-
-	scope := &state.Scope{AuthPolicy: resolved}
+	scope := &state.Scope{AuthPolicy: authPolicy}
 
 	requestAuthenticationName := authPolicy.Name
 	denyAuthorizationPolicyName := authPolicy.Name + "-deny-auth-rules"
@@ -117,7 +119,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.RequestAuthentication]{
 					ResourceKind:    "RequestAuthentication",
 					ResourceName:    requestAuthenticationName,
-					DesiredResource: requestauthentication.GetDesired(scope, utils.BuildObjectMeta(requestAuthenticationName, authPolicy.Namespace)),
+					DesiredResource: utils.Ptr(requestauthentication.GetDesired(scope, utils.BuildObjectMeta(requestAuthenticationName, authPolicy.Namespace))),
 					Scope:           scope,
 					ShouldUpdate: func(current, desired *istioclientsecurityv1.RequestAuthentication) bool {
 						return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
@@ -135,7 +137,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
 					ResourceKind:    "AuthorizationPolicy",
 					ResourceName:    denyAuthorizationPolicyName,
-					DesiredResource: deny.GetDesired(scope, utils.BuildObjectMeta(denyAuthorizationPolicyName, authPolicy.Namespace)),
+					DesiredResource: utils.Ptr(deny.GetDesired(scope, utils.BuildObjectMeta(denyAuthorizationPolicyName, authPolicy.Namespace))),
 					Scope:           scope,
 					ShouldUpdate: func(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
 						return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
@@ -153,7 +155,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
 					ResourceKind:    "AuthorizationPolicy",
 					ResourceName:    ignoreAuthAuthorizationPolicyName,
-					DesiredResource: ignore_auth.GetDesired(scope, utils.BuildObjectMeta(ignoreAuthAuthorizationPolicyName, authPolicy.Namespace)),
+					DesiredResource: utils.Ptr(ignore_auth.GetDesired(scope, utils.BuildObjectMeta(ignoreAuthAuthorizationPolicyName, authPolicy.Namespace))),
 					Scope:           scope,
 					ShouldUpdate: func(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
 						return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
@@ -171,7 +173,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
 					ResourceKind:    "AuthorizationPolicy",
 					ResourceName:    requireAuthAuthorizationPolicyName,
-					DesiredResource: require_auth.GetDesired(scope, utils.BuildObjectMeta(requireAuthAuthorizationPolicyName, authPolicy.Namespace)),
+					DesiredResource: utils.Ptr(require_auth.GetDesired(scope, utils.BuildObjectMeta(requireAuthAuthorizationPolicyName, authPolicy.Namespace))),
 					Scope:           scope,
 					ShouldUpdate: func(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
 						return !reflect.DeepEqual(current.Spec.Selector, desired.Spec.Selector) ||
@@ -231,7 +233,7 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, scope *state.Sc
 	}
 
 	switch {
-	case len(scope.Descendants) != len(reconcileFuncs):
+	case len(scope.Descendants) != reconciliation.CountReconciledResources(reconcileFuncs):
 		ap.Status.Phase = ztoperatorv1alpha1.PhasePending
 		ap.Status.Ready = false
 		ap.Status.Message = "AuthPolicy pending due to missing Descendants."
@@ -281,15 +283,17 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, scope *state.Sc
 		conditions = append(conditions, cond)
 	}
 	for _, rf := range reconcileFuncs {
-		expectedID := state.GetID(rf.GetResourceKind(), rf.GetResourceName())
-		if !descendantIDs[expectedID] {
-			conditions = append(conditions, metav1.Condition{
-				Type:               expectedID,
-				Status:             metav1.ConditionFalse,
-				Reason:             "NotFound",
-				Message:            fmt.Sprintf("Expected resource %s of kind %s was not created", rf.GetResourceName(), rf.GetResourceKind()),
-				LastTransitionTime: metav1.Now(),
-			})
+		if !rf.IsResourceNil() {
+			expectedID := state.GetID(rf.GetResourceKind(), rf.GetResourceName())
+			if !descendantIDs[expectedID] {
+				conditions = append(conditions, metav1.Condition{
+					Type:               expectedID,
+					Status:             metav1.ConditionFalse,
+					Reason:             "NotFound",
+					Message:            fmt.Sprintf("Expected resource %s of kind %s was not created", rf.GetResourceName(), rf.GetResourceKind()),
+					LastTransitionTime: metav1.Now(),
+				})
+			}
 		}
 	}
 
@@ -323,50 +327,90 @@ func reconcileAuthPolicy[T client.Object](
 	scheme *runtime.Scheme,
 	scope *state.Scope,
 	resourceKind, resourceName string,
-	desired T,
+	desired *T,
 	shouldUpdate func(current, desired T) bool,
 	updateFields func(current, desired T),
 ) (ctrl.Result, error) {
 	rLog := log.GetLogger(ctx)
-	kind := reflect.TypeOf(desired).Elem().Name()
-	current := reflect.New(reflect.TypeOf(desired).Elem()).Interface().(T)
+	if desired == nil || reflect.ValueOf(*desired).IsNil() {
+		// Resource is not desired. Try deleting the existing one if it exists.
+		resourceType := reflect.TypeOf((*T)(nil)).Elem()
+		current := reflect.New(resourceType.Elem()).Interface().(T)
 
-	rLog.Info(fmt.Sprintf("Trying to generate %s %s/%s", kind, desired.GetNamespace(), desired.GetName()))
+		accessor := current
+		accessor.SetNamespace(scope.AuthPolicy.Namespace)
+		accessor.SetName(resourceName)
 
-	rLog.Debug(fmt.Sprintf("Checking if %s %s/%s exists", kind, desired.GetNamespace(), desired.GetName()))
-	err := k8sClient.Get(ctx, client.ObjectKeyFromObject(desired), current)
+		rLog.Info(fmt.Sprintf("Desired %s %s/%s is nil. Will try to delete it if it exist", resourceKind, accessor.GetNamespace(), accessor.GetName()))
+		rLog.Debug(fmt.Sprintf("Checking if %s %s/%s exists", resourceKind, accessor.GetNamespace(), accessor.GetName()))
+
+		err := k8sClient.Get(ctx, client.ObjectKeyFromObject(accessor), current)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				rLog.Debug(fmt.Sprintf("%s %s/%s already deleted", resourceKind, accessor.GetNamespace(), accessor.GetName()))
+				return ctrl.Result{}, nil
+			}
+			getErrorMessage := fmt.Sprintf("Failed to get %s %s/%s when trying to delete it.", resourceKind, accessor.GetNamespace(), accessor.GetName())
+			rLog.Error(err, getErrorMessage)
+			scope.ReplaceDescendant(accessor, &getErrorMessage, nil, resourceKind, resourceName)
+			return ctrl.Result{}, err
+		}
+
+		rLog.Info(fmt.Sprintf("Deleting %s %s/%s as it's no longer desired", resourceKind, accessor.GetNamespace(), accessor.GetName()))
+		if err := k8sClient.Delete(ctx, current); err != nil {
+			deleteErrorMessage := fmt.Sprintf("Failed to delete %s %s/%s", resourceKind, accessor.GetNamespace(), accessor.GetName())
+			rLog.Error(err, deleteErrorMessage)
+			scope.ReplaceDescendant(accessor, &deleteErrorMessage, nil, resourceKind, resourceName)
+			return ctrl.Result{}, err
+		}
+
+		rLog.Debug(fmt.Sprintf("Successfully deleted %s %s/%s", resourceKind, accessor.GetNamespace(), accessor.GetName()))
+		successMsg := fmt.Sprintf("Deleted %s %s/%s as it is no longer desired.", resourceKind, accessor.GetNamespace(), accessor.GetName())
+		scope.ReplaceDescendant(accessor, nil, &successMsg, resourceKind, resourceName)
+		return ctrl.Result{}, nil
+	}
+
+	deReferencedDesired := *desired
+
+	kind := reflect.TypeOf(deReferencedDesired).Elem().Name()
+	current := reflect.New(reflect.TypeOf(deReferencedDesired).Elem()).Interface().(T)
+
+	rLog.Info(fmt.Sprintf("Trying to generate %s %s/%s", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()))
+
+	rLog.Debug(fmt.Sprintf("Checking if %s %s/%s exists", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()))
+	err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deReferencedDesired), current)
 	if apierrors.IsNotFound(err) {
-		rLog.Debug(fmt.Sprintf("%s %s/%s does not exist", kind, desired.GetNamespace(), desired.GetName()))
-		if err := ctrl.SetControllerReference(scope.AuthPolicy, desired, scheme); err != nil {
-			errorReason := fmt.Sprintf("Unable to set AuthPolicy ownerReference on %s %s/%s.", kind, desired.GetNamespace(), desired.GetName())
-			scope.ReplaceDescendant(desired, &errorReason, nil, resourceKind, resourceName)
+		rLog.Debug(fmt.Sprintf("%s %s/%s does not exist", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()))
+		if err := ctrl.SetControllerReference(scope.AuthPolicy, deReferencedDesired, scheme); err != nil {
+			errorReason := fmt.Sprintf("Unable to set AuthPolicy ownerReference on %s %s/%s.", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName())
+			scope.ReplaceDescendant(deReferencedDesired, &errorReason, nil, resourceKind, resourceName)
 			return ctrl.Result{}, err
 		}
 
-		rLog.Info(fmt.Sprintf("Creating %s %s/%s", kind, desired.GetNamespace(), desired.GetName()))
-		if err := k8sClient.Create(ctx, desired); err != nil {
-			errorReason := fmt.Sprintf("Unable to create %s %s/%s", kind, desired.GetNamespace(), desired.GetName())
-			scope.ReplaceDescendant(desired, &errorReason, nil, resourceKind, resourceName)
+		rLog.Info(fmt.Sprintf("Creating %s %s/%s", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()))
+		if err := k8sClient.Create(ctx, deReferencedDesired); err != nil {
+			errorReason := fmt.Sprintf("Unable to create %s %s/%s", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName())
+			scope.ReplaceDescendant(deReferencedDesired, &errorReason, nil, resourceKind, resourceName)
 			return ctrl.Result{}, err
 		}
-		successMessage := fmt.Sprintf("Successfully created %s %s/%s.", kind, desired.GetNamespace(), desired.GetName())
-		scope.ReplaceDescendant(desired, nil, &successMessage, resourceKind, resourceName)
+		successMessage := fmt.Sprintf("Successfully created %s %s/%s.", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName())
+		scope.ReplaceDescendant(deReferencedDesired, nil, &successMessage, resourceKind, resourceName)
 
 		return ctrl.Result{}, nil
 	}
 
 	if err != nil {
-		errorReason := fmt.Sprintf("Unable to get %s %s/%s.", kind, desired.GetNamespace(), desired.GetName())
-		scope.ReplaceDescendant(desired, &errorReason, nil, resourceKind, resourceName)
+		errorReason := fmt.Sprintf("Unable to get %s %s/%s.", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName())
+		scope.ReplaceDescendant(deReferencedDesired, &errorReason, nil, resourceKind, resourceName)
 		return ctrl.Result{}, err
 	}
 
-	rLog.Debug(fmt.Sprintf("%s %s/%s exists", kind, desired.GetNamespace(), desired.GetName()))
-	rLog.Debug(fmt.Sprintf("Determing if %s %s/%s should be updated", kind, desired.GetNamespace(), desired.GetName()))
-	if shouldUpdate(current, desired) {
-		rLog.Debug(fmt.Sprintf("Current %s %s/%s != desired", kind, desired.GetNamespace(), desired.GetName()))
-		rLog.Debug(fmt.Sprintf("Updating current %s %s/%s with desired", kind, desired.GetNamespace(), desired.GetName()))
-		updateFields(current, desired)
+	rLog.Debug(fmt.Sprintf("%s %s/%s exists", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()))
+	rLog.Debug(fmt.Sprintf("Determing if %s %s/%s should be updated", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()))
+	if shouldUpdate(current, deReferencedDesired) {
+		rLog.Debug(fmt.Sprintf("Current %s %s/%s != desired", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()))
+		rLog.Debug(fmt.Sprintf("Updating current %s %s/%s with desired", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()))
+		updateFields(current, deReferencedDesired)
 
 		if err := k8sClient.Update(ctx, current); err != nil {
 			errorReason := fmt.Sprintf("Unable to update %s %s/%s.", kind, current.GetNamespace(), current.GetName())
@@ -375,7 +419,7 @@ func reconcileAuthPolicy[T client.Object](
 		}
 
 	} else {
-		rLog.Debug(fmt.Sprintf("Current %s %s/%s == desired. No update needed.", kind, desired.GetNamespace(), desired.GetName()))
+		rLog.Debug(fmt.Sprintf("Current %s %s/%s == desired. No update needed.", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()))
 	}
 
 	successMessage := fmt.Sprintf("Successfully generated %s %s/%s", kind, current.GetNamespace(), current.GetName())

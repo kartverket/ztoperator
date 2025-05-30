@@ -32,3 +32,6 @@ istio-*
 samples/
 # Added by goreleaser init:
 dist/
+
+# Python virtualenv
+venv/

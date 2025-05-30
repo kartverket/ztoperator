@@ -44,9 +44,27 @@ spec:
         - key: request.auth.claims[iss]
           notValues:
             - https://fake.auth/idporten
+    - to:
+        - operation:
+            methods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /idporten/secure
+      when:
         - key: request.auth.claims[aud]
           notValues:
             - idporten_server
+    - to:
+        - operation:
+            methods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /idporten/secure
+      when:
         - key: request.auth.claims[role]
           notValues:
             - idporten_role
@@ -58,9 +76,19 @@ spec:
         - key: request.auth.claims[iss]
           notValues:
             - https://fake.auth/maskinporten
+    - to:
+        - operation:
+            paths:
+              - /maskinporten/secure
+      when:
         - key: request.auth.claims[aud]
           notValues:
             - maskinporten_server
+    - to:
+        - operation:
+            paths:
+              - /maskinporten/secure
+      when:
         - key: request.auth.claims[role]
           notValues:
             - maskinporten_role
@@ -72,9 +100,19 @@ spec:
         - key: request.auth.claims[iss]
           notValues:
             - https://fake.auth/entraid
+    - to:
+        - operation:
+            paths:
+              - /entraid/*
+      when:
         - key: request.auth.claims[aud]
           notValues:
             - entraid_server
+    - to:
+        - operation:
+            paths:
+              - /entraid/*
+      when:
         - key: request.auth.claims[role]
           notValues:
             - entraid_role
