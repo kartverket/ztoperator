@@ -3,7 +3,7 @@ module github.com/kartverket/ztoperator
 go 1.24.3
 
 require (
-	github.com/go-logr/logr v1.4.2
+	github.com/go-logr/logr v1.4.3
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6
 	istio.io/api v1.26.0
