@@ -9,6 +9,10 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
+	if !scope.AuthPolicy.Spec.Enabled || !scope.HasValidPaths {
+		return nil
+	}
+
 	ignoreAuthRequestMatchers := scope.AuthPolicy.GetIgnoreAuthRequestMatchers()
 
 	var ruleToList []*v1beta1.Rule_To

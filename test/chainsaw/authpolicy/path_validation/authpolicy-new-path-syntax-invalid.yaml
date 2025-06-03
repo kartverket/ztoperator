@@ -1,0 +1,33 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: single-asterix-not-alone-in-segment
+spec:
+  enabled: true
+  ignoreAuthRules:
+    - paths:
+        - /api/{*}something/secure
+  audience:
+    - entraid_server
+  issuerURI: https://fake.auth/entraid
+  jwksURI: http://mock-oauth2.auth:8080/entraid/jwks
+  selector:
+    matchLabels:
+      app: application
+---
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: wildcard-after-double-asterix
+spec:
+  enabled: true
+  ignoreAuthRules:
+    - paths:
+        - /api/{**}/secure/{*}
+  audience:
+    - entraid_server
+  issuerURI: https://fake.auth/entraid
+  jwksURI: http://mock-oauth2.auth:8080/entraid/jwks
+  selector:
+    matchLabels:
+      app: application

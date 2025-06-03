@@ -1,0 +1,35 @@
+---
+# AuthorizationPolicy (deny-auth-rules)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: single-asterix-not-alone-in-segment-deny-auth-rules
+spec:
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            paths:
+              - '*'
+  selector:
+    matchLabels:
+      app: application
+---
+---
+# AuthorizationPolicy (deny-auth-rules)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: wildcard-after-double-asterix-deny-auth-rules
+spec:
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            paths:
+              - '*'
+  selector:
+    matchLabels:
+      app: application
+---
+

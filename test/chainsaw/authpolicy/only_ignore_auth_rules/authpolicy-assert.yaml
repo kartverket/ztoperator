@@ -14,6 +14,22 @@ spec:
     matchLabels:
       app: application
 ---
+# AuthorizationPolicy (ignore-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-ignore-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            paths:
+              - /public*
+              - /anotherPublic*
+  selector:
+    matchLabels:
+      app: application
+---
 # AuthorizationPolicy (require-auth)
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
@@ -23,6 +39,23 @@ spec:
   rules:
     - to:
         - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /public*
+              - /anotherPublic*
+        - operation:
+            notPaths:
+              - /public*
+              - /anotherPublic*
             paths:
               - '*'
       when:

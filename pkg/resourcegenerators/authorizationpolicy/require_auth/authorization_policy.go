@@ -12,11 +12,27 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
+	if !scope.AuthPolicy.Spec.Enabled || !scope.HasValidPaths {
+		return nil
+	}
+
 	var authorizationPolicyRules []*v1beta1.Rule
 
-	for _, jwtRule := range scope.AuthPolicy.Spec.Rules {
-		baseConditions := authorizationpolicy.GetBaseConditions(jwtRule, false)
+	baseConditions := authorizationpolicy.GetBaseConditions(*scope.AuthPolicy, false)
 
+	if (scope.AuthPolicy.Spec.AuthRules == nil || len(*scope.AuthPolicy.Spec.AuthRules) == 0) &&
+		(scope.AuthPolicy.Spec.IgnoreAuthRules == nil || len(*scope.AuthPolicy.Spec.IgnoreAuthRules) == 0) {
+		authorizationPolicyRules = append(authorizationPolicyRules, &v1beta1.Rule{
+			To: []*v1beta1.Rule_To{
+				{
+					Operation: &v1beta1.Operation{
+						Paths: []string{"*"},
+					},
+				},
+			},
+			When: baseConditions,
+		})
+	} else {
 		var toList []*v1beta1.Rule_To
 		var mentionedPaths []string
 		for _, matcher := range append(
@@ -47,25 +63,8 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 			To:   toList,
 			When: baseConditions,
 		})
-	}
-
-	for _, jwtRule := range scope.AuthPolicy.Spec.Rules {
-		baseConditions := authorizationpolicy.GetBaseConditions(jwtRule, false)
-
-		if (jwtRule.AuthRules == nil || len(*jwtRule.AuthRules) == 0) &&
-			(jwtRule.IgnoreAuthRules == nil || len(*jwtRule.IgnoreAuthRules) == 0) {
-			authorizationPolicyRules = append(authorizationPolicyRules, &v1beta1.Rule{
-				To: []*v1beta1.Rule_To{
-					{
-						Operation: &v1beta1.Operation{
-							Paths: []string{"*"},
-						},
-					},
-				},
-				When: baseConditions,
-			})
-		} else {
-			for _, authRule := range *jwtRule.AuthRules {
+		if scope.AuthPolicy.Spec.AuthRules != nil {
+			for _, authRule := range *scope.AuthPolicy.Spec.AuthRules {
 				var authPolicyConditionsAsIstioConditions []*v1beta1.Condition
 				for _, condition := range authRule.When {
 					authPolicyConditionsAsIstioConditions = append(authPolicyConditionsAsIstioConditions, &v1beta1.Condition{

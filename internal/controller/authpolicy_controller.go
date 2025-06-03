@@ -108,6 +108,16 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	scope := &state.Scope{AuthPolicy: authPolicy}
 
+	if err := utils.ValidatePaths(authPolicy.GetPaths()); err != nil {
+		rLog.Error(err, fmt.Sprintf("Path validation failed for AuthPolicy with name %s", req.NamespacedName.String()))
+		rLog.Debug(fmt.Sprintf("Path validation failed for AuthPolicy with name %s. Defaulting to default deny on all paths.", req.NamespacedName.String()))
+		scope.HasValidPaths = false
+		pathValidationError := err.Error()
+		scope.PathValidationErrorMessage = &pathValidationError
+	} else {
+		scope.HasValidPaths = true
+	}
+
 	requestAuthenticationName := authPolicy.Name
 	denyAuthorizationPolicyName := authPolicy.Name + "-deny-auth-rules"
 	ignoreAuthAuthorizationPolicyName := authPolicy.Name + "-ignore-auth"
@@ -233,6 +243,14 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, scope *state.Sc
 	}
 
 	switch {
+	case !scope.HasValidPaths:
+		ap.Status.Phase = ztoperatorv1alpha1.PhaseInvalid
+		ap.Status.Ready = false
+		ap.Status.Message = *scope.PathValidationErrorMessage
+		authPolicyCondition.Status = metav1.ConditionFalse
+		authPolicyCondition.Reason = "InvalidConfiguration"
+		authPolicyCondition.Message = *scope.PathValidationErrorMessage
+
 	case len(scope.Descendants) != reconciliation.CountReconciledResources(reconcileFuncs):
 		ap.Status.Phase = ztoperatorv1alpha1.PhasePending
 		ap.Status.Ready = false

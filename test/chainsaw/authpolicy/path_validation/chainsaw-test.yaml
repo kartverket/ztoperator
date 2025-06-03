@@ -1,0 +1,34 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: path-validation
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: authpolicy-mixing-path-syntax.yaml
+        - assert:
+            file: authpolicy-mixing-path-syntax-assert.yaml
+        - create:
+            file: authpolicy-new-path-syntax-invalid.yaml
+        - assert:
+            file: authpolicy-new-path-syntax-invalid-assert.yaml
+        - create:
+            file: authpolicy-new-path-syntax-valid.yaml
+        - assert:
+            file: authpolicy-new-path-syntax-valid-assert.yaml
+        - create:
+            file: authpolicy-old-path-syntax-invalid.yaml
+        - assert:
+            file: authpolicy-old-path-syntax-invalid-assert.yaml
+        - create:
+            file: authpolicy-old-path-syntax-valid.yaml
+        - assert:
+            file: authpolicy-old-path-syntax-valid-assert.yaml

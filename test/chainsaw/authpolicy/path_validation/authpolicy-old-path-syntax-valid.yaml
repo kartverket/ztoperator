@@ -1,9 +1,14 @@
 apiVersion: ztoperator.kartverket.no/v1alpha1
 kind: AuthPolicy
 metadata:
-  name: auth-policy
+  name: auth-policy-valid-old-syntax
 spec:
   enabled: true
+  ignoreAuthRules:
+    - paths:
+        - '*/prefix'
+        - /suffix*
+        - '*'
   audience:
     - entraid_server
   issuerURI: https://fake.auth/entraid

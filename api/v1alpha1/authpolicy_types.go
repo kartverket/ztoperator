@@ -6,29 +6,6 @@ import (
 
 // AuthPolicySpec defines the desired state of AuthPolicy.
 type AuthPolicySpec struct {
-	// Rules specifies how incoming requests should be allowed or denied based on the presence and validation of accompanying JWTs.
-	// +kubebuilder:validation:Required
-	Rules []RequestAuth `json:"rules"`
-
-	// The Selector specifies which workload the defined auth policy should be applied to.
-	// +kubebuilder:validation:Required
-	Selector WorkloadSelector `json:"selector"`
-}
-
-type WorkloadSelector struct {
-	// One or more labels that indicate a specific set of pods/VMs
-	// on which a policy should be applied. The scope of label search is restricted to
-	// the configuration namespace in which the resource is present.
-	// +kubebuilder:validation:XValidation:message="wildcard not allowed in label key match",rule="self.all(key, !key.contains('*'))"
-	// +kubebuilder:validation:XValidation:message="key must not be empty",rule="self.all(key, key.size() != 0)"
-	// +kubebuilder:validation:MaxProperties=4096
-	MatchLabels map[string]string `json:"matchLabels,omitempty"`
-}
-
-// RequestAuth specifies how incoming JWTs should be validated.
-//
-// +kubebuilder:object:generate=true
-type RequestAuth struct {
 	// Whether to enable JWT validation.
 	// If enabled, incoming JWTs will be validated against the issuer specified in the app registration and the generated audience.
 	//
@@ -102,6 +79,20 @@ type RequestAuth struct {
 	//
 	// +kubebuilder:validation:Optional
 	IgnoreAuthRules *[]RequestMatcher `json:"ignoreAuthRules,omitempty"`
+
+	// The Selector specifies which workload the defined auth policy should be applied to.
+	// +kubebuilder:validation:Required
+	Selector WorkloadSelector `json:"selector"`
+}
+
+type WorkloadSelector struct {
+	// One or more labels that indicate a specific set of pods/VMs
+	// on which a policy should be applied. The scope of label search is restricted to
+	// the configuration namespace in which the resource is present.
+	// +kubebuilder:validation:XValidation:message="wildcard not allowed in label key match",rule="self.all(key, !key.contains('*'))"
+	// +kubebuilder:validation:XValidation:message="key must not be empty",rule="self.all(key, key.size() != 0)"
+	// +kubebuilder:validation:MaxProperties=4096
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
 }
 
 // ClaimToHeader specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.
@@ -138,12 +129,11 @@ type RequestAuthRule struct {
 //
 // +kubebuilder:object:generate=true
 type RequestMatcher struct {
-	// Paths specifies a set of URI paths that this rule applies to.
+	// Paths specify a set of URI paths that this rule applies to.
 	// Each path must be a valid URI path, starting with '/' and not ending with '/'.
-	// The wildcard '*' is allowed only at the end of the path.
 	//
 	// +listType=set
-	// +kubebuilder:validation:Items.Pattern=`^/[a-zA-Z0-9\-._~!$&'()+,;=:@%/]*(\*)?$`
+	// +kubebuilder:validation:Items.Pattern=`^\/(?:[^*/]+|\*|\*\*)(?:\/(?:[^*/]+|\*|\*\*))*\/?$`
 	Paths []string `json:"paths"`
 
 	// Methods specifies HTTP methods that applies for the defined paths.
@@ -200,6 +190,7 @@ const (
 	PhasePending Phase = "Pending"
 	PhaseReady   Phase = "Ready"
 	PhaseFailed  Phase = "Failed"
+	PhaseInvalid Phase = "Invalid"
 )
 
 // +kubebuilder:object:root=true
@@ -251,20 +242,16 @@ func (ap *AuthPolicy) InitializeStatus() {
 
 func (ap *AuthPolicy) GetRequireAuthRequestMatchers() []RequestMatcher {
 	var requireAuthRequestMatchers []RequestMatcher
-	for _, rule := range ap.Spec.Rules {
-		if rule.AuthRules != nil {
-			requireAuthRequestMatchers = append(requireAuthRequestMatchers, GetRequestMatchers(rule.AuthRules)...)
-		}
+	if ap.Spec.AuthRules != nil {
+		requireAuthRequestMatchers = append(requireAuthRequestMatchers, GetRequestMatchers(ap.Spec.AuthRules)...)
 	}
 	return requireAuthRequestMatchers
 }
 
 func (ap *AuthPolicy) GetIgnoreAuthRequestMatchers() []RequestMatcher {
 	var ignoreAuthRequestMatchers []RequestMatcher
-	for _, rule := range ap.Spec.Rules {
-		if rule.IgnoreAuthRules != nil {
-			ignoreAuthRequestMatchers = append(ignoreAuthRequestMatchers, *rule.IgnoreAuthRules...)
-		}
+	if ap.Spec.IgnoreAuthRules != nil {
+		ignoreAuthRequestMatchers = append(ignoreAuthRequestMatchers, *ap.Spec.IgnoreAuthRules...)
 	}
 	return ignoreAuthRequestMatchers
 }
@@ -287,4 +274,19 @@ func GetRequestMatchers(requestAuthRules *[]RequestAuthRule) []RequestMatcher {
 		}
 	}
 	return requestMatchers
+}
+
+func (ap *AuthPolicy) GetPaths() []string {
+	var paths []string
+	if ap.Spec.AuthRules != nil {
+		for _, authRule := range *ap.Spec.AuthRules {
+			paths = append(paths, authRule.Paths...)
+		}
+	}
+	if ap.Spec.IgnoreAuthRules != nil {
+		for _, ignoreAuthRule := range *ap.Spec.IgnoreAuthRules {
+			paths = append(paths, ignoreAuthRule.Paths...)
+		}
+	}
+	return paths
 }

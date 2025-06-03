@@ -10,37 +10,36 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.RequestAuthentication {
-	var jwtRules []*securityv1.JWTRule
+	if !scope.AuthPolicy.Spec.Enabled || !scope.HasValidPaths {
+		return nil
+	}
 
-	for _, rule := range scope.AuthPolicy.Spec.Rules {
-		jwtRule := &securityv1.JWTRule{
-			Issuer:               rule.IssuerUri,
-			Audiences:            rule.Audience,
-			JwksUri:              rule.JwksUri,
-			ForwardOriginalToken: rule.ForwardJwt,
-		}
+	jwtRule := &securityv1.JWTRule{
+		Issuer:               scope.AuthPolicy.Spec.IssuerUri,
+		Audiences:            scope.AuthPolicy.Spec.Audience,
+		JwksUri:              scope.AuthPolicy.Spec.JwksUri,
+		ForwardOriginalToken: scope.AuthPolicy.Spec.ForwardJwt,
+	}
 
-		if rule.FromCookies != nil && len(*rule.FromCookies) > 0 {
-			jwtRule.FromCookies = *rule.FromCookies
-		}
-		if rule.OutputClaimToHeaders != nil && len(*rule.OutputClaimToHeaders) > 0 {
-			claimsToHeaders := make([]*v1beta1.ClaimToHeader, len(*rule.OutputClaimToHeaders))
-			for i, claimToHeader := range *rule.OutputClaimToHeaders {
-				claimsToHeaders[i] = &v1beta1.ClaimToHeader{
-					Header: claimToHeader.Header,
-					Claim:  claimToHeader.Claim,
-				}
+	if scope.AuthPolicy.Spec.FromCookies != nil && len(*scope.AuthPolicy.Spec.FromCookies) > 0 {
+		jwtRule.FromCookies = *scope.AuthPolicy.Spec.FromCookies
+	}
+	if scope.AuthPolicy.Spec.OutputClaimToHeaders != nil && len(*scope.AuthPolicy.Spec.OutputClaimToHeaders) > 0 {
+		claimsToHeaders := make([]*v1beta1.ClaimToHeader, len(*scope.AuthPolicy.Spec.OutputClaimToHeaders))
+		for i, claimToHeader := range *scope.AuthPolicy.Spec.OutputClaimToHeaders {
+			claimsToHeaders[i] = &v1beta1.ClaimToHeader{
+				Header: claimToHeader.Header,
+				Claim:  claimToHeader.Claim,
 			}
-			jwtRule.OutputClaimToHeaders = claimsToHeaders
 		}
-		jwtRules = append(jwtRules, jwtRule)
+		jwtRule.OutputClaimToHeaders = claimsToHeaders
 	}
 
 	return &istioclientsecurityv1.RequestAuthentication{
 		ObjectMeta: objectMeta,
 		Spec: securityv1.RequestAuthentication{
 			Selector: &istiotypev1beta1.WorkloadSelector{MatchLabels: scope.AuthPolicy.Spec.Selector.MatchLabels},
-			JwtRules: jwtRules,
+			JwtRules: []*securityv1.JWTRule{jwtRule},
 		},
 	}
 }

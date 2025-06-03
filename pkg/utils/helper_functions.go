@@ -1,8 +1,11 @@
 package utils
 
 import (
+	"fmt"
+	"istio.io/istio/pkg/config/security"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"strings"
 )
 
 func LowestNonZeroResult(i, j ctrl.Result) ctrl.Result {
@@ -32,4 +35,19 @@ func BuildObjectMeta(name, namespace string) metav1.ObjectMeta {
 
 func Ptr[T any](v T) *T {
 	return &v
+}
+
+func ValidatePaths(paths []string) error {
+	for _, path := range paths {
+		if strings.Contains(path, "{") || strings.Contains(path, "}") {
+			if err := security.CheckValidPathTemplate("Paths", paths); err != nil {
+				return err
+			}
+			continue
+		}
+		if strings.Count(path, "*") > 1 || (strings.Contains(path, "*") && !(path == "*" || strings.HasPrefix(path, "*") || strings.HasSuffix(path, "*"))) {
+			return fmt.Errorf("invalid path: %s; '*' must appear only once, be at the start, end, or be '*'", path)
+		}
+	}
+	return nil
 }

@@ -1,7 +1,7 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: multiple-providers
+  name: only-ignore-auth-rules
 spec:
   skip: false
   concurrent: true
@@ -28,6 +28,4 @@ spec:
             content: |
               hurl --error-format long \
               --insecure --test tests.hurl \
-              --variable idporten_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer idporten --code idporten_code)" \
-              --variable maskinporten_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer maskinporten --code maskinporten_code)" \
-              --variable entraid_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client)"              
+              --variable entraid_token_client="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client)"

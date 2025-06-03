@@ -4,6 +4,10 @@ metadata:
   name: auth-policy
 spec:
   enabled: true
+  ignoreAuthRules:
+    - paths:
+        - /public*
+        - /anotherPublic*
   audience:
     - entraid_server
   issuerURI: https://fake.auth/entraid

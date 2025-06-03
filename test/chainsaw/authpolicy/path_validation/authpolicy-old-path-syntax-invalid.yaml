@@ -1,9 +1,12 @@
 apiVersion: ztoperator.kartverket.no/v1alpha1
 kind: AuthPolicy
 metadata:
-  name: auth-policy
+  name: asterix-in-path
 spec:
   enabled: true
+  ignoreAuthRules:
+    - paths:
+        - /asterix/*/in/path
   audience:
     - entraid_server
   issuerURI: https://fake.auth/entraid
