@@ -122,7 +122,7 @@ func flattenAuthRules(authRules []v1alpha1.RequestAuthRule) []AuthRuleDeny {
 
 func (rule AuthRuleDeny) IsSubSetOf(otherRule AuthRuleDeny) bool {
 
-	//TODO: Denne må oppdateres til å finne subset mellom to paths både med den gamle path syntaxen OG den nye
+	//TODO: Denne må oppdateres til å finne subset mellom to paths både med den gamle path syntaxen OG den n
 
 	if rule.Method != otherRule.Method {
 		return false

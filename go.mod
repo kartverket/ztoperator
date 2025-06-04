@@ -4,13 +4,9 @@ go 1.24.3
 
 require (
 	github.com/go-logr/logr v1.4.2
-	github.com/onsi/ginkgo/v2 v2.23.4
-	github.com/onsi/gomega v1.37.0
 	go.uber.org/zap v1.27.0
 	istio.io/api v1.26.1
 	istio.io/client-go v1.26.1
-	istio.io/istio v0.0.0-20250602152640-66759ffabfb3
-	k8s.io/api v0.33.0
 	k8s.io/apimachinery v0.33.1
 	k8s.io/client-go v0.33.0
 	sigs.k8s.io/controller-runtime v0.20.4
