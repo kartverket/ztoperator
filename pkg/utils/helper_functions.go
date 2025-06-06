@@ -48,7 +48,7 @@ func Ptr[T any](v T) *T {
 
 func ValidatePaths(paths []string) error {
 	for _, path := range paths {
-		if strings.Contains(path, "{") || strings.Contains(path, "}") {
+		if strings.Contains(path, "{") {
 			if err := validateNewPathSyntax(paths); err != nil {
 				return err
 			}

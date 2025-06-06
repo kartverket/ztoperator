@@ -9,7 +9,6 @@ import (
 	v1beta2 "istio.io/api/type/v1beta1"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
 )
 
 type AuthRuleDeny struct {
@@ -50,8 +49,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 
 	baseConditions := authorizationpolicy.GetBaseConditions(*scope.AuthPolicy, true)
 	if scope.AuthPolicy.Spec.AuthRules != nil {
-		flattenedAuthRules := flattenAuthRules(*scope.AuthPolicy.Spec.AuthRules)
-		for _, rule := range flattenedAuthRules {
+		for _, rule := range *scope.AuthPolicy.Spec.AuthRules {
 			authPolicyConditionsAsIstioConditions := baseConditions
 			for _, condition := range rule.When {
 				authPolicyConditionsAsIstioConditions = append(authPolicyConditionsAsIstioConditions, &v1beta1.Condition{
@@ -60,22 +58,14 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 				})
 			}
 
-			ruleToOperation := v1beta1.Operation{
-				Paths:   []string{rule.Path},
-				Methods: []string{rule.Method},
-			}
-
-			for _, otherRule := range flattenedAuthRules {
-				if otherRule.IsSubSetOf(rule) {
-					ruleToOperation.NotPaths = append(ruleToOperation.NotPaths, otherRule.Path)
-				}
-			}
-
 			for _, istioCondition := range authPolicyConditionsAsIstioConditions {
 				denyRules = append(denyRules, &v1beta1.Rule{
 					To: []*v1beta1.Rule_To{
 						{
-							Operation: &ruleToOperation,
+							Operation: &v1beta1.Operation{
+								Paths:   rule.Paths,
+								Methods: rule.Methods,
+							},
 						},
 					},
 					When: []*v1beta1.Condition{istioCondition},
@@ -97,53 +87,4 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 		}
 	}
 	return nil
-}
-
-func flattenAuthRules(authRules []v1alpha1.RequestAuthRule) []AuthRuleDeny {
-	var flattenedAuthRules []AuthRuleDeny
-	for _, authRule := range authRules {
-		methods := authRule.Methods
-		if len(methods) == 0 {
-			methods = v1alpha1.AcceptedHttpMethods
-		}
-
-		for _, method := range methods {
-			for _, path := range authRule.Paths {
-				flattenedAuthRules = append(flattenedAuthRules, AuthRuleDeny{
-					Path:   path,
-					Method: method,
-					When:   authRule.When,
-				})
-			}
-		}
-	}
-	return flattenedAuthRules
-}
-
-func (rule AuthRuleDeny) IsSubSetOf(otherRule AuthRuleDeny) bool {
-
-	//TODO: Denne må oppdateres til å finne subset mellom to paths både med den gamle path syntaxen OG den n
-
-	if rule.Method != otherRule.Method {
-		return false
-	}
-	if rule.Path == otherRule.Path {
-		return false
-	}
-
-	prefix := func(path string) string {
-		if i := strings.Index(path, "*"); i >= 0 {
-			return path[:i]
-		}
-		return path
-	}
-
-	rulePrefix := prefix(rule.Path)
-	otherPrefix := prefix(otherRule.Path)
-
-	if rulePrefix != otherPrefix {
-		return false
-	}
-
-	return len(rule.Path) > len(otherRule.Path)
 }

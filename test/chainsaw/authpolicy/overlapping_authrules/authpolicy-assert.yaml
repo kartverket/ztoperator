@@ -51,67 +51,40 @@ spec:
       when:
         - key: request.auth.claims[role]
           notValues:
+            - entraid_role
+    - to:
+        - operation:
+            methods:
+              - POST
+              - GET
+            paths:
+              - /api/*
+      when:
+        - key: request.auth.claims[iss]
+          notValues:
+            - https://fake.auth/entraid
+    - to:
+        - operation:
+            methods:
+              - POST
+              - GET
+            paths:
+              - /api/*
+      when:
+        - key: request.auth.claims[aud]
+          notValues:
+            - entraid_server
+    - to:
+        - operation:
+            methods:
+              - POST
+              - GET
+            paths:
+              - /api/*
+      when:
+        - key: request.auth.claims[role]
+          notValues:
             - entra_user_role
-    - to:
-        - operation:
-            methods:
-              - POST
-            paths:
-              - /api/*
-      when:
-        - key: request.auth.claims[iss]
-          notValues:
-            - https://fake.auth/entraid
-    - to:
-        - operation:
-            methods:
-              - POST
-            paths:
-              - /api/*
-      when:
-        - key: request.auth.claims[aud]
-          notValues:
-            - entraid_server
-    - to:
-        - operation:
-            methods:
-              - POST
-            paths:
-              - /api/*
-      when:
-        - key: request.auth.claims[role]
-          notValues:
-            - entraid_role
-    - to:
-        - operation:
-            methods:
-              - GET
-            paths:
-              - /api/*
-      when:
-        - key: request.auth.claims[iss]
-          notValues:
-            - https://fake.auth/entraid
-    - to:
-        - operation:
-            methods:
-              - GET
-            paths:
-              - /api/*
-      when:
-        - key: request.auth.claims[aud]
-          notValues:
-            - entraid_server
-    - to:
-        - operation:
-            methods:
-              - GET
-            paths:
-              - /api/*
-      when:
-        - key: request.auth.claims[role]
-          notValues:
-            - entraid_role
   selector:
     matchLabels:
       app: application
@@ -209,7 +182,7 @@ spec:
             - entraid_server
         - key: request.auth.claims[role]
           values:
-            - entra_user_role
+            - entraid_role
     - to:
         - operation:
             methods:
@@ -226,7 +199,7 @@ spec:
             - entraid_server
         - key: request.auth.claims[role]
           values:
-            - entraid_role
+            - entra_user_role
   selector:
     matchLabels:
       app: application

@@ -26,35 +26,6 @@ spec:
         - operation:
             methods:
               - POST
-            paths:
-              - /api/update*
-      when:
-        - key: request.auth.claims[iss]
-          notValues:
-            - https://fake.auth/entraid
-    - to:
-        - operation:
-            methods:
-              - POST
-            paths:
-              - /api/update*
-      when:
-        - key: request.auth.claims[aud]
-          notValues:
-            - entraid_server
-    - to:
-        - operation:
-            methods:
-              - POST
-            paths:
-              - /api/update*
-      when:
-        - key: request.auth.claims[role]
-          notValues:
-            - entra_user_role
-    - to:
-        - operation:
-            methods:
               - DELETE
             paths:
               - /api/update*
@@ -65,6 +36,7 @@ spec:
     - to:
         - operation:
             methods:
+              - POST
               - DELETE
             paths:
               - /api/update*
@@ -75,6 +47,7 @@ spec:
     - to:
         - operation:
             methods:
+              - POST
               - DELETE
             paths:
               - /api/update*

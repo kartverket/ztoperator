@@ -17,7 +17,7 @@ spec:
       when:
         - claim: role
           values:
-            - entra_user_role
+            - entraid_role
     - paths:
         - /api/*
       methods:
@@ -26,7 +26,7 @@ spec:
       when:
         - claim: role
           values:
-            - entraid_role
+            - entra_user_role
   audience:
     - entraid_server
   issuerURI: https://fake.auth/entraid
