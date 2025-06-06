@@ -1,0 +1,31 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: only-authentication
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: application.yaml
+        - apply:
+            file: wildcard-ingress.yaml
+        - assert:
+            file: application-assert.yaml
+        - create:
+            file: authpolicy.yaml
+        - assert:
+            file: authpolicy-assert.yaml
+        - script:
+            content: sleep 10
+        - script:
+            content: |
+              hurl --error-format long \
+              --insecure --test tests.hurl \
+              --variable entraid_token_client="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client)"

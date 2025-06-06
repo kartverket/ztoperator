@@ -43,214 +43,198 @@ spec:
           spec:
             description: AuthPolicySpec defines the desired state of AuthPolicy.
             properties:
-              rules:
-                description: Rules specifies how incoming requests should be allowed
-                  or denied based on the presence and validation of accompanying JWTs.
+              acceptedResources:
+                description: |-
+                  AcceptedResources is used as a validation field following [RFC8707](https://datatracker.ietf.org/doc/html/rfc8707).
+                  It defines accepted audience resource indicators in the JWT token.
+
+
+                  Each resource indicator must be a valid URI, and the indicator must be present as the `aud` claim in the JWT token.
                 items:
-                  description: RequestAuth specifies how incoming JWTs should be validated.
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
+              audience:
+                description: |-
+                  Audience defines the accepted audience (`aud`) values in the JWT.
+                  At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
+                items:
+                  type: string
+                type: array
+              authRules:
+                description: |-
+                  AuthRules defines rules for allowing HTTP requests based on conditions
+                  that must be met based on JWT claims.
+
+
+                  API endpoints not covered by AuthRules and/or IgnoreAuthRules requires an authenticated JWT by default.
+                items:
+                  description: RequestAuthRule defines a rule for controlling access
+                    to HTTP requests using JWT authentication.
                   properties:
-                    acceptedResources:
+                    methods:
                       description: |-
-                        AcceptedResources is used as a validation field following [RFC8707](https://datatracker.ietf.org/doc/html/rfc8707).
-                        It defines accepted audience resource indicators in the JWT token.
+                        Methods specifies HTTP methods that applies for the defined paths.
+                        If omitted, all methods are permitted.
 
 
-                        Each resource indicator must be a valid URI, and the indicator must be present as the `aud` claim in the JWT token.
+                        Allowed methods:
+                        - GET
+                        - POST
+                        - PUT
+                        - PATCH
+                        - DELETE
+                        - HEAD
+                        - OPTIONS
+                        - TRACE
+                        - CONNECT
                       items:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
-                    audience:
+                    paths:
                       description: |-
-                        Audience defines the accepted audience (`aud`) values in the JWT.
-                        At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
+                        Paths specify a set of URI paths that this rule applies to.
+                        Each path must be a valid URI path, starting with '/' and not ending with '/'.
                       items:
                         type: string
                       type: array
-                    authRules:
+                      x-kubernetes-list-type: set
+                    when:
                       description: |-
-                        AuthRules defines rules for allowing HTTP requests based on conditions
-                        that must be met based on JWT claims.
+                        When defines additional conditions based on JWT claims that must be met.
 
 
-                        API endpoints not covered by AuthRules and/or IgnoreAuthRules requires an authenticated JWT by default.
-                      items:
-                        description: RequestAuthRule defines a rule for controlling
-                          access to HTTP requests using JWT authentication.
-                        properties:
-                          methods:
-                            description: |-
-                              Methods specifies HTTP methods that applies for the defined paths.
-                              If omitted, all methods are permitted.
-
-
-                              Allowed methods:
-                              - GET
-                              - POST
-                              - PUT
-                              - PATCH
-                              - DELETE
-                              - HEAD
-                              - OPTIONS
-                              - TRACE
-                              - CONNECT
-                            items:
-                              type: string
-                            type: array
-                            x-kubernetes-list-type: set
-                          paths:
-                            description: |-
-                              Paths specifies a set of URI paths that this rule applies to.
-                              Each path must be a valid URI path, starting with '/' and not ending with '/'.
-                              The wildcard '*' is allowed only at the end of the path.
-                            items:
-                              type: string
-                            type: array
-                            x-kubernetes-list-type: set
-                          when:
-                            description: |-
-                              When defines additional conditions based on JWT claims that must be met.
-
-
-                              The request is permitted if at least one of the specified conditions is satisfied.
-                            items:
-                              description: |-
-                                Condition represents a rule that evaluates JWT claims to determine access control.
-
-
-                                This type allows defining conditions that check whether a specific claim in
-                                the JWT token contains one of the expected values.
-
-
-                                If multiple conditions are specified, all must be met (AND logic) for the request to be allowed.
-                              properties:
-                                claim:
-                                  description: Claim specifies the name of the JWT
-                                    claim to check.
-                                  type: string
-                                values:
-                                  description: |-
-                                    Values specifies a list of allowed values for the claim.
-                                    If the claim in the JWT contains any of these values (OR logic), the condition is met.
-                                  items:
-                                    type: string
-                                  type: array
-                                  x-kubernetes-list-type: set
-                              required:
-                              - claim
-                              - values
-                              type: object
-                            type: array
-                        required:
-                        - paths
-                        - when
-                        type: object
-                      type: array
-                    enabled:
-                      description: |-
-                        Whether to enable JWT validation.
-                        If enabled, incoming JWTs will be validated against the issuer specified in the app registration and the generated audience.
-                      type: boolean
-                    forwardJwt:
-                      default: true
-                      description: If set to `true`, the original token will be kept
-                        for the upstream request. Defaults to `true`.
-                      type: boolean
-                    fromCookies:
-                      description: FromCookies denotes the cookies from which the
-                        auth policy will look for a JWT.
-                      items:
-                        type: string
-                      type: array
-                    ignoreAuthRules:
-                      description: |-
-                        IgnoreAuthRules defines request matchers for HTTP requests that do not require JWT authentication.
-
-
-                        API endpoints not covered by AuthRules or IgnoreAuthRules require an authenticated JWT by default.
-                      items:
-                        description: RequestMatcher defines paths and methods to match
-                          incoming HTTP requests.
-                        properties:
-                          methods:
-                            description: |-
-                              Methods specifies HTTP methods that applies for the defined paths.
-                              If omitted, all methods are permitted.
-
-
-                              Allowed methods:
-                              - GET
-                              - POST
-                              - PUT
-                              - PATCH
-                              - DELETE
-                              - HEAD
-                              - OPTIONS
-                              - TRACE
-                              - CONNECT
-                            items:
-                              type: string
-                            type: array
-                            x-kubernetes-list-type: set
-                          paths:
-                            description: |-
-                              Paths specifies a set of URI paths that this rule applies to.
-                              Each path must be a valid URI path, starting with '/' and not ending with '/'.
-                              The wildcard '*' is allowed only at the end of the path.
-                            items:
-                              type: string
-                            type: array
-                            x-kubernetes-list-type: set
-                        required:
-                        - paths
-                        type: object
-                      type: array
-                    issuerURI:
-                      description: |-
-                        IssuerUri specifies the expected issuer (`iss`) claim in the JWT.
-                        This should match the issuer identifier used when the token was generated.
-                      type: string
-                    jwksURI:
-                      description: |-
-                        JwksUri is the URI where the JSON Web Key Set (JWKS) can be fetched.
-                        It is used to validate the signature of incoming JWTs.
-                      type: string
-                    outputClaimToHeaders:
-                      description: "OutputClaimsToHeaders specifies a list of operations
-                        to copy the claim to HTTP headers on a successfully verified
-                        token.\nThe header specified in each operation in the list
-                        must be unique. Nested claims of type string/int/bool is supported
-                        as well.\n```\n\n\n\toutputClaimToHeaders:\n\t- header: x-my-company-jwt-group\n\t
-                        \ claim: my-group\n\t- header: x-test-environment-flag\n\t
-                        \ claim: test-flag\n\t- header: x-jwt-claim-group\n\t  claim:
-                        nested.key.group\n\n\n```"
+                        The request is permitted if at least one of the specified conditions is satisfied.
                       items:
                         description: |-
-                          ClaimToHeader specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.
-                          The header specified in each operation in the list must be unique. Nested claims of type string/int/bool is supported as well.
+                          Condition represents a rule that evaluates JWT claims to determine access control.
+
+
+                          This type allows defining conditions that check whether a specific claim in
+                          the JWT token contains one of the expected values.
+
+
+                          If multiple conditions are specified, all must be met (AND logic) for the request to be allowed.
                         properties:
                           claim:
-                            description: Claim specifies the name of the claim in
-                              the JWT token that will be copied to the header.
-                            maxLength: 128
-                            pattern: ^[a-zA-Z0-9-._]+$
+                            description: Claim specifies the name of the JWT claim
+                              to check.
                             type: string
-                          header:
-                            description: Header specifies the name of the HTTP header
-                              to which the claim value will be copied.
-                            maxLength: 64
-                            pattern: ^[a-zA-Z0-9-]+$
-                            type: string
+                          values:
+                            description: |-
+                              Values specifies a list of allowed values for the claim.
+                              If the claim in the JWT contains any of these values (OR logic), the condition is met.
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: set
                         required:
                         - claim
-                        - header
+                        - values
                         type: object
                       type: array
                   required:
-                  - audience
-                  - enabled
-                  - issuerURI
-                  - jwksURI
+                  - paths
+                  - when
+                  type: object
+                type: array
+              enabled:
+                description: |-
+                  Whether to enable JWT validation.
+                  If enabled, incoming JWTs will be validated against the issuer specified in the app registration and the generated audience.
+                type: boolean
+              forwardJwt:
+                default: true
+                description: If set to `true`, the original token will be kept for
+                  the upstream request. Defaults to `true`.
+                type: boolean
+              fromCookies:
+                description: FromCookies denotes the cookies from which the auth policy
+                  will look for a JWT.
+                items:
+                  type: string
+                type: array
+              ignoreAuthRules:
+                description: |-
+                  IgnoreAuthRules defines request matchers for HTTP requests that do not require JWT authentication.
+
+
+                  API endpoints not covered by AuthRules or IgnoreAuthRules require an authenticated JWT by default.
+                items:
+                  description: RequestMatcher defines paths and methods to match incoming
+                    HTTP requests.
+                  properties:
+                    methods:
+                      description: |-
+                        Methods specifies HTTP methods that applies for the defined paths.
+                        If omitted, all methods are permitted.
+
+
+                        Allowed methods:
+                        - GET
+                        - POST
+                        - PUT
+                        - PATCH
+                        - DELETE
+                        - HEAD
+                        - OPTIONS
+                        - TRACE
+                        - CONNECT
+                      items:
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: set
+                    paths:
+                      description: |-
+                        Paths specify a set of URI paths that this rule applies to.
+                        Each path must be a valid URI path, starting with '/' and not ending with '/'.
+                      items:
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: set
+                  required:
+                  - paths
+                  type: object
+                type: array
+              issuerURI:
+                description: |-
+                  IssuerUri specifies the expected issuer (`iss`) claim in the JWT.
+                  This should match the issuer identifier used when the token was generated.
+                type: string
+              jwksURI:
+                description: |-
+                  JwksUri is the URI where the JSON Web Key Set (JWKS) can be fetched.
+                  It is used to validate the signature of incoming JWTs.
+                type: string
+              outputClaimToHeaders:
+                description: "OutputClaimsToHeaders specifies a list of operations
+                  to copy the claim to HTTP headers on a successfully verified token.\nThe
+                  header specified in each operation in the list must be unique. Nested
+                  claims of type string/int/bool is supported as well.\n```\n\n\n\toutputClaimToHeaders:\n\t-
+                  header: x-my-company-jwt-group\n\t  claim: my-group\n\t- header:
+                  x-test-environment-flag\n\t  claim: test-flag\n\t- header: x-jwt-claim-group\n\t
+                  \ claim: nested.key.group\n\n\n```"
+                items:
+                  description: |-
+                    ClaimToHeader specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.
+                    The header specified in each operation in the list must be unique. Nested claims of type string/int/bool is supported as well.
+                  properties:
+                    claim:
+                      description: Claim specifies the name of the claim in the JWT
+                        token that will be copied to the header.
+                      maxLength: 128
+                      pattern: ^[a-zA-Z0-9-._]+$
+                      type: string
+                    header:
+                      description: Header specifies the name of the HTTP header to
+                        which the claim value will be copied.
+                      maxLength: 64
+                      pattern: ^[a-zA-Z0-9-]+$
+                      type: string
+                  required:
+                  - claim
+                  - header
                   type: object
                 type: array
               selector:
@@ -273,7 +257,10 @@ spec:
                       rule: self.all(key, key.size() != 0)
                 type: object
             required:
-            - rules
+            - audience
+            - enabled
+            - issuerURI
+            - jwksURI
             - selector
             type: object
           status:

@@ -1,0 +1,36 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+spec:
+  enabled: true
+  ignoreAuthRules:
+    - paths:
+        - /api/public*
+    - paths:
+        - /public*
+  authRules:
+    - paths:
+        - /api/{*}/secure/{**}
+      methods:
+        - POST
+      when:
+        - claim: role
+          values:
+            - entraid_role
+    - paths:
+        - /api/*
+      methods:
+        - POST
+        - GET
+      when:
+        - claim: role
+          values:
+            - entra_user_role
+  audience:
+    - entraid_server
+  issuerURI: https://fake.auth/entraid
+  jwksURI: http://mock-oauth2.auth:8080/entraid/jwks
+  selector:
+    matchLabels:
+      app: application

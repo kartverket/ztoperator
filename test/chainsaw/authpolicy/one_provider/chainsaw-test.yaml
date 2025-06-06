@@ -1,7 +1,7 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: jwtrules
+  name: one-provider
 spec:
   skip: false
   concurrent: true
@@ -28,5 +28,6 @@ spec:
             content: |
               hurl --error-format long \
               --insecure --test tests.hurl \
-              --variable entraid_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_code)" \
+              --variable entraid_token_client="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client)" \
+              --variable entraid_token_user="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_user)" \
               --variable idporten_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer idporten --code idporten_code)"

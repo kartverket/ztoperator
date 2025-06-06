@@ -1,0 +1,16 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: mixing-old-and-new-path-syntax
+spec:
+  enabled: true
+  ignoreAuthRules:
+    - paths:
+        - /api/{*}/*
+  audience:
+    - entraid_server
+  issuerURI: https://fake.auth/entraid
+  jwksURI: http://mock-oauth2.auth:8080/entraid/jwks
+  selector:
+    matchLabels:
+      app: application
