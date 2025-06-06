@@ -59,6 +59,45 @@
           }
         }
       ]
+    },
+    {
+      "issuerId": "smapi",
+      "requestMappings": [
+        {
+          "requestParam": "code",
+          "match": "admin",
+          "claims": {
+            "roles": [
+              "sikkerhetsmetrikker.lese.alt",
+              "sikkerhetsmetrikker.skrive.alt"
+            ],
+            "aud": [
+              "audience"
+            ]
+          }
+        },
+        {
+          "requestParam": "code",
+          "match": "user",
+          "claims": {
+            "aud": [
+              "audience"
+            ]
+          }
+        },
+        {
+          "requestParam": "code",
+          "match": "backstage",
+          "claims": {
+            "roles": [
+              "githubkvmail.lese.alt"
+            ],
+            "aud": [
+              "audience"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

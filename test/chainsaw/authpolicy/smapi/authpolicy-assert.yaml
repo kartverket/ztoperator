@@ -1,0 +1,221 @@
+# RequestAuthentication
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: authpolicy
+spec:
+  jwtRules:
+    - audiences:
+        - audience
+      forwardOriginalToken: true
+      issuer: https://fake.auth/smapi
+      jwksUri: http://mock-oauth2.auth:8080/smapi/jwks
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (deny-auth-rules)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: authpolicy-deny-auth-rules
+spec:
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            methods:
+              - POST
+              - DELETE
+            paths:
+              - /api/oppdateringer*
+              - /api/securityChampion/update
+      when:
+        - key: request.auth.claims[iss]
+          notValues:
+            - https://fake.auth/smapi
+    - to:
+        - operation:
+            methods:
+              - POST
+              - DELETE
+            paths:
+              - /api/oppdateringer*
+              - /api/securityChampion/update
+      when:
+        - key: request.auth.claims[aud]
+          notValues:
+            - audience
+    - to:
+        - operation:
+            methods:
+              - POST
+              - DELETE
+            paths:
+              - /api/oppdateringer*
+              - /api/securityChampion/update
+      when:
+        - key: request.auth.claims[roles]
+          notValues:
+            - sikkerhetsmetrikker.skrive.alt
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /api/securityChampion/workMail
+      when:
+        - key: request.auth.claims[iss]
+          notValues:
+            - https://fake.auth/smapi
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /api/securityChampion/workMail
+      when:
+        - key: request.auth.claims[aud]
+          notValues:
+            - audience
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /api/securityChampion/workMail
+      when:
+        - key: request.auth.claims[roles]
+          notValues:
+            - githubkvmail.lese.alt
+            - sikkerhetsmetrikker.lese.alt
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (ignore-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: authpolicy-ignore-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /swagger-ui*
+              - /api-docs*
+              - /token
+              - /login/oauth2/code/entra
+              - /oauth2/authorization/entra
+              - /dummy/vulnerabilities/*
+              - /api/public/metrikker/avdeling
+        - operation:
+            methods:
+              - POST
+            paths:
+              - /api/backstage/catalogInfo
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (require-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: authpolicy-require-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            notMethods:
+              - POST
+              - DELETE
+            paths:
+              - /api/oppdateringer*
+              - /api/securityChampion/update
+        - operation:
+            notMethods:
+              - GET
+            paths:
+              - /api/securityChampion/workMail
+        - operation:
+            notMethods:
+              - GET
+            paths:
+              - /swagger-ui*
+              - /api-docs*
+              - /token
+              - /login/oauth2/code/entra
+              - /oauth2/authorization/entra
+              - /dummy/vulnerabilities/*
+              - /api/public/metrikker/avdeling
+        - operation:
+            notMethods:
+              - POST
+            paths:
+              - /api/backstage/catalogInfo
+        - operation:
+            notPaths:
+              - /api/oppdateringer*
+              - /api/securityChampion/update
+              - /api/securityChampion/workMail
+              - /swagger-ui*
+              - /api-docs*
+              - /token
+              - /login/oauth2/code/entra
+              - /oauth2/authorization/entra
+              - /dummy/vulnerabilities/*
+              - /api/public/metrikker/avdeling
+              - /api/backstage/catalogInfo
+            paths:
+              - '*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/smapi
+        - key: request.auth.claims[aud]
+          values:
+            - audience
+    - to:
+        - operation:
+            methods:
+              - POST
+              - DELETE
+            paths:
+              - /api/oppdateringer*
+              - /api/securityChampion/update
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/smapi
+        - key: request.auth.claims[aud]
+          values:
+            - audience
+        - key: request.auth.claims[roles]
+          values:
+            - sikkerhetsmetrikker.skrive.alt
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /api/securityChampion/workMail
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/smapi
+        - key: request.auth.claims[aud]
+          values:
+            - audience
+        - key: request.auth.claims[roles]
+          values:
+            - githubkvmail.lese.alt
+            - sikkerhetsmetrikker.lese.alt
+  selector:
+    matchLabels:
+      app: application
+---
+
