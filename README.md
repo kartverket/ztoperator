@@ -19,38 +19,37 @@ spec:
   selector:
     matchLabels:
       app: some-app
-  rules:
-    - enabled: true
-      issuerURI: https://example.com
-      jwksURI: https://example.com/jwks
-      audience: 
-        - example-audience
-      acceptedResources:
-        - https://some-app.com
-      authRules:
-        - paths:
-            - /api
-          methods:
-            - GET
-          when:
-            - claim: sub
-              values:
-                - "*"
-        - paths:
-            - /admin
-          methods:
-            - GET
-            - POST
-            - PUT
-          when:
-            - claim: role
-              values:
-                - "admin"
-      ignoreAuthRules:
-        - paths:
-            - /public
-          methods:
-            - GET
+  enabled: true
+  issuerURI: https://example.com
+  jwksURI: https://example.com/jwks
+  audience:
+    - example-audience
+  acceptedResources:
+   - https://some-app.com
+  authRules:
+    - paths:
+      - /api
+      methods:
+      - GET
+      when:
+        - claim: sub
+          values:
+            - "*"
+    - paths:
+      - /admin
+      methods:
+      - GET
+      - POST
+      - PUT
+      when:
+      - claim: role
+        values:
+          - "admin"
+  ignoreAuthRules:
+    - paths:
+      - /public
+      methods:
+      - GET
 ```
 
 ## Local development
