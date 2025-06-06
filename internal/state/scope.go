@@ -8,8 +8,10 @@ import (
 )
 
 type Scope struct {
-	AuthPolicy  *ztoperatorv1alpha1.AuthPolicy
-	Descendants []Descendant[client.Object]
+	AuthPolicy                 *ztoperatorv1alpha1.AuthPolicy
+	Descendants                []Descendant[client.Object]
+	HasValidPaths              bool
+	PathValidationErrorMessage *string
 }
 
 type Descendant[T client.Object] struct {

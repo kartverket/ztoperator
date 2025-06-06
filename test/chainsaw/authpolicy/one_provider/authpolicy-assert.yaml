@@ -24,18 +24,67 @@ spec:
   rules:
     - to:
         - operation:
+            methods:
+              - POST
+              - DELETE
             paths:
-              - /entraid/secure
+              - /api/update*
       when:
         - key: request.auth.claims[iss]
           notValues:
             - https://fake.auth/entraid
+    - to:
+        - operation:
+            methods:
+              - POST
+              - DELETE
+            paths:
+              - /api/update*
+      when:
         - key: request.auth.claims[aud]
           notValues:
             - entraid_server
+    - to:
+        - operation:
+            methods:
+              - POST
+              - DELETE
+            paths:
+              - /api/update*
+      when:
         - key: request.auth.claims[role]
           notValues:
-            - entraid_role
+            - entra_user_role
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /api/*
+      when:
+        - key: request.auth.claims[iss]
+          notValues:
+            - https://fake.auth/entraid
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /api/*
+      when:
+        - key: request.auth.claims[aud]
+          notValues:
+            - entraid_server
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /api/*
+      when:
+        - key: request.auth.claims[role]
+          notValues:
+            - entra_user_role
   selector:
     matchLabels:
       app: application
@@ -49,8 +98,10 @@ spec:
   rules:
     - to:
         - operation:
+            methods:
+              - GET
             paths:
-              - /entraid/public
+              - /api-docs*
   selector:
     matchLabels:
       app: application
@@ -65,34 +116,25 @@ spec:
     - to:
         - operation:
             notMethods:
-              - GET
               - POST
-              - PUT
-              - PATCH
               - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
             paths:
-              - /entraid/secure
+              - /api/update*
         - operation:
             notMethods:
               - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
             paths:
-              - /entraid/public
+              - /api/*
+        - operation:
+            notMethods:
+              - GET
+            paths:
+              - /api-docs*
         - operation:
             notPaths:
-              - /entraid/secure
-              - /entraid/public
+              - /api/update*
+              - /api/*
+              - /api-docs*
             paths:
               - '*'
       when:
@@ -104,8 +146,11 @@ spec:
             - entraid_server
     - to:
         - operation:
+            methods:
+              - POST
+              - DELETE
             paths:
-              - /entraid/secure
+              - /api/update*
       when:
         - key: request.auth.claims[iss]
           values:
@@ -115,7 +160,25 @@ spec:
             - entraid_server
         - key: request.auth.claims[role]
           values:
-            - entraid_role
+            - entra_user_role
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /api/*
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+        - key: request.auth.claims[role]
+          values:
+            - entra_user_role
   selector:
     matchLabels:
       app: application
+---
+

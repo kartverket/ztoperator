@@ -38,12 +38,62 @@
       "requestMappings": [
         {
           "requestParam": "code",
-          "match": "entraid_code",
+          "match": "entraid_client",
           "claims": {
             "sub": "entraid_client",
             "role": "entraid_role",
             "aud": [
               "entraid_server"
+            ]
+          }
+        },
+        {
+          "requestParam": "code",
+          "match": "entraid_user",
+          "claims": {
+            "sub": "entraid_user",
+            "role": ["entraid_role", "entra_user_role"],
+            "aud": [
+              "entraid_server"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "issuerId": "smapi",
+      "requestMappings": [
+        {
+          "requestParam": "code",
+          "match": "admin",
+          "claims": {
+            "roles": [
+              "sikkerhetsmetrikker.lese.alt",
+              "sikkerhetsmetrikker.skrive.alt"
+            ],
+            "aud": [
+              "audience"
+            ]
+          }
+        },
+        {
+          "requestParam": "code",
+          "match": "user",
+          "claims": {
+            "aud": [
+              "audience"
+            ]
+          }
+        },
+        {
+          "requestParam": "code",
+          "match": "backstage",
+          "claims": {
+            "roles": [
+              "githubkvmail.lese.alt"
+            ],
+            "aud": [
+              "audience"
             ]
           }
         }

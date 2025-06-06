@@ -3,22 +3,34 @@ kind: AuthPolicy
 metadata:
   name: auth-policy
 spec:
-  rules:
-    - enabled: true
-      ignoreAuthRules:
-        - paths:
-            - /entraid/public
-      authRules:
-        - paths:
-            - /entraid/secure
-          when:
-            - claim: "role"
-              values:
-                - "entraid_role"
-      audience:
-        - entraid_server
-      issuerURI: https://fake.auth/entraid
-      jwksURI: http://mock-oauth2.auth:8080/entraid/jwks
+  enabled: true
+  ignoreAuthRules:
+    - paths:
+        - /api-docs*
+      methods:
+        - GET
+  authRules:
+    - paths:
+        - /api/update*
+      methods:
+        - POST
+        - DELETE
+      when:
+        - claim: role
+          values:
+            - entra_user_role
+    - paths:
+        - /api/*
+      methods:
+        - GET
+      when:
+        - claim: role
+          values:
+            - entra_user_role
+  audience:
+    - entraid_server
+  issuerURI: https://fake.auth/entraid
+  jwksURI: http://mock-oauth2.auth:8080/entraid/jwks
   selector:
     matchLabels:
       app: application

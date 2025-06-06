@@ -1,0 +1,34 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: smapi
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: application.yaml
+        - apply:
+            file: wildcard-ingress.yaml
+        - assert:
+            file: application-assert.yaml
+        - create:
+            file: authpolicy.yaml
+        - assert:
+            file: authpolicy-assert.yaml
+        - script:
+            content: sleep 10
+        - script:
+            content: |
+              hurl --error-format long \
+              --insecure --test tests.hurl \
+              --variable baseUrl="https://127.0.0.1:8443" \
+              --variable admin="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer smapi --code admin)" \
+              --variable user="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer smapi --code user)" \
+              --variable backstage="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer smapi --code backstage)"

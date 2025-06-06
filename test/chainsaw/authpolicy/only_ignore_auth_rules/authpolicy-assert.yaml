@@ -1,0 +1,72 @@
+# RequestAuthentication
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: auth-policy
+spec:
+  jwtRules:
+    - audiences:
+        - entraid_server
+      forwardOriginalToken: true
+      issuer: https://fake.auth/entraid
+      jwksUri: http://mock-oauth2.auth:8080/entraid/jwks
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (ignore-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-ignore-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            paths:
+              - /public*
+              - /anotherPublic*
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (require-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-require-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /public*
+              - /anotherPublic*
+        - operation:
+            notPaths:
+              - /public*
+              - /anotherPublic*
+            paths:
+              - '*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - https://fake.auth/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+  selector:
+    matchLabels:
+      app: application
+---
+

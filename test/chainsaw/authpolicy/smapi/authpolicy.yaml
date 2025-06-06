@@ -1,0 +1,48 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: authpolicy
+spec:
+  enabled: true
+  ignoreAuthRules:
+    - paths:
+        - '/swagger-ui*'
+        - '/api-docs*'
+        - '/token'
+        - '/login/oauth2/code/entra'
+        - '/oauth2/authorization/entra'
+        - '/dummy/vulnerabilities/*'
+        - '/api/public/metrikker/avdeling'
+      methods:
+        - GET
+    - paths:
+        - '/api/backstage/catalogInfo'
+      methods:
+        - POST
+  authRules:
+    - paths:
+        - /api/oppdateringer*
+        - /api/securityChampion/update
+      methods:
+        - POST
+        - DELETE
+      when:
+        - claim: roles
+          values:
+            - sikkerhetsmetrikker.skrive.alt
+    - paths:
+        - /api/securityChampion/workMail
+      methods:
+        - GET
+      when:
+        - claim: roles
+          values:
+            - githubkvmail.lese.alt
+            - sikkerhetsmetrikker.lese.alt
+  audience:
+    - audience
+  issuerURI: https://fake.auth/smapi
+  jwksURI: http://mock-oauth2.auth:8080/smapi/jwks
+  selector:
+    matchLabels:
+      app: application

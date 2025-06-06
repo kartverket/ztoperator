@@ -1,0 +1,18 @@
+---
+# AuthorizationPolicy (deny-auth-rules)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: mixing-old-and-new-path-syntax-deny-auth-rules
+spec:
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            paths:
+              - '*'
+  selector:
+    matchLabels:
+      app: application
+---
+
