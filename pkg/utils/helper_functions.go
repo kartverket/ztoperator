@@ -1,10 +1,17 @@
 package utils
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"net/url"
 	"regexp"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 )
 
@@ -48,6 +55,9 @@ func Ptr[T any](v T) *T {
 
 func ValidatePaths(paths []string) error {
 	for _, path := range paths {
+		if !strings.HasPrefix(path, "/") {
+			return fmt.Errorf("invalid path: %s; must start with '/'", path)
+		}
 		if strings.Contains(path, "{") {
 			if err := validateNewPathSyntax(paths); err != nil {
 				return err
@@ -97,4 +107,31 @@ func validateNewPathSyntax(paths []string) error {
 		}
 	}
 	return nil
+}
+
+func GetSecret(client client.Client, ctx context.Context, namespacedName types.NamespacedName) (v1.Secret, error) {
+	secret := v1.Secret{}
+
+	err := client.Get(ctx, namespacedName, &secret)
+
+	return secret, err
+}
+
+func GetHostname(uri string) (*string, error) {
+	parsedURL, err := url.Parse(uri)
+	if err != nil {
+		return nil, err
+	}
+	hostname := parsedURL.Hostname()
+	return &hostname, nil
+}
+
+func GenerateHMACSecret(size int) (*string, error) {
+	secret := make([]byte, size)
+	_, err := rand.Read(secret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate HMAC secret: %w", err)
+	}
+	base64EncodedSecret := base64.StdEncoding.EncodeToString(secret)
+	return &base64EncodedSecret, nil
 }
