@@ -12,23 +12,26 @@ type AuthPolicySpec struct {
 	// +kubebuilder:validation:Required
 	Enabled bool `json:"enabled"`
 
-	// IssuerUri specifies the expected issuer (`iss`) claim in the JWT.
-	// This should match the issuer identifier used when the token was generated.
+	// AutoLogin specifies the required configuration needed to log in users.
 	//
-	// +kubebuilder:validation:Required
-	IssuerUri string `json:"issuerURI"`
+	// +kubebuilder:validation:Optional
+	AutoLogin *AutoLogin `json:"autoLogin,omitempty"`
 
-	// JwksUri is the URI where the JSON Web Key Set (JWKS) can be fetched.
-	// It is used to validate the signature of incoming JWTs.
+	// OAuthCredentials specifies a reference to a kubernetes secret in the same namespace holding OAuth credentials used for authentication.
 	//
 	// +kubebuilder:validation:Required
-	JwksUri string `json:"jwksURI"`
+	OAuthCredentials *OAuthCredentials `json:"oAuthCredentials,omitempty"`
+
+	// WellKnownUri specifies the URi to the identity provider's discovery document (also known as well-known endpoint).
+	//
+	// +kubebuilder:validation:Required
+	WellKnownUri string `json:"wellKnownUri"`
 
 	// Audience defines the accepted audience (`aud`) values in the JWT.
 	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
 	//
-	// +kubebuilder:validation:Required
-	Audience []string `json:"audience"`
+	// +kubebuilder:validation:Optional
+	Audience []string `json:"audience,omitempty"`
 
 	// If set to `true`, the original token will be kept for the upstream request. Defaults to `true`.
 	// +kubebuilder:default=true
@@ -85,6 +88,52 @@ type AuthPolicySpec struct {
 	Selector WorkloadSelector `json:"selector"`
 }
 
+// AutoLogin specifies the required configuration needed to log in users.
+//
+// +kubebuilder:object:generate=true
+type AutoLogin struct {
+	// Whether to enable auto login.
+	// If enabled, users accessing authenticated endpoints will be redirected to log in towards the configured identity provider.
+	//
+	// +kubebuilder:validation:Required
+	Enabled bool `json:"enabled"`
+
+	// RedirectPath specifies which path to redirect the user to after completing the OIDC flow.
+	//
+	// +kubebuilder:validation:Required
+	RedirectPath string `json:"redirectPath"`
+
+	// LogoutPath specifies which URI to redirect the user to when signing out.
+	//
+	// +kubebuilder:validation:Required
+	LogoutPath string `json:"logoutPath"`
+
+	// Scopes specifies the OAuth2 scopes used during authorization code flow.
+	//
+	// +kubebuilder:validation:Required
+	Scopes []string `json:"scopes"`
+}
+
+// OAuthCredentials specifies the kubernetes secret holding OAuth credentials used for authentication.
+//
+// +kubebuilder:object:generate=true
+type OAuthCredentials struct {
+	// SecretRef specifies the name of the kubernetes secret.
+	//
+	// +kubebuilder:validation:Required
+	SecretRef string `json:"secretRef"`
+
+	// ClientSecretKey specifies the data key to access the client secret.
+	//
+	// +kubebuilder:validation:Required
+	ClientSecretKey string `json:"clientSecretKey"`
+
+	// ClientIdKey specifies the data key to access the client secret.
+	//
+	// +kubebuilder:validation:Required
+	ClientIdKey string `json:"clientIdKey"`
+}
+
 type WorkloadSelector struct {
 	// One or more labels that indicate a specific set of pods/VMs
 	// on which a policy should be applied. The scope of label search is restricted to
@@ -133,7 +182,7 @@ type RequestMatcher struct {
 	// Each path must be a valid URI path, starting with '/' and not ending with '/'.
 	//
 	// +listType=set
-	// +kubebuilder:validation:Items.Pattern=`^\/(?:[^*/]+|\*|\*\*)(?:\/(?:[^*/]+|\*|\*\*))*\/?$`
+	// +kubebuilder:validation:Items:Pattern=`^/.*$`
 	Paths []string `json:"paths"`
 
 	// Methods specifies HTTP methods that applies for the defined paths.

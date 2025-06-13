@@ -139,6 +139,35 @@ spec:
                   - when
                   type: object
                 type: array
+              autoLogin:
+                description: AutoLogin specifies the required configuration needed
+                  to log in users.
+                properties:
+                  enabled:
+                    description: |-
+                      Whether to enable auto login.
+                      If enabled, users accessing authenticated endpoints will be redirected to log in towards the configured identity provider.
+                    type: boolean
+                  logoutPath:
+                    description: LogoutPath specifies which URI to redirect the user
+                      to when signing out.
+                    type: string
+                  redirectPath:
+                    description: RedirectPath specifies which path to redirect the
+                      user to after completing the OIDC flow.
+                    type: string
+                  scopes:
+                    description: Scopes specifies the OAuth2 scopes used during authorization
+                      code flow.
+                    items:
+                      type: string
+                    type: array
+                required:
+                - enabled
+                - logoutPath
+                - redirectPath
+                - scopes
+                type: object
               enabled:
                 description: |-
                   Whether to enable JWT validation.
@@ -197,16 +226,27 @@ spec:
                   - paths
                   type: object
                 type: array
-              issuerURI:
-                description: |-
-                  IssuerUri specifies the expected issuer (`iss`) claim in the JWT.
-                  This should match the issuer identifier used when the token was generated.
-                type: string
-              jwksURI:
-                description: |-
-                  JwksUri is the URI where the JSON Web Key Set (JWKS) can be fetched.
-                  It is used to validate the signature of incoming JWTs.
-                type: string
+              oAuthCredentials:
+                description: OAuthCredentials specifies a reference to a kubernetes
+                  secret in the same namespace holding OAuth credentials used for
+                  authentication.
+                properties:
+                  clientIdKey:
+                    description: ClientIdKey specifies the data key to access the
+                      client secret.
+                    type: string
+                  clientSecretKey:
+                    description: ClientSecretKey specifies the data key to access
+                      the client secret.
+                    type: string
+                  secretRef:
+                    description: SecretRef specifies the name of the kubernetes secret.
+                    type: string
+                required:
+                - clientIdKey
+                - clientSecretKey
+                - secretRef
+                type: object
               outputClaimToHeaders:
                 description: "OutputClaimsToHeaders specifies a list of operations
                   to copy the claim to HTTP headers on a successfully verified token.\nThe
@@ -256,12 +296,14 @@ spec:
                     - message: key must not be empty
                       rule: self.all(key, key.size() != 0)
                 type: object
+              wellKnownUri:
+                description: WellKnownUri specifies the URi to the identity provider's
+                  discovery document (also known as well-known endpoint).
+                type: string
             required:
-            - audience
             - enabled
-            - issuerURI
-            - jwksURI
             - selector
+            - wellKnownUri
             type: object
           status:
             description: AuthPolicyStatus defines the observed state of AuthPolicy

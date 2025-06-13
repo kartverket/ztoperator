@@ -5,7 +5,7 @@ import (
 	"istio.io/api/security/v1beta1"
 )
 
-func GetBaseConditions(authPolicy ztoperatorv1alpha1.AuthPolicy, notValues bool) []*v1beta1.Condition {
+func GetBaseConditions(authPolicy ztoperatorv1alpha1.AuthPolicy, issuer string, notValues bool) []*v1beta1.Condition {
 	makeCondition := func(key string, values []string) *v1beta1.Condition {
 		if notValues {
 			return &v1beta1.Condition{
@@ -20,7 +20,7 @@ func GetBaseConditions(authPolicy ztoperatorv1alpha1.AuthPolicy, notValues bool)
 	}
 
 	conditions := []*v1beta1.Condition{
-		makeCondition("request.auth.claims[iss]", []string{authPolicy.Spec.IssuerUri}),
+		makeCondition("request.auth.claims[iss]", []string{issuer}),
 		makeCondition("request.auth.claims[aud]", authPolicy.Spec.Audience),
 	}
 

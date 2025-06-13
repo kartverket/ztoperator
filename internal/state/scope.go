@@ -8,10 +8,32 @@ import (
 )
 
 type Scope struct {
-	AuthPolicy                 *ztoperatorv1alpha1.AuthPolicy
-	Descendants                []Descendant[client.Object]
-	HasValidPaths              bool
-	PathValidationErrorMessage *string
+	AuthPolicy             ztoperatorv1alpha1.AuthPolicy
+	AutoLoginConfig        AutoLoginConfig
+	OAuthCredentials       OAuthCredentials
+	IdentityProviderUris   IdentityProviderUris
+	Descendants            []Descendant[client.Object]
+	InvalidConfig          bool
+	ValidationErrorMessage *string
+}
+
+type IdentityProviderUris struct {
+	IssuerUri        string
+	JwksUri          string
+	TokenUri         string
+	AuthorizationUri string
+}
+
+type AutoLoginConfig struct {
+	Enabled      bool
+	RedirectPath string
+	LogoutPath   string
+	Scopes       []string
+}
+
+type OAuthCredentials struct {
+	ClientId     *string
+	ClientSecret *string
 }
 
 type Descendant[T client.Object] struct {

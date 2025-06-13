@@ -12,13 +12,13 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
-	if !scope.AuthPolicy.Spec.Enabled || !scope.HasValidPaths {
+	if !scope.AuthPolicy.Spec.Enabled || scope.InvalidConfig {
 		return nil
 	}
 
 	var authorizationPolicyRules []*v1beta1.Rule
 
-	baseConditions := authorizationpolicy.GetBaseConditions(*scope.AuthPolicy, false)
+	baseConditions := authorizationpolicy.GetBaseConditions(scope.AuthPolicy, scope.IdentityProviderUris.IssuerUri, false)
 
 	if (scope.AuthPolicy.Spec.AuthRules == nil || len(*scope.AuthPolicy.Spec.AuthRules) == 0) &&
 		(scope.AuthPolicy.Spec.IgnoreAuthRules == nil || len(*scope.AuthPolicy.Spec.IgnoreAuthRules) == 0) {

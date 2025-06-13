@@ -10,13 +10,19 @@ import (
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/deny"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore_auth"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/require_auth"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
+	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/kartverket/ztoperator/pkg/utils"
+	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -78,6 +84,8 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=ztoperator.kartverket.no,resources=authpolicies/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies;requestauthentications,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	rLog := log.GetLogger(ctx)
@@ -106,24 +114,64 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
-	scope := &state.Scope{AuthPolicy: authPolicy}
+	scope, err := resolveAuthPolicy(ctx, r.Client, authPolicy)
+	if err != nil {
+		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.NamespacedName.String()))
+		return reconcile.Result{}, err
+	}
 
 	if err := utils.ValidatePaths(authPolicy.GetPaths()); err != nil {
 		rLog.Error(err, fmt.Sprintf("Path validation failed for AuthPolicy with name %s", req.NamespacedName.String()))
 		rLog.Debug(fmt.Sprintf("Path validation failed for AuthPolicy with name %s. Defaulting to default deny on all paths.", req.NamespacedName.String()))
-		scope.HasValidPaths = false
+		scope.InvalidConfig = true
 		pathValidationError := err.Error()
-		scope.PathValidationErrorMessage = &pathValidationError
+		scope.ValidationErrorMessage = &pathValidationError
 	} else {
-		scope.HasValidPaths = true
+		scope.InvalidConfig = false
 	}
 
+	autoLoginSecretName := authPolicy.Name + "-envoy-secret"
+	autoLoginEnvoyFilter := authPolicy.Name + "-login"
 	requestAuthenticationName := authPolicy.Name
 	denyAuthorizationPolicyName := authPolicy.Name + "-deny-auth-rules"
 	ignoreAuthAuthorizationPolicyName := authPolicy.Name + "-ignore-auth"
 	requireAuthAuthorizationPolicyName := authPolicy.Name + "-require-auth"
 
 	reconcileFuncs := []reconciliation.ReconcileAction{
+		AuthPolicyAdapter[*v1.Secret]{
+			reconciliation.ReconcileFuncAdapter[*v1.Secret]{
+				Func: reconciliation.ReconcileFunc[*v1.Secret]{
+					ResourceKind:    "Secret",
+					ResourceName:    autoLoginSecretName,
+					DesiredResource: utils.Ptr(secret.GetDesired(scope, utils.BuildObjectMeta(autoLoginSecretName, authPolicy.Namespace))),
+					Scope:           scope,
+					ShouldUpdate: func(current, desired *v1.Secret) bool {
+						return !reflect.DeepEqual(current.Data, desired.Data)
+					},
+					UpdateFields: func(current, desired *v1.Secret) {
+						current.Data = desired.Data
+					},
+				},
+			},
+		},
+		AuthPolicyAdapter[*v1alpha4.EnvoyFilter]{
+			reconciliation.ReconcileFuncAdapter[*v1alpha4.EnvoyFilter]{
+				Func: reconciliation.ReconcileFunc[*v1alpha4.EnvoyFilter]{
+					ResourceKind:    "EnvoyFilter",
+					ResourceName:    autoLoginEnvoyFilter,
+					DesiredResource: utils.Ptr(envoyfilter.GetDesired(scope, utils.BuildObjectMeta(autoLoginEnvoyFilter, authPolicy.Namespace))),
+					Scope:           scope,
+					ShouldUpdate: func(current, desired *v1alpha4.EnvoyFilter) bool {
+						return !reflect.DeepEqual(current.Spec.WorkloadSelector, desired.Spec.WorkloadSelector) ||
+							!reflect.DeepEqual(current.Spec.ConfigPatches, desired.Spec.ConfigPatches)
+					},
+					UpdateFields: func(current, desired *v1alpha4.EnvoyFilter) {
+						current.Spec.WorkloadSelector = desired.Spec.WorkloadSelector
+						current.Spec.ConfigPatches = desired.Spec.ConfigPatches
+					},
+				},
+			},
+		},
 		AuthPolicyAdapter[*istioclientsecurityv1.RequestAuthentication]{
 			reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.RequestAuthentication]{
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.RequestAuthentication]{
@@ -211,10 +259,10 @@ func (r *AuthPolicyReconciler) doReconcile(ctx context.Context, reconcileFuncs [
 	for _, rf := range reconcileFuncs {
 		reconcileResult, err := rf.Reconcile(ctx, r.Client, r.Scheme)
 		if err != nil {
-			r.Recorder.Eventf(scope.AuthPolicy, "Warning", fmt.Sprintf("%sReconcileFailed", rf.GetResourceKind()), fmt.Sprintf("%s with name %s failed during reconciliation.", rf.GetResourceKind(), rf.GetResourceName()))
+			r.Recorder.Eventf(&scope.AuthPolicy, "Warning", fmt.Sprintf("%sReconcileFailed", rf.GetResourceKind()), fmt.Sprintf("%s with name %s failed during reconciliation.", rf.GetResourceKind(), rf.GetResourceName()))
 			errs = append(errs, err)
 		} else {
-			r.Recorder.Eventf(scope.AuthPolicy, "Normal", fmt.Sprintf("%sReconciledSuccessfully", rf.GetResourceKind()), fmt.Sprintf("%s with name %s reconciled successfully.", rf.GetResourceKind(), rf.GetResourceName()))
+			r.Recorder.Eventf(&scope.AuthPolicy, "Normal", fmt.Sprintf("%sReconciledSuccessfully", rf.GetResourceKind()), fmt.Sprintf("%s with name %s reconciled successfully.", rf.GetResourceKind(), rf.GetResourceName()))
 		}
 		if len(errs) > 0 {
 			continue
@@ -223,10 +271,10 @@ func (r *AuthPolicyReconciler) doReconcile(ctx context.Context, reconcileFuncs [
 	}
 
 	if len(errs) > 0 {
-		r.Recorder.Eventf(scope.AuthPolicy, "Warning", "ReconcileFailed", "AuthPolicy failed during reconciliation")
+		r.Recorder.Eventf(&scope.AuthPolicy, "Warning", "ReconcileFailed", "AuthPolicy failed during reconciliation")
 		return ctrl.Result{}, errors.NewAggregate(errs)
 	}
-	r.Recorder.Eventf(scope.AuthPolicy, "Normal", "ReconcileSuccess", "AuthPolicy reconciled successfully")
+	r.Recorder.Eventf(&scope.AuthPolicy, "Normal", "ReconcileSuccess", "AuthPolicy reconciled successfully")
 	return result, nil
 }
 
@@ -234,7 +282,7 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, scope *state.Sc
 	ap := scope.AuthPolicy
 	rLog := log.GetLogger(ctx)
 	rLog.Debug(fmt.Sprintf("Updating AuthPolicy status for %s/%s", ap.Namespace, ap.Name))
-	r.Recorder.Eventf(ap, "Normal", "StatusUpdateStarted", "Status update of AuthPolicy started.")
+	r.Recorder.Eventf(&ap, "Normal", "StatusUpdateStarted", "Status update of AuthPolicy started.")
 
 	ap.Status.ObservedGeneration = ap.GetGeneration()
 	authPolicyCondition := metav1.Condition{
@@ -243,13 +291,13 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, scope *state.Sc
 	}
 
 	switch {
-	case !scope.HasValidPaths:
+	case scope.InvalidConfig:
 		ap.Status.Phase = ztoperatorv1alpha1.PhaseInvalid
 		ap.Status.Ready = false
-		ap.Status.Message = *scope.PathValidationErrorMessage
+		ap.Status.Message = *scope.ValidationErrorMessage
 		authPolicyCondition.Status = metav1.ConditionFalse
 		authPolicyCondition.Reason = "InvalidConfiguration"
-		authPolicyCondition.Message = *scope.PathValidationErrorMessage
+		authPolicyCondition.Message = *scope.ValidationErrorMessage
 
 	case len(scope.Descendants) != reconciliation.CountReconciledResources(reconcileFuncs):
 		ap.Status.Phase = ztoperatorv1alpha1.PhasePending
@@ -321,17 +369,17 @@ func (r *AuthPolicyReconciler) updateStatus(ctx context.Context, scope *state.Sc
 		rLog.Debug(fmt.Sprintf("Updating AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
 		if err := r.updateStatusWithRetriesOnConflict(ctx, ap); err != nil {
 			rLog.Error(err, fmt.Sprintf("Failed to update AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
-			r.Recorder.Eventf(ap, "Warning", "StatusUpdateFailed", "Status update of AuthPolicy failed.")
+			r.Recorder.Eventf(&ap, "Warning", "StatusUpdateFailed", "Status update of AuthPolicy failed.")
 		} else {
-			r.Recorder.Eventf(ap, "Normal", "StatusUpdateSuccess", "Status update of AuthPolicy updated successfully.")
+			r.Recorder.Eventf(&ap, "Normal", "StatusUpdateSuccess", "Status update of AuthPolicy updated successfully.")
 		}
 	}
 }
 
-func (r *AuthPolicyReconciler) updateStatusWithRetriesOnConflict(ctx context.Context, authPolicy *ztoperatorv1alpha1.AuthPolicy) error {
+func (r *AuthPolicyReconciler) updateStatusWithRetriesOnConflict(ctx context.Context, authPolicy ztoperatorv1alpha1.AuthPolicy) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		latest := &ztoperatorv1alpha1.AuthPolicy{}
-		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(authPolicy), latest); err != nil {
+		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(&authPolicy), latest); err != nil {
 			return err
 		}
 		latest.Status = authPolicy.Status
@@ -399,7 +447,7 @@ func reconcileAuthPolicy[T client.Object](
 	err := k8sClient.Get(ctx, client.ObjectKeyFromObject(deReferencedDesired), current)
 	if apierrors.IsNotFound(err) {
 		rLog.Debug(fmt.Sprintf("%s %s/%s does not exist", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()))
-		if err := ctrl.SetControllerReference(scope.AuthPolicy, deReferencedDesired, scheme); err != nil {
+		if err := ctrl.SetControllerReference(&scope.AuthPolicy, deReferencedDesired, scheme); err != nil {
 			errorReason := fmt.Sprintf("Unable to set AuthPolicy ownerReference on %s %s/%s.", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName())
 			scope.ReplaceDescendant(deReferencedDesired, &errorReason, nil, resourceKind, resourceName)
 			return ctrl.Result{}, err
@@ -445,4 +493,84 @@ func reconcileAuthPolicy[T client.Object](
 	scope.ReplaceDescendant(current, nil, &successMessage, resourceKind, resourceName)
 
 	return ctrl.Result{}, nil
+}
+
+func resolveAuthPolicy(ctx context.Context, k8sClient client.Client, authPolicy *ztoperatorv1alpha1.AuthPolicy) (*state.Scope, error) {
+	if authPolicy == nil {
+		return nil, fmt.Errorf("encountered AuthPolicy as null when resolving")
+	}
+	if !authPolicy.Spec.Enabled {
+		return &state.Scope{
+			AuthPolicy: *authPolicy,
+		}, nil
+	}
+
+	var oAuthCredentials state.OAuthCredentials
+
+	if authPolicy.Spec.OAuthCredentials != nil {
+		oAuthSecret, err := utils.GetSecret(k8sClient, ctx, types.NamespacedName{
+			Namespace: authPolicy.Namespace,
+			Name:      authPolicy.Spec.OAuthCredentials.SecretRef,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if authPolicy.Spec.AutoLogin != nil && authPolicy.Spec.AutoLogin.Enabled {
+			clientId := string(oAuthSecret.Data[authPolicy.Spec.OAuthCredentials.ClientIdKey])
+			oAuthCredentials.ClientId = &clientId
+
+			clientSecret := string(oAuthSecret.Data[authPolicy.Spec.OAuthCredentials.ClientSecretKey])
+			oAuthCredentials.ClientSecret = &clientSecret
+
+			if oAuthCredentials.ClientId == nil {
+				return nil, fmt.Errorf("client id with key: %s was nil when retrieving it from Secret with name %s/%s", authPolicy.Spec.OAuthCredentials.ClientIdKey, authPolicy.Namespace, authPolicy.Spec.OAuthCredentials.SecretRef)
+			} else {
+				if *oAuthCredentials.ClientId == "" {
+					return nil, fmt.Errorf("client id with key: %s was empty string when retrieving it from Secret with name %s/%s", authPolicy.Spec.OAuthCredentials.ClientIdKey, authPolicy.Namespace, authPolicy.Spec.OAuthCredentials.SecretRef)
+				}
+			}
+
+			if oAuthCredentials.ClientSecret == nil {
+				return nil, fmt.Errorf("client secret with key: %s was nil when retrieving it from Secret with name %s/%s", authPolicy.Spec.OAuthCredentials.ClientSecretKey, authPolicy.Namespace, authPolicy.Spec.OAuthCredentials.SecretRef)
+			} else {
+				if *oAuthCredentials.ClientSecret == "" {
+					return nil, fmt.Errorf("client secret with key: %s was empty string when retrieving it from Secret with name %s/%s", authPolicy.Spec.OAuthCredentials.ClientSecretKey, authPolicy.Namespace, authPolicy.Spec.OAuthCredentials.SecretRef)
+				}
+			}
+		}
+	}
+
+	var identityProviderUris state.IdentityProviderUris
+
+	discoveryDocument, err := rest.GetOAuthDiscoveryDocument(authPolicy.Spec.WellKnownUri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve discovery document from well-known uri: %s for AuthPolicy with name %s/%s: %w", authPolicy.Spec.WellKnownUri, authPolicy.Namespace, authPolicy.Name, err)
+	}
+
+	if discoveryDocument.Issuer == nil || discoveryDocument.JwksUri == nil || discoveryDocument.TokenEndpoint == nil || discoveryDocument.AuthorizationEndpoint == nil {
+		return nil, fmt.Errorf("failed to parse discovery document from well-known uri: %s for AuthPolicy with name %s/%s", authPolicy.Spec.WellKnownUri, authPolicy.Namespace, authPolicy.Name)
+	}
+	identityProviderUris.IssuerUri = *discoveryDocument.Issuer
+	identityProviderUris.JwksUri = *discoveryDocument.JwksUri
+	identityProviderUris.TokenUri = *discoveryDocument.TokenEndpoint
+	identityProviderUris.AuthorizationUri = *discoveryDocument.AuthorizationEndpoint
+
+	autoLoginConfig := state.AutoLoginConfig{
+		Enabled: false,
+	}
+
+	if authPolicy.Spec.AutoLogin != nil && authPolicy.Spec.AutoLogin.Enabled {
+		autoLoginConfig.Enabled = authPolicy.Spec.AutoLogin.Enabled
+		autoLoginConfig.RedirectPath = authPolicy.Spec.AutoLogin.RedirectPath
+		autoLoginConfig.LogoutPath = authPolicy.Spec.AutoLogin.LogoutPath
+		autoLoginConfig.Scopes = authPolicy.Spec.AutoLogin.Scopes
+	}
+
+	return &state.Scope{
+		AuthPolicy:           *authPolicy,
+		AutoLoginConfig:      autoLoginConfig,
+		OAuthCredentials:     oAuthCredentials,
+		IdentityProviderUris: identityProviderUris,
+	}, nil
 }
