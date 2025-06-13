@@ -104,6 +104,8 @@ type AutoLogin struct {
 	RedirectPath string `json:"redirectPath"`
 
 	// LogoutPath specifies which URI to redirect the user to when signing out.
+	// This will end the session for the application, but not end the session towards the configured identity provider.
+	// This feature will hopefully soon be available in later releases of Istio.
 	//
 	// +kubebuilder:validation:Required
 	LogoutPath string `json:"logoutPath"`

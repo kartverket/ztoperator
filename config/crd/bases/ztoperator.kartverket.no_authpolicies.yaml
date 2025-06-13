@@ -149,8 +149,10 @@ spec:
                       If enabled, users accessing authenticated endpoints will be redirected to log in towards the configured identity provider.
                     type: boolean
                   logoutPath:
-                    description: LogoutPath specifies which URI to redirect the user
-                      to when signing out.
+                    description: |-
+                      LogoutPath specifies which URI to redirect the user to when signing out.
+                      This will end the session for the application, but not end the session towards the configured identity provider.
+                      This feature will hopefully soon be available in later releases of Istio.
                     type: string
                   redirectPath:
                     description: RedirectPath specifies which path to redirect the

@@ -29,8 +29,7 @@ spec:
             - entra_user_role
   audience:
     - entraid_server
-  issuerURI: https://fake.auth/entraid
-  jwksURI: http://mock-oauth2.auth:8080/entraid/jwks
+  wellKnownUri: https://fake.auth/entraid/.well-known/openid-configuration
   selector:
     matchLabels:
       app: application

@@ -32,6 +32,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 			scope.AutoLoginConfig.LogoutPath,
 			*scope.OAuthCredentials.ClientId,
 			scope.AutoLoginConfig.Scopes,
+			scope.AuthPolicy.Spec.AcceptedResources,
 			scope.AuthPolicy.Spec.IgnoreAuthRules,
 		),
 	)

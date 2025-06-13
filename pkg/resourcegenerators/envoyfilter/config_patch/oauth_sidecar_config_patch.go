@@ -12,11 +12,6 @@ const (
 	IstioCredentialsDirectory = "/etc/istio/config"
 )
 
-type normalizedIgnoreAuthRule struct {
-	Path   string
-	Method string
-}
-
 func GetOAuthSidecarConfigPatchValue(
 	tokenEndpoint string,
 	authorizationEndpoint string,
@@ -24,6 +19,7 @@ func GetOAuthSidecarConfigPatchValue(
 	signoutPath string,
 	clientId string,
 	authScopes []string,
+	resources *[]string,
 	ignoreAuthRules *[]v1alpha1.RequestMatcher,
 ) map[string]interface{} {
 	passThroughMatchers := []interface{}{
@@ -38,94 +34,83 @@ func GetOAuthSidecarConfigPatchValue(
 		passThroughMatchers = append(passThroughMatchers, getPassThroughMatcher(*ignoreAuthRules))
 	}
 
-	//TODO: Add resource indicator as resources config field
-	//TODO: Must update podSettings, is this wanted??
-	//TODO: RetryPolicy??
-	//TODO: end_session_endpoint
-	//TODO: CookieConfig??
+	var resourcesInterface []interface{}
+	if resources != nil {
+		for _, resource := range *resources {
+			resourcesInterface = append(resourcesInterface, resource)
+		}
+	}
 
-	// Convert authScopes []string into []interface{}
 	authScopesInterface := make([]interface{}, len(authScopes))
 	for i, v := range authScopes {
 		authScopesInterface[i] = v
 	}
 
+	oauthSidecarConfigPatchValue := map[string]interface{}{
+		"token_endpoint": map[string]interface{}{
+			"cluster": "oauth",
+			"uri":     tokenEndpoint,
+			"timeout": "5s",
+		},
+		"retry_policy":           map[string]interface{}{},
+		"authorization_endpoint": authorizationEndpoint,
+		"redirect_uri":           "https://%REQ(:authority)%" + redirectPath,
+		"redirect_path_matcher": map[string]interface{}{
+			"path": map[string]interface{}{
+				"exact": redirectPath,
+			},
+		},
+		"signout_path": map[string]interface{}{
+			"path": map[string]interface{}{
+				"exact": signoutPath,
+			},
+		},
+		"forward_bearer_token": true,
+		"use_refresh_token":    true,
+		"pass_through_matcher": passThroughMatchers,
+		"credentials": map[string]interface{}{
+			"client_id": clientId,
+			"token_secret": map[string]interface{}{
+				"name": "token",
+				"sds_config": map[string]interface{}{
+					"path_config_source": map[string]interface{}{
+						"path": IstioTokenSecretSource,
+						"watched_directory": map[string]interface{}{
+							"path": IstioCredentialsDirectory,
+						},
+					},
+				},
+			},
+			"hmac_secret": map[string]interface{}{
+				"name": "hmac",
+				"sds_config": map[string]interface{}{
+					"path_config_source": map[string]interface{}{
+						"path": IstioHmacSecretSource,
+						"watched_directory": map[string]interface{}{
+							"path": IstioCredentialsDirectory,
+						},
+					},
+				},
+			},
+		},
+		"auth_scopes": authScopesInterface,
+	}
+
+	if resources != nil && len(*resources) > 0 {
+		oauthSidecarConfigPatchValue["resources"] = resourcesInterface
+	}
+
 	return map[string]interface{}{
 		"name": "envoy.filters.http.oauth2",
 		"typed_config": map[string]interface{}{
-			"@type": "type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2",
-			"config": map[string]interface{}{
-				"token_endpoint": map[string]interface{}{
-					"cluster": "oauth",
-					"uri":     tokenEndpoint,
-					"timeout": "5s",
-				},
-				"authorization_endpoint": authorizationEndpoint,
-				"redirect_uri":           "https://%REQ(:authority)%" + redirectPath,
-				"redirect_path_matcher": map[string]interface{}{
-					"path": map[string]interface{}{
-						"exact": redirectPath,
-					},
-				},
-				"signout_path": map[string]interface{}{
-					"path": map[string]interface{}{
-						"exact": signoutPath,
-					},
-				},
-				"forward_bearer_token": true,
-				"use_refresh_token":    true,
-				"pass_through_matcher": passThroughMatchers,
-				"credentials": map[string]interface{}{
-					"client_id": clientId,
-					"token_secret": map[string]interface{}{
-						"name": "token",
-						"sds_config": map[string]interface{}{
-							"path_config_source": map[string]interface{}{
-								"path": IstioTokenSecretSource,
-								"watched_directory": map[string]interface{}{
-									"path": IstioCredentialsDirectory,
-								},
-							},
-						},
-					},
-					"hmac_secret": map[string]interface{}{
-						"name": "hmac",
-						"sds_config": map[string]interface{}{
-							"path_config_source": map[string]interface{}{
-								"path": IstioHmacSecretSource,
-								"watched_directory": map[string]interface{}{
-									"path": IstioCredentialsDirectory,
-								},
-							},
-						},
-					},
-				},
-				"auth_scopes": authScopesInterface,
-			},
+			"@type":  "type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2",
+			"config": oauthSidecarConfigPatchValue,
 		},
 	}
 }
 
-func normalizeIgnoreAuthRules(ignoreAuthRules []v1alpha1.RequestMatcher) []normalizedIgnoreAuthRule {
-	var normalizedIgnoreAuthRules []normalizedIgnoreAuthRule
-	for _, ignoreAuthRule := range ignoreAuthRules {
-		for _, path := range ignoreAuthRule.Paths {
-			if len(ignoreAuthRule.Methods) == 0 {
-				ignoreAuthRule.Methods = v1alpha1.AcceptedHttpMethods
-			}
-			for _, method := range ignoreAuthRule.Methods {
-				normalizedIgnoreAuthRules = append(normalizedIgnoreAuthRules, normalizedIgnoreAuthRule{
-					Path:   path,
-					Method: method,
-				})
-			}
-		}
-	}
-	return normalizedIgnoreAuthRules
-}
-
 func getPassThroughMatcher(rules []v1alpha1.RequestMatcher) map[string]interface{} {
-	var regexString []string
+	var regexPattern []string
 	for _, rule := range rules {
 		for _, path := range rule.Paths {
 			var methodsPattern []string
@@ -142,15 +127,15 @@ func getPassThroughMatcher(rules []v1alpha1.RequestMatcher) map[string]interface
 			} else {
 				methodsPatternString = methodsPattern[0]
 			}
-			regexString = append(regexString, fmt.Sprintf(`%s:%s`, methodsPatternString, convertPathToRegex(path)))
+			regexPattern = append(regexPattern, fmt.Sprintf(`%s:%s`, methodsPatternString, convertPathToRegex(path)))
 		}
 	}
 	var result string
-	if len(regexString) > 1 {
-		concatenated := strings.Join(regexString, "|")
+	if len(regexPattern) > 1 {
+		concatenated := strings.Join(regexPattern, "|")
 		result = fmt.Sprintf(`^(%s)$`, concatenated)
 	} else {
-		result = fmt.Sprintf(`^%s$`, regexString[0])
+		result = fmt.Sprintf(`^%s$`, regexPattern[0])
 	}
 
 	return map[string]interface{}{
@@ -178,6 +163,7 @@ func convertToEnvoyWildcards(pathWithIstioWildcards string) string {
 		removedStartBracket := strings.ReplaceAll(pathWithIstioWildcards, "{", "")
 		return strings.ReplaceAll(removedStartBracket, "}", "")
 	}
+	// Old wildcard syntax
 	return strings.ReplaceAll(pathWithIstioWildcards, "*", "**")
 }
 
