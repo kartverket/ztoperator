@@ -7,8 +7,10 @@ import (
 )
 
 const (
-	IstioTokenSecretSource    = "/etc/istio/config/token-secret.yaml"
-	IstioHmacSecretSource     = "/etc/istio/config/hmac-secret.yaml"
+	TokenSecretFileName       = "token-secret.yaml"
+	HmacSecretFileName        = "hmac-secret.yaml"
+	IstioTokenSecretSource    = "/etc/istio/config/" + TokenSecretFileName
+	IstioHmacSecretSource     = "/etc/istio/config/" + HmacSecretFileName
 	IstioCredentialsDirectory = "/etc/istio/config"
 )
 
@@ -21,6 +23,7 @@ func GetOAuthSidecarConfigPatchValue(
 	authScopes []string,
 	resources *[]string,
 	ignoreAuthRules *[]v1alpha1.RequestMatcher,
+	loginPath *string,
 ) map[string]interface{} {
 	passThroughMatchers := []interface{}{
 		map[string]interface{}{
@@ -30,8 +33,10 @@ func GetOAuthSidecarConfigPatchValue(
 			},
 		},
 	}
-	if ignoreAuthRules != nil {
-		passThroughMatchers = append(passThroughMatchers, getPassThroughMatcher(*ignoreAuthRules))
+	if loginPath != nil {
+		passThroughMatchers = append(passThroughMatchers, getPassThroughMatcherFromLoginPath(*loginPath, redirectPath, signoutPath))
+	} else if ignoreAuthRules != nil {
+		passThroughMatchers = append(passThroughMatchers, getPassThroughMatcherFromIgnoreAuthRules(*ignoreAuthRules))
 	}
 
 	var resourcesInterface []interface{}
@@ -109,7 +114,25 @@ func GetOAuthSidecarConfigPatchValue(
 	}
 }
 
-func getPassThroughMatcher(rules []v1alpha1.RequestMatcher) map[string]interface{} {
+func getPassThroughMatcherFromLoginPath(loginPath, redirectPath, logoutPath string) map[string]interface{} {
+	return map[string]interface{}{
+		"name": ":path",
+		"string_match": map[string]interface{}{
+			"safe_regex": map[string]interface{}{
+				"google_re2": map[string]interface{}{},
+				"regex": fmt.Sprintf(
+					"^(%s|%s.*|%s)$",
+					convertPathToRegex(loginPath),
+					convertPathToRegex(redirectPath),
+					convertPathToRegex(logoutPath),
+				),
+			},
+		},
+		"invert_match": true,
+	}
+}
+
+func getPassThroughMatcherFromIgnoreAuthRules(rules []v1alpha1.RequestMatcher) map[string]interface{} {
 	var regexPattern []string
 	for _, rule := range rules {
 		for _, path := range rule.Paths {

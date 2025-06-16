@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
@@ -11,6 +12,7 @@ import (
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore_auth"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/require_auth"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/config_patch"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
 	"github.com/kartverket/ztoperator/pkg/rest"
@@ -76,6 +78,8 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&ztoperatorv1alpha1.AuthPolicy{}).
 		Owns(&istioclientsecurityv1.RequestAuthentication{}).
 		Owns(&istioclientsecurityv1.AuthorizationPolicy{}).
+		Owns(&v1alpha4.EnvoyFilter{}).
+		Owns(&v1.Secret{}).
 		Complete(r)
 }
 
@@ -146,7 +150,9 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					DesiredResource: utils.Ptr(secret.GetDesired(scope, utils.BuildObjectMeta(autoLoginSecretName, authPolicy.Namespace))),
 					Scope:           scope,
 					ShouldUpdate: func(current, desired *v1.Secret) bool {
-						return !reflect.DeepEqual(current.Data, desired.Data)
+						desiredTokenSecret, hasDesired := desired.Data[config_patch.TokenSecretFileName]
+						currentTokenSecret, hasCurrent := current.Data[config_patch.TokenSecretFileName]
+						return !hasDesired || !hasCurrent || !bytes.Equal(currentTokenSecret, desiredTokenSecret)
 					},
 					UpdateFields: func(current, desired *v1.Secret) {
 						current.Data = desired.Data
@@ -496,10 +502,13 @@ func reconcileAuthPolicy[T client.Object](
 }
 
 func resolveAuthPolicy(ctx context.Context, k8sClient client.Client, authPolicy *ztoperatorv1alpha1.AuthPolicy) (*state.Scope, error) {
+	rLog := log.GetLogger(ctx)
 	if authPolicy == nil {
 		return nil, fmt.Errorf("encountered AuthPolicy as null when resolving")
 	}
+	rLog.Info(fmt.Sprintf("Trying to resolve auth policy %s/%s", authPolicy.Namespace, authPolicy.Name))
 	if !authPolicy.Spec.Enabled {
+		rLog.Debug(fmt.Sprintf("AuthPolicy %s/%s is disabled", authPolicy.Namespace, authPolicy.Name))
 		return &state.Scope{
 			AuthPolicy: *authPolicy,
 		}, nil
@@ -542,8 +551,8 @@ func resolveAuthPolicy(ctx context.Context, k8sClient client.Client, authPolicy 
 	}
 
 	var identityProviderUris state.IdentityProviderUris
-
-	discoveryDocument, err := rest.GetOAuthDiscoveryDocument(authPolicy.Spec.WellKnownUri)
+	rLog.Info(fmt.Sprintf("Trying to resolve discovery document from well-known uri: %s for AuthPolicy with name %s/%s", authPolicy.Spec.WellKnownUri, authPolicy.Namespace, authPolicy.Name))
+	discoveryDocument, err := rest.GetOAuthDiscoveryDocument(authPolicy.Spec.WellKnownUri, rLog)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve discovery document from well-known uri: %s for AuthPolicy with name %s/%s: %w", authPolicy.Spec.WellKnownUri, authPolicy.Namespace, authPolicy.Name, err)
 	}
@@ -562,10 +571,13 @@ func resolveAuthPolicy(ctx context.Context, k8sClient client.Client, authPolicy 
 
 	if authPolicy.Spec.AutoLogin != nil && authPolicy.Spec.AutoLogin.Enabled {
 		autoLoginConfig.Enabled = authPolicy.Spec.AutoLogin.Enabled
+		autoLoginConfig.LoginPath = authPolicy.Spec.AutoLogin.LoginPath
 		autoLoginConfig.RedirectPath = authPolicy.Spec.AutoLogin.RedirectPath
 		autoLoginConfig.LogoutPath = authPolicy.Spec.AutoLogin.LogoutPath
 		autoLoginConfig.Scopes = authPolicy.Spec.AutoLogin.Scopes
 	}
+
+	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name %s/%s", authPolicy.Namespace, authPolicy.Name))
 
 	return &state.Scope{
 		AuthPolicy:           *authPolicy,

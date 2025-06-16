@@ -2,12 +2,20 @@ package rest
 
 import (
 	"errors"
+	"fmt"
+	log2 "github.com/kartverket/ztoperator/pkg/log"
 	"resty.dev/v3"
 )
 
-func GetOAuthDiscoveryDocument(uri string) (*DiscoveryDocument, error) {
+func GetOAuthDiscoveryDocument(uri string, rLog log2.Logger) (*DiscoveryDocument, error) {
 	var discoveryDocument DiscoveryDocument
 
+	if _, exists := wellknownUriToDiscoveryDocument[uri]; exists {
+		rLog.Info(fmt.Sprintf("Using cached discovery document for well-known uri: %s", uri))
+		cachedDiscoveryDocument := wellknownUriToDiscoveryDocument[uri]
+		return &cachedDiscoveryDocument, nil
+	}
+	rLog.Info(fmt.Sprintf("Fetching discovery document for well-known uri: %s", uri))
 	client := resty.New()
 	defer func(client *resty.Client) {
 		closeErr := client.Close()

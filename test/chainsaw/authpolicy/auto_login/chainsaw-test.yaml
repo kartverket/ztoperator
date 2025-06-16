@@ -1,0 +1,35 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: auto-login
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: application.yaml
+        - create:
+            file: oauth2-credentials.yaml
+        - create:
+            file: authpolicy.yaml
+        - apply:
+            file: wildcard-ingress.yaml
+        - assert:
+            file: application-assert.yaml
+        - assert:
+            file: oauth2-credentials-assert.yaml
+        - assert:
+            file: authpolicy-assert.yaml
+        - script:
+            content: sleep 10
+        - script:
+            content: |
+              hurl --error-format long \
+              --insecure --test tests.hurl \
+              --variable entraid_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client)"

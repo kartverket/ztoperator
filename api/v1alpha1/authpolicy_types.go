@@ -98,6 +98,12 @@ type AutoLogin struct {
 	// +kubebuilder:validation:Required
 	Enabled bool `json:"enabled"`
 
+	// LoginPaths specifies a list of URI paths that should trigger the auto-login behavior.
+	// When a request matches any of these paths, the user will be redirected to log in if not already authenticated.
+	//
+	// +kubebuilder:validation:Pattern=`^/.*$`
+	LoginPath *string `json:"loginPath,omitempty"`
+
 	// RedirectPath specifies which path to redirect the user to after completing the OIDC flow.
 	//
 	// +kubebuilder:validation:Required

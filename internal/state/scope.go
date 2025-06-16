@@ -26,6 +26,7 @@ type IdentityProviderUris struct {
 
 type AutoLoginConfig struct {
 	Enabled      bool
+	LoginPath    *string
 	RedirectPath string
 	LogoutPath   string
 	Scopes       []string

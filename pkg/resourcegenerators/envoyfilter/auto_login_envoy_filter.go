@@ -17,11 +17,11 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 
 	issuerHostName, err := utils.GetHostname(scope.IdentityProviderUris.IssuerUri)
 	if err != nil {
-		return nil
+		panic("failed to get issuer hostname from issuer URI " + scope.IdentityProviderUris.IssuerUri + " due to the following error: " + err.Error())
 	}
 	oAuthClusterConfigPatchValueAsPbStruct, err := structpb.NewStruct(config_patch.GetOAuthClusterConfigPatchValue(*issuerHostName))
 	if err != nil {
-		return nil
+		panic("failed to serialize OAuth Cluster Config Patch to protobuf struct due to the following error: " + err.Error())
 	}
 
 	oAuthSidecarConfigPatchValueAsPbStruct, err := structpb.NewStruct(
@@ -34,18 +34,19 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 			scope.AutoLoginConfig.Scopes,
 			scope.AuthPolicy.Spec.AcceptedResources,
 			scope.AuthPolicy.Spec.IgnoreAuthRules,
+			scope.AutoLoginConfig.LoginPath,
 		),
 	)
 	if err != nil {
-		return nil
+		panic("failed to serialize OAuth Sidecar Config Patch to protobuf struct due to the following error: " + err.Error())
 	}
 
 	var configPatches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
 
-	if scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
+	if scope.AutoLoginConfig.LoginPath == nil && scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
 		luaScript, structPbErr := structpb.NewStruct(config_patch.GetLuaScript())
 		if structPbErr != nil {
-			return nil
+			panic("failed to serialize Custom Lua Script to protobuf struct due to the following error: " + structPbErr.Error())
 		}
 		configPatches = append(configPatches, &v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
 			ApplyTo: v1alpha3.EnvoyFilter_HTTP_FILTER,
@@ -110,6 +111,9 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 		ObjectMeta: objectMeta,
 		Spec: v1alpha3.EnvoyFilter{
 			ConfigPatches: configPatches,
+			WorkloadSelector: &v1alpha3.WorkloadSelector{
+				Labels: scope.AuthPolicy.Spec.Selector.MatchLabels,
+			},
 		},
 	}
 }
