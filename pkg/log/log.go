@@ -2,11 +2,12 @@ package log
 
 import (
 	"context"
+
 	"github.com/go-logr/logr"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-type log interface {
+type _ interface {
 	Error(err error, msg string, keysAndValues ...interface{})
 	Warning(msg string, keysAndValues ...interface{})
 	Info(msg string, keysAndValues ...interface{})

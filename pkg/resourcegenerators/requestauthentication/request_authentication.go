@@ -10,14 +10,26 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.RequestAuthentication {
-	if !scope.AuthPolicy.Spec.Enabled || !scope.HasValidPaths {
+	if !scope.AuthPolicy.Spec.Enabled || scope.InvalidConfig {
 		return nil
 	}
 
+	var audiences []string
+	if scope.AuthPolicy.Spec.Audience != nil {
+		audiences = scope.AuthPolicy.Spec.Audience
+	}
+	if scope.OAuthCredentials.ClientID != nil {
+		for _, audience := range audiences {
+			if *scope.OAuthCredentials.ClientID != audience {
+				audiences = append(audiences, *scope.OAuthCredentials.ClientID)
+			}
+		}
+	}
+
 	jwtRule := &securityv1.JWTRule{
-		Issuer:               scope.AuthPolicy.Spec.IssuerUri,
-		Audiences:            scope.AuthPolicy.Spec.Audience,
-		JwksUri:              scope.AuthPolicy.Spec.JwksUri,
+		Issuer:               scope.IdentityProviderUris.IssuerURI,
+		Audiences:            audiences,
+		JwksUri:              scope.IdentityProviderUris.JwksURI,
 		ForwardOriginalToken: scope.AuthPolicy.Spec.ForwardJwt,
 	}
 

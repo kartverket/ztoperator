@@ -12,23 +12,26 @@ type AuthPolicySpec struct {
 	// +kubebuilder:validation:Required
 	Enabled bool `json:"enabled"`
 
-	// IssuerUri specifies the expected issuer (`iss`) claim in the JWT.
-	// This should match the issuer identifier used when the token was generated.
+	// AutoLogin specifies the required configuration needed to log in users.
 	//
-	// +kubebuilder:validation:Required
-	IssuerUri string `json:"issuerURI"`
+	// +kubebuilder:validation:Optional
+	AutoLogin *AutoLogin `json:"autoLogin,omitempty"`
 
-	// JwksUri is the URI where the JSON Web Key Set (JWKS) can be fetched.
-	// It is used to validate the signature of incoming JWTs.
+	// OAuthCredentials specifies a reference to a kubernetes secret in the same namespace holding OAuth credentials used for authentication.
 	//
 	// +kubebuilder:validation:Required
-	JwksUri string `json:"jwksURI"`
+	OAuthCredentials *OAuthCredentials `json:"oAuthCredentials,omitempty"`
+
+	// WellKnownURI specifies the URi to the identity provider's discovery document (also known as well-known endpoint).
+	//
+	// +kubebuilder:validation:Required
+	WellKnownURI string `json:"wellKnownURI"`
 
 	// Audience defines the accepted audience (`aud`) values in the JWT.
 	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
 	//
-	// +kubebuilder:validation:Required
-	Audience []string `json:"audience"`
+	// +kubebuilder:validation:Optional
+	Audience []string `json:"audience,omitempty"`
 
 	// If set to `true`, the original token will be kept for the upstream request. Defaults to `true`.
 	// +kubebuilder:default=true
@@ -85,6 +88,60 @@ type AuthPolicySpec struct {
 	Selector WorkloadSelector `json:"selector"`
 }
 
+// AutoLogin specifies the required configuration needed to log in users.
+//
+// +kubebuilder:object:generate=true
+type AutoLogin struct {
+	// Whether to enable auto login.
+	// If enabled, users accessing authenticated endpoints will be redirected to log in towards the configured identity provider.
+	//
+	// +kubebuilder:validation:Required
+	Enabled bool `json:"enabled"`
+
+	// LoginPath specifies a list of URI paths that should trigger the auto-login behavior.
+	// When a request matches any of these paths, the user will be redirected to log in if not already authenticated.
+	//
+	// +kubebuilder:validation:Pattern=`^/.*$`
+	LoginPath *string `json:"loginPath,omitempty"`
+
+	// RedirectPath specifies which path to redirect the user to after completing the OIDC flow.
+	//
+	// +kubebuilder:validation:Required
+	RedirectPath string `json:"redirectPath"`
+
+	// LogoutPath specifies which URI to redirect the user to when signing out.
+	// This will end the session for the application, but not end the session towards the configured identity provider.
+	// This feature will hopefully soon be available in later releases of Istio, ref. [envoy/envoyproxy](https://github.com/envoyproxy/envoy/commit/c12fefc11f7adc9cd404287eb674ba838c2c8bd0).
+	//
+	// +kubebuilder:validation:Required
+	LogoutPath string `json:"logoutPath"`
+
+	// Scopes specifies the OAuth2 scopes used during authorization code flow.
+	//
+	// +kubebuilder:validation:Required
+	Scopes []string `json:"scopes"`
+}
+
+// OAuthCredentials specifies the kubernetes secret holding OAuth credentials used for authentication.
+//
+// +kubebuilder:object:generate=true
+type OAuthCredentials struct {
+	// SecretRef specifies the name of the kubernetes secret.
+	//
+	// +kubebuilder:validation:Required
+	SecretRef string `json:"secretRef"`
+
+	// ClientSecretKey specifies the data key to access the client secret.
+	//
+	// +kubebuilder:validation:Required
+	ClientSecretKey string `json:"clientSecretKey"`
+
+	// ClientIDKey specifies the data key to access the client ID.
+	//
+	// +kubebuilder:validation:Required
+	ClientIDKey string `json:"clientIDKey"`
+}
+
 type WorkloadSelector struct {
 	// One or more labels that indicate a specific set of pods/VMs
 	// on which a policy should be applied. The scope of label search is restricted to
@@ -133,7 +190,7 @@ type RequestMatcher struct {
 	// Each path must be a valid URI path, starting with '/' and not ending with '/'.
 	//
 	// +listType=set
-	// +kubebuilder:validation:Items.Pattern=`^\/(?:[^*/]+|\*|\*\*)(?:\/(?:[^*/]+|\*|\*\*))*\/?$`
+	// +kubebuilder:validation:Items:Pattern=`^/.*$`
 	Paths []string `json:"paths"`
 
 	// Methods specifies HTTP methods that applies for the defined paths.
@@ -175,7 +232,7 @@ type Condition struct {
 	Values []string `json:"values"`
 }
 
-// AuthPolicyStatus defines the observed state of AuthPolicy
+// AuthPolicyStatus defines the observed state of AuthPolicy.
 type AuthPolicyStatus struct {
 	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
 	Conditions         []metav1.Condition `json:"conditions,omitempty"`
@@ -197,7 +254,7 @@ const (
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.phase`
 
-// AuthPolicy is the Schema for the authpolicies API
+// AuthPolicy is the Schema for the authpolicies API.
 type AuthPolicy struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -208,23 +265,25 @@ type AuthPolicy struct {
 
 // +kubebuilder:object:root=true
 
-// AuthPolicyList contains a list of AuthPolicy
+// AuthPolicyList contains a list of AuthPolicy.
 type AuthPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []AuthPolicy `json:"items"`
 }
 
-var AcceptedHttpMethods = []string{
-	"GET",
-	"POST",
-	"PUT",
-	"PATCH",
-	"DELETE",
-	"HEAD",
-	"OPTIONS",
-	"TRACE",
-	"CONNECT",
+func GetAcceptedHTTPMethods() []string {
+	return []string{
+		"GET",
+		"POST",
+		"PUT",
+		"PATCH",
+		"DELETE",
+		"HEAD",
+		"OPTIONS",
+		"TRACE",
+		"CONNECT",
+	}
 }
 
 func init() {
@@ -259,9 +318,7 @@ func (ap *AuthPolicy) GetIgnoreAuthRequestMatchers() []RequestMatcher {
 func (ap *AuthPolicy) GetAuthorizedPaths() []string {
 	var authorizedPaths []string
 	for _, requestMatcher := range ap.GetRequireAuthRequestMatchers() {
-		for _, path := range requestMatcher.Paths {
-			authorizedPaths = append(authorizedPaths, path)
-		}
+		authorizedPaths = append(authorizedPaths, requestMatcher.Paths...)
 	}
 	return authorizedPaths
 }

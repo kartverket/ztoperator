@@ -1,0 +1,21 @@
+apiVersion: skiperator.kartverket.no/v1alpha1
+kind: Application
+metadata:
+  name: application
+spec:
+  podSettings:
+    annotations:
+      sidecar.istio.io/userVolume: '[{ "name": "istio-oauth2", "secret": { "secretName":
+        "auth-policy-envoy-secret" } }]'
+      sidecar.istio.io/userVolumeMount: '[{ "name": "istio-oauth2", "mountPath": "/etc/istio/config",
+        "readonly": true }]'
+  image: hashicorp/http-echo:latest
+  port: 5678
+  replicas: 1
+  ingresses:
+    - foo.bar
+  accessPolicy:
+    outbound:
+      rules:
+        - application: mock-oauth2
+          namespace: auth

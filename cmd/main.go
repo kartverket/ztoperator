@@ -20,9 +20,10 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"go.uber.org/zap/zapcore"
 	"os"
 	"strings"
+
+	"go.uber.org/zap/zapcore"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -31,6 +32,7 @@ import (
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/controller"
 	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
+	"istio.io/client-go/pkg/apis/networking/v1alpha3"
 	securityv1 "istio.io/client-go/pkg/apis/security/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -52,6 +54,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(istionetworkingv1.AddToScheme(scheme))
 	utilruntime.Must(securityv1.AddToScheme(scheme))
+	utilruntime.Must(v1alpha3.AddToScheme(scheme))
 	utilruntime.Must(ztoperatorv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
@@ -98,9 +101,9 @@ func main() {
 		tlsOpts = append(tlsOpts, disableHTTP2)
 	}
 
-	//webhookServer := webhook.NewServer(webhook.Options{
+	// webhookServer := webhook.NewServer(webhook.Options{
 	//	TLSOpts: tlsOpts,
-	//})
+	// })
 
 	// Metrics endpoint is enabled in 'config/default/kustomization.yaml'. The Metrics options configure the server.
 	// More info:
@@ -131,9 +134,8 @@ func main() {
 	if !*isDeployment && !strings.Contains(kubeconfig.Host, "https://127.0.0.1") {
 		setupLog.Info("Tried to start ztoperator with non-local kubecontext. Exiting to prevent havoc.")
 		os.Exit(1)
-	} else {
-		setupLog.Info(fmt.Sprintf("Starting ztoperator using kube-apiserver at %s", kubeconfig.Host))
 	}
+	setupLog.Info(fmt.Sprintf("Starting ztoperator using kube-apiserver at %s", kubeconfig.Host))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:  scheme,
@@ -169,18 +171,18 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+	if healthCheckErr := mgr.AddHealthzCheck("healthz", healthz.Ping); healthCheckErr != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
+	if readyCheckErr := mgr.AddReadyzCheck("readyz", healthz.Ping); readyCheckErr != nil {
+		setupLog.Error(readyCheckErr, "unable to set up ready check")
 		os.Exit(1)
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+	if startingMngErr := mgr.Start(ctrl.SetupSignalHandler()); startingMngErr != nil {
+		setupLog.Error(startingMngErr, "problem running manager")
 		os.Exit(1)
 	}
 }

@@ -2,6 +2,7 @@ package reconciliation
 
 import (
 	"context"
+
 	"github.com/kartverket/ztoperator/internal/state"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
