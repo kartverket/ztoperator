@@ -2,6 +2,7 @@ package deny
 
 import (
 	"fmt"
+
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy"
 	"istio.io/api/security/v1beta1"
@@ -40,15 +41,22 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 
 	var denyRules []*v1beta1.Rule
 
-	baseConditions := authorizationpolicy.GetBaseConditions(scope.AuthPolicy, scope.IdentityProviderUris.IssuerUri, true)
+	baseConditions := authorizationpolicy.GetBaseConditions(
+		scope.AuthPolicy,
+		scope.IdentityProviderUris.IssuerUri,
+		true,
+	)
 	if scope.AuthPolicy.Spec.AuthRules != nil {
 		for _, rule := range *scope.AuthPolicy.Spec.AuthRules {
 			authPolicyConditionsAsIstioConditions := baseConditions
 			for _, condition := range rule.When {
-				authPolicyConditionsAsIstioConditions = append(authPolicyConditionsAsIstioConditions, &v1beta1.Condition{
-					Key:       fmt.Sprintf("request.auth.claims[%s]", condition.Claim),
-					NotValues: condition.Values,
-				})
+				authPolicyConditionsAsIstioConditions = append(
+					authPolicyConditionsAsIstioConditions,
+					&v1beta1.Condition{
+						Key:       fmt.Sprintf("request.auth.claims[%s]", condition.Claim),
+						NotValues: condition.Values,
+					},
+				)
 			}
 
 			for _, istioCondition := range authPolicyConditionsAsIstioConditions {

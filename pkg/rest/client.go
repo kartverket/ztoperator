@@ -3,6 +3,7 @@ package rest
 import (
 	"errors"
 	"fmt"
+
 	log2 "github.com/kartverket/ztoperator/pkg/log"
 	"resty.dev/v3"
 )

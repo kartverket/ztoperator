@@ -2,8 +2,9 @@ package config_patch
 
 import (
 	"fmt"
-	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"strings"
+
+	"github.com/kartverket/ztoperator/api/v1alpha1"
 )
 
 const (
@@ -34,7 +35,10 @@ func GetOAuthSidecarConfigPatchValue(
 		},
 	}
 	if loginPath != nil {
-		passThroughMatchers = append(passThroughMatchers, getPassThroughMatcherFromLoginPath(*loginPath, redirectPath, signoutPath))
+		passThroughMatchers = append(
+			passThroughMatchers,
+			getPassThroughMatcherFromLoginPath(*loginPath, redirectPath, signoutPath),
+		)
 	} else if ignoreAuthRules != nil {
 		passThroughMatchers = append(passThroughMatchers, getPassThroughMatcherFromIgnoreAuthRules(*ignoreAuthRules))
 	}
@@ -140,9 +144,7 @@ func getPassThroughMatcherFromIgnoreAuthRules(rules []v1alpha1.RequestMatcher) m
 			if len(rule.Methods) == 0 {
 				rule.Methods = v1alpha1.AcceptedHttpMethods
 			}
-			for _, method := range rule.Methods {
-				methodsPattern = append(methodsPattern, method)
-			}
+			methodsPattern = append(methodsPattern, rule.Methods...)
 			var methodsPatternString string
 			if len(methodsPattern) > 1 {
 				concatenated := strings.Join(methodsPattern, "|")
@@ -166,7 +168,7 @@ func getPassThroughMatcherFromIgnoreAuthRules(rules []v1alpha1.RequestMatcher) m
 		"string_match": map[string]interface{}{
 			"safe_regex": map[string]interface{}{
 				"google_re2": map[string]interface{}{},
-				"regex":      fmt.Sprintf("%s", result),
+				"regex":      result,
 			},
 		},
 	}

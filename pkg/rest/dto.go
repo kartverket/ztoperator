@@ -24,10 +24,18 @@ var (
 			JwksUri:               utils.Ptr("http://mock-oauth2.auth:8080/smapi/jwks"),
 		},
 		"https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0/.well-known/openid-configuration": {
-			Issuer:                utils.Ptr("https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0"),
-			AuthorizationEndpoint: utils.Ptr("https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/oauth2/v2.0/authorize"),
-			TokenEndpoint:         utils.Ptr("https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/oauth2/v2.0/token"),
-			JwksUri:               utils.Ptr("https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/discovery/v2.0/keys"),
+			Issuer: utils.Ptr(
+				"https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0",
+			),
+			AuthorizationEndpoint: utils.Ptr(
+				"https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/oauth2/v2.0/authorize",
+			),
+			TokenEndpoint: utils.Ptr(
+				"https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/oauth2/v2.0/token",
+			),
+			JwksUri: utils.Ptr(
+				"https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/discovery/v2.0/keys",
+			),
 		},
 		"https://idporten.no/.well-known/openid-configuration": {
 			Issuer:                utils.Ptr("https://idporten.no"),

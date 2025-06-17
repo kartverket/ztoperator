@@ -2,8 +2,9 @@ package state
 
 import (
 	"fmt"
-	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"reflect"
+
+	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -56,7 +57,12 @@ func (s *Scope) GetErrors() []string {
 	return errs
 }
 
-func (s *Scope) ReplaceDescendant(obj client.Object, errorMessage *string, successMessage *string, resourceKind, resourceName string) {
+func (s *Scope) ReplaceDescendant(
+	obj client.Object,
+	errorMessage *string,
+	successMessage *string,
+	resourceKind, resourceName string,
+) {
 	if s != nil {
 		for i, d := range s.Descendants {
 			if reflect.TypeOf(d) == reflect.TypeOf(obj) && d.ID == obj.GetName() {

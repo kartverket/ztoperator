@@ -29,7 +29,7 @@ spec:
             - entra_user_role
   audience:
     - entraid_server
-  wellKnownUri: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
+  wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
   selector:
     matchLabels:
       app: application

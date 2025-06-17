@@ -20,9 +20,10 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"go.uber.org/zap/zapcore"
 	"os"
 	"strings"
+
+	"go.uber.org/zap/zapcore"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -100,7 +101,7 @@ func main() {
 		tlsOpts = append(tlsOpts, disableHTTP2)
 	}
 
-	//webhookServer := webhook.NewServer(webhook.Options{
+	// webhookServer := webhook.NewServer(webhook.Options{
 	//	TLSOpts: tlsOpts,
 	//})
 
@@ -171,18 +172,18 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+	if healthCheckErr := mgr.AddHealthzCheck("healthz", healthz.Ping); healthCheckErr != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
+	if readyCheckErr := mgr.AddReadyzCheck("readyz", healthz.Ping); readyCheckErr != nil {
+		setupLog.Error(readyCheckErr, "unable to set up ready check")
 		os.Exit(1)
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+	if startingMngErr := mgr.Start(ctrl.SetupSignalHandler()); startingMngErr != nil {
+		setupLog.Error(startingMngErr, "problem running manager")
 		os.Exit(1)
 	}
 }

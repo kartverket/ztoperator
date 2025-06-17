@@ -7,21 +7,29 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 	"istio.io/api/networking/v1alpha3"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFilter {
-	if !scope.AuthPolicy.Spec.Enabled || scope.AuthPolicy.Spec.AutoLogin == nil || !scope.AuthPolicy.Spec.AutoLogin.Enabled || scope.InvalidConfig {
+	if !scope.AuthPolicy.Spec.Enabled || scope.AuthPolicy.Spec.AutoLogin == nil ||
+		!scope.AuthPolicy.Spec.AutoLogin.Enabled ||
+		scope.InvalidConfig {
 		return nil
 	}
 
 	issuerHostName, err := utils.GetHostname(scope.IdentityProviderUris.IssuerUri)
 	if err != nil {
-		panic("failed to get issuer hostname from issuer URI " + scope.IdentityProviderUris.IssuerUri + " due to the following error: " + err.Error())
+		panic(
+			"failed to get issuer hostname from issuer URI " + scope.IdentityProviderUris.IssuerUri + " due to the following error: " + err.Error(),
+		)
 	}
-	oAuthClusterConfigPatchValueAsPbStruct, err := structpb.NewStruct(config_patch.GetOAuthClusterConfigPatchValue(*issuerHostName))
+	oAuthClusterConfigPatchValueAsPbStruct, err := structpb.NewStruct(
+		config_patch.GetOAuthClusterConfigPatchValue(*issuerHostName),
+	)
 	if err != nil {
-		panic("failed to serialize OAuth Cluster Config Patch to protobuf struct due to the following error: " + err.Error())
+		panic(
+			"failed to serialize OAuth Cluster Config Patch to protobuf struct due to the following error: " + err.Error(),
+		)
 	}
 
 	oAuthSidecarConfigPatchValueAsPbStruct, err := structpb.NewStruct(
@@ -38,7 +46,9 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 		),
 	)
 	if err != nil {
-		panic("failed to serialize OAuth Sidecar Config Patch to protobuf struct due to the following error: " + err.Error())
+		panic(
+			"failed to serialize OAuth Sidecar Config Patch to protobuf struct due to the following error: " + err.Error(),
+		)
 	}
 
 	var configPatches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
@@ -46,7 +56,9 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 	if scope.AutoLoginConfig.LoginPath == nil && scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
 		luaScript, structPbErr := structpb.NewStruct(config_patch.GetLuaScript())
 		if structPbErr != nil {
-			panic("failed to serialize Custom Lua Script to protobuf struct due to the following error: " + structPbErr.Error())
+			panic(
+				"failed to serialize Custom Lua Script to protobuf struct due to the following error: " + structPbErr.Error(),
+			)
 		}
 		configPatches = append(configPatches, &v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
 			ApplyTo: v1alpha3.EnvoyFilter_HTTP_FILTER,

@@ -21,7 +21,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: AuthPolicy is the Schema for the authpolicies API
+        description: AuthPolicy is the Schema for the authpolicies API.
         properties:
           apiVersion:
             description: |-
@@ -150,7 +150,7 @@ spec:
                     type: boolean
                   loginPath:
                     description: |-
-                      LoginPaths specifies a list of URI paths that should trigger the auto-login behavior.
+                      LoginPath specifies a list of URI paths that should trigger the auto-login behavior.
                       When a request matches any of these paths, the user will be redirected to log in if not already authenticated.
                     pattern: ^/.*$
                     type: string
@@ -158,7 +158,7 @@ spec:
                     description: |-
                       LogoutPath specifies which URI to redirect the user to when signing out.
                       This will end the session for the application, but not end the session towards the configured identity provider.
-                      This feature will hopefully soon be available in later releases of Istio.
+                      This feature will hopefully soon be available in later releases of Istio, ref. [envoy/envoyproxy](https://github.com/envoyproxy/envoy/commit/c12fefc11f7adc9cd404287eb674ba838c2c8bd0).
                     type: string
                   redirectPath:
                     description: RedirectPath specifies which path to redirect the
@@ -241,7 +241,7 @@ spec:
                 properties:
                   clientIdKey:
                     description: ClientIdKey specifies the data key to access the
-                      client secret.
+                      client ID.
                     type: string
                   clientSecretKey:
                     description: ClientSecretKey specifies the data key to access
@@ -304,17 +304,17 @@ spec:
                     - message: key must not be empty
                       rule: self.all(key, key.size() != 0)
                 type: object
-              wellKnownUri:
-                description: WellKnownUri specifies the URi to the identity provider's
+              wellKnownURI:
+                description: WellKnownURI specifies the URi to the identity provider's
                   discovery document (also known as well-known endpoint).
                 type: string
             required:
             - enabled
             - selector
-            - wellKnownUri
+            - wellKnownURI
             type: object
           status:
-            description: AuthPolicyStatus defines the observed state of AuthPolicy
+            description: AuthPolicyStatus defines the observed state of AuthPolicy.
             properties:
               conditions:
                 items:

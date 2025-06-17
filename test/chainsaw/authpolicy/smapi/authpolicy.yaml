@@ -41,7 +41,7 @@ spec:
             - sikkerhetsmetrikker.lese.alt
   audience:
     - audience
-  wellKnownUri: http://mock-oauth2.auth:8080/smapi/.well-known/openid-configuration
+  wellKnownURI: http://mock-oauth2.auth:8080/smapi/.well-known/openid-configuration
   selector:
     matchLabels:
       app: application

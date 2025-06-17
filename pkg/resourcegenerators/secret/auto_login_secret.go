@@ -2,6 +2,7 @@ package secret
 
 import (
 	"fmt"
+
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/config_patch"
 	"github.com/kartverket/ztoperator/pkg/utils"
@@ -11,7 +12,9 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta metav1.ObjectMeta) *v1.Secret {
-	if !scope.AuthPolicy.Spec.Enabled || scope.AuthPolicy.Spec.AutoLogin == nil || !scope.AuthPolicy.Spec.AutoLogin.Enabled || scope.InvalidConfig {
+	if !scope.AuthPolicy.Spec.Enabled || scope.AuthPolicy.Spec.AutoLogin == nil ||
+		!scope.AuthPolicy.Spec.AutoLogin.Enabled ||
+		scope.InvalidConfig {
 		return nil
 	}
 

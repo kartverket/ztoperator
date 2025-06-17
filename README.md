@@ -2,12 +2,14 @@
   <img src="ztoperator_logo.png" alt="Architecture Diagram" width="600"/>
 </p>
 
-ztoperator is a Kubernetes operator that simplifies and enforces zero trust security for workloads using Istio and OAuth 2.0. 
-At the core of ztoperator is the custom resource definition (CRD) AuthPolicy, which provides an abstraction layer for specifying authentication and authorization rules based on OAuth 2 tokens.
+ZToperator is a Kubernetes operator that simplifies and enforces zero trust security for workloads using Istio and OAuth 2.0. 
+At the core of ZToperator is the custom resource definition (CRD) AuthPolicy, which provides an abstraction layer for specifying authentication and authorization rules based on OAuth 2 tokens.
 
 
 # Core functionality
-Ztoperator provides one CRD, AuthPolicy, which configures valid JWT issuers and authorization rules using Istio RequestAuthentication and AuthorizationPolicy.
+ZToperator provides one CRD, AuthPolicy, which configures valid JWT issuers and authorization rules using Istio RequestAuthentication and AuthorizationPolicy.
+Optionally, an [OAuth EnvoyFilter](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter) 
+can also be created to support login using the authorization code flow. 
 
 Example AuthPolicy:
 ```yaml
@@ -20,21 +22,27 @@ spec:
     matchLabels:
       app: some-app
   enabled: true
-  issuerURI: https://example.com
-  jwksURI: https://example.com/jwks
+  wellKnownUri: https://example.com/.well-known/openid-configuration
   audience:
     - example-audience
   acceptedResources:
    - https://some-app.com
+  autoLogin:
+    enabled: true
+    logoutPath: /logout
+    redirectPath: /oauth2/callback
+    scopes:
+      - openid
+      - profile
   authRules:
     - paths:
       - /api
       methods:
       - GET
       when:
-        - claim: sub
+        - claim: acr
           values:
-            - "*"
+            - Level4
     - paths:
       - /admin
       methods:

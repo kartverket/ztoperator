@@ -2,6 +2,7 @@ package require_auth
 
 import (
 	"fmt"
+
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy"
@@ -18,7 +19,11 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 
 	var authorizationPolicyRules []*v1beta1.Rule
 
-	baseConditions := authorizationpolicy.GetBaseConditions(scope.AuthPolicy, scope.IdentityProviderUris.IssuerUri, false)
+	baseConditions := authorizationpolicy.GetBaseConditions(
+		scope.AuthPolicy,
+		scope.IdentityProviderUris.IssuerUri,
+		false,
+	)
 
 	if (scope.AuthPolicy.Spec.AuthRules == nil || len(*scope.AuthPolicy.Spec.AuthRules) == 0) &&
 		(scope.AuthPolicy.Spec.IgnoreAuthRules == nil || len(*scope.AuthPolicy.Spec.IgnoreAuthRules) == 0) {

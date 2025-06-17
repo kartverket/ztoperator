@@ -5,22 +5,23 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"net/url"
+	"regexp"
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"net/url"
-	"regexp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 var (
-	MatchOneTemplate = "{*}"
-	MatchAnyTemplate = "{**}"
+	matchOneTemplate = "{*}"
+	matchAnyTemplate = "{**}"
 
 	// Valid pchar from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
-	// pchar = unreserved / pct-encoded / sub-delims / ":" / "@"
+	// pchar = unreserved / pct-encoded / sub-delims / ":" / "@".
 	validLiteral = regexp.MustCompile("^[a-zA-Z0-9-._~%!$&'()+,;:@=]+$")
 )
 
@@ -64,7 +65,8 @@ func ValidatePaths(paths []string) error {
 			}
 			continue
 		}
-		if strings.Count(path, "*") > 1 || (strings.Contains(path, "*") && !(path == "*" || strings.HasPrefix(path, "*") || strings.HasSuffix(path, "*"))) {
+		if strings.Count(path, "*") > 1 ||
+			(strings.Contains(path, "*") && (path != "*" && !strings.HasPrefix(path, "*") && !strings.HasSuffix(path, "*"))) {
 			return fmt.Errorf("invalid path: %s; '*' must appear only once, be at the start, end, or be '*'", path)
 		}
 	}
@@ -73,7 +75,7 @@ func ValidatePaths(paths []string) error {
 
 func validateNewPathSyntax(paths []string) error {
 	for _, path := range paths {
-		containsPathTemplate := strings.Contains(path, MatchOneTemplate) || strings.Contains(path, MatchAnyTemplate)
+		containsPathTemplate := strings.Contains(path, matchOneTemplate) || strings.Contains(path, matchAnyTemplate)
 		foundMatchAnyTemplate := false
 		// Strip leading and trailing slashes if they exist
 		path = strings.Trim(path, "/")
@@ -81,12 +83,12 @@ func validateNewPathSyntax(paths []string) error {
 		for _, glob := range globs {
 			// If glob is a supported path template, skip the check
 			// If glob is {**}, it must be the last operator in the template
-			if glob == MatchOneTemplate && !foundMatchAnyTemplate {
+			if glob == matchOneTemplate && !foundMatchAnyTemplate {
 				continue
-			} else if glob == MatchAnyTemplate && !foundMatchAnyTemplate {
+			} else if glob == matchAnyTemplate && !foundMatchAnyTemplate {
 				foundMatchAnyTemplate = true
 				continue
-			} else if (glob == MatchAnyTemplate || glob == MatchOneTemplate) && foundMatchAnyTemplate {
+			} else if (glob == matchAnyTemplate || glob == matchOneTemplate) && foundMatchAnyTemplate {
 				return fmt.Errorf("invalid or unsupported path %s. "+
 					"{**} is not the last operator", path)
 			}
