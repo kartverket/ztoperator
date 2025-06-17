@@ -22,7 +22,7 @@ spec:
     matchLabels:
       app: some-app
   enabled: true
-  wellKnownUri: https://example.com/.well-known/openid-configuration
+  wellKnownURI: https://example.com/.well-known/openid-configuration
   audience:
     - example-audience
   acceptedResources:
@@ -34,6 +34,10 @@ spec:
     scopes:
       - openid
       - profile
+  oAuthCredentials:
+    clientIDKey: CLIENT_ID
+    clientSecretKey: CLIENT_SECRET
+    secretRef: oauth-secret
   authRules:
     - paths:
       - /api
