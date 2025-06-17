@@ -8,7 +8,7 @@ spec:
     - paths:
         - /public*
   oAuthCredentials:
-    clientIdKey: CLIENT_ID
+    clientIDKey: CLIENT_ID
     clientSecretKey: CLIENT_SECRET
     secretRef: oauth-secret
   autoLogin:
