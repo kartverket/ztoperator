@@ -19,10 +19,10 @@ type Scope struct {
 }
 
 type IdentityProviderUris struct {
-	IssuerUri        string
-	JwksUri          string
-	TokenUri         string
-	AuthorizationUri string
+	IssuerURI        string
+	JwksURI          string
+	TokenURI         string
+	AuthorizationURI string
 }
 
 type AutoLoginConfig struct {
@@ -34,7 +34,7 @@ type AutoLoginConfig struct {
 }
 
 type OAuthCredentials struct {
-	ClientId     *string
+	ClientID     *string
 	ClientSecret *string
 }
 

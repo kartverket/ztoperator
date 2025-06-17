@@ -1,4 +1,4 @@
-package config_patch
+package configpatch
 
 import (
 	"fmt"

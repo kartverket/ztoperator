@@ -1,4 +1,4 @@
-package ignore_auth
+package ignore
 
 import (
 	"github.com/kartverket/ztoperator/internal/state"

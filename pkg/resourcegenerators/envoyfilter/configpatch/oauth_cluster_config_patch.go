@@ -1,4 +1,4 @@
-package config_patch
+package configpatch
 
 func GetOAuthClusterConfigPatchValue(identityProviderHost string) map[string]interface{} {
 	return map[string]interface{}{

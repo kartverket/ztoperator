@@ -1,4 +1,4 @@
-package require_auth
+package require
 
 import (
 	"fmt"
@@ -21,7 +21,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 
 	baseConditions := authorizationpolicy.GetBaseConditions(
 		scope.AuthPolicy,
-		scope.IdentityProviderUris.IssuerUri,
+		scope.IdentityProviderUris.IssuerURI,
 		false,
 	)
 
@@ -47,7 +47,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 			mentionedPaths = append(mentionedPaths, matcher.Paths...)
 			methods := matcher.Methods
 			if len(matcher.Methods) == 0 {
-				methods = v1alpha1.AcceptedHttpMethods
+				methods = v1alpha1.GetAcceptedHTTPMethods()
 			}
 			toList = append(toList, &v1beta1.Rule_To{
 				Operation: &v1beta1.Operation{

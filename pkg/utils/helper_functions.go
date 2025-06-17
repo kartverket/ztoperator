@@ -16,10 +16,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
+const (
 	matchOneTemplate = "{*}"
 	matchAnyTemplate = "{**}"
+)
 
+var (
 	// Valid pchar from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
 	// pchar = unreserved / pct-encoded / sub-delims / ":" / "@".
 	validLiteral = regexp.MustCompile("^[a-zA-Z0-9-._~%!$&'()+,;:@=]+$")
@@ -83,12 +85,13 @@ func validateNewPathSyntax(paths []string) error {
 		for _, glob := range globs {
 			// If glob is a supported path template, skip the check
 			// If glob is {**}, it must be the last operator in the template
-			if glob == matchOneTemplate && !foundMatchAnyTemplate {
+			switch {
+			case glob == matchOneTemplate && !foundMatchAnyTemplate:
 				continue
-			} else if glob == matchAnyTemplate && !foundMatchAnyTemplate {
+			case glob == matchAnyTemplate && !foundMatchAnyTemplate:
 				foundMatchAnyTemplate = true
 				continue
-			} else if (glob == matchAnyTemplate || glob == matchOneTemplate) && foundMatchAnyTemplate {
+			case (glob == matchAnyTemplate || glob == matchOneTemplate) && foundMatchAnyTemplate:
 				return fmt.Errorf("invalid or unsupported path %s. "+
 					"{**} is not the last operator", path)
 			}
@@ -111,7 +114,7 @@ func validateNewPathSyntax(paths []string) error {
 	return nil
 }
 
-func GetSecret(client client.Client, ctx context.Context, namespacedName types.NamespacedName) (v1.Secret, error) {
+func GetSecret(ctx context.Context, client client.Client, namespacedName types.NamespacedName) (v1.Secret, error) {
 	secret := v1.Secret{}
 
 	err := client.Get(ctx, namespacedName, &secret)

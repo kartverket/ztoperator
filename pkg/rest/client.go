@@ -4,16 +4,19 @@ import (
 	"errors"
 	"fmt"
 
-	log2 "github.com/kartverket/ztoperator/pkg/log"
 	"resty.dev/v3"
+
+	"github.com/kartverket/ztoperator/pkg/log"
 )
 
-func GetOAuthDiscoveryDocument(uri string, rLog log2.Logger) (*DiscoveryDocument, error) {
+func GetOAuthDiscoveryDocument(uri string, rLog log.Logger) (*DiscoveryDocument, error) {
 	var discoveryDocument DiscoveryDocument
 
-	if _, exists := wellknownUriToDiscoveryDocument[uri]; exists {
+	wellknownURIToDiscoveryDocument := GetWellknownURIToDiscoveryDocument()
+
+	if _, exists := wellknownURIToDiscoveryDocument[uri]; exists {
 		rLog.Info(fmt.Sprintf("Using cached discovery document for well-known uri: %s", uri))
-		cachedDiscoveryDocument := wellknownUriToDiscoveryDocument[uri]
+		cachedDiscoveryDocument := wellknownURIToDiscoveryDocument[uri]
 		return &cachedDiscoveryDocument, nil
 	}
 	rLog.Info(fmt.Sprintf("Fetching discovery document for well-known uri: %s", uri))

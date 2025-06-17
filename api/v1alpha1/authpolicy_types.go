@@ -136,10 +136,10 @@ type OAuthCredentials struct {
 	// +kubebuilder:validation:Required
 	ClientSecretKey string `json:"clientSecretKey"`
 
-	// ClientIdKey specifies the data key to access the client ID.
+	// ClientIDKey specifies the data key to access the client ID.
 	//
 	// +kubebuilder:validation:Required
-	ClientIdKey string `json:"clientIdKey"`
+	ClientIDKey string `json:"clientIDKey"`
 }
 
 type WorkloadSelector struct {
@@ -272,16 +272,18 @@ type AuthPolicyList struct {
 	Items           []AuthPolicy `json:"items"`
 }
 
-var AcceptedHttpMethods = []string{
-	"GET",
-	"POST",
-	"PUT",
-	"PATCH",
-	"DELETE",
-	"HEAD",
-	"OPTIONS",
-	"TRACE",
-	"CONNECT",
+func GetAcceptedHTTPMethods() []string {
+	return []string{
+		"GET",
+		"POST",
+		"PUT",
+		"PATCH",
+		"DELETE",
+		"HEAD",
+		"OPTIONS",
+		"TRACE",
+		"CONNECT",
+	}
 }
 
 func init() {

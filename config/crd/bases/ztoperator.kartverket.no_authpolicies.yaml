@@ -239,8 +239,8 @@ spec:
                   secret in the same namespace holding OAuth credentials used for
                   authentication.
                 properties:
-                  clientIdKey:
-                    description: ClientIdKey specifies the data key to access the
+                  clientIDKey:
+                    description: ClientIDKey specifies the data key to access the
                       client ID.
                     type: string
                   clientSecretKey:
@@ -251,7 +251,7 @@ spec:
                     description: SecretRef specifies the name of the kubernetes secret.
                     type: string
                 required:
-                - clientIdKey
+                - clientIDKey
                 - clientSecretKey
                 - secretRef
                 type: object

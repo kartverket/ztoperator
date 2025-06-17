@@ -3,8 +3,8 @@ package controller
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/errors"
 	"reflect"
 	"strings"
 
@@ -13,10 +13,10 @@ import (
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/deny"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore_auth"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/require_auth"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/require"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/config_patch"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
 	"github.com/kartverket/ztoperator/pkg/rest"
@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	k8sErrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -137,7 +138,13 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	if pathValidationErr := utils.ValidatePaths(authPolicy.GetPaths()); pathValidationErr != nil {
-		rLog.Error(pathValidationErr, fmt.Sprintf("Path validation failed for AuthPolicy with name %s", req.NamespacedName.String()))
+		rLog.Error(
+			pathValidationErr,
+			fmt.Sprintf(
+				"Path validation failed for AuthPolicy with name %s",
+				req.NamespacedName.String(),
+			),
+		)
 		rLog.Debug(
 			fmt.Sprintf(
 				"Path validation failed for AuthPolicy with name %s. Defaulting to default deny on all paths.",
@@ -169,8 +176,8 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					),
 					Scope: scope,
 					ShouldUpdate: func(current, desired *v1.Secret) bool {
-						desiredTokenSecret, hasDesired := desired.Data[config_patch.TokenSecretFileName]
-						currentTokenSecret, hasCurrent := current.Data[config_patch.TokenSecretFileName]
+						desiredTokenSecret, hasDesired := desired.Data[configpatch.TokenSecretFileName]
+						currentTokenSecret, hasCurrent := current.Data[configpatch.TokenSecretFileName]
 						return !hasDesired || !hasCurrent || !bytes.Equal(currentTokenSecret, desiredTokenSecret)
 					},
 					UpdateFields: func(current, desired *v1.Secret) {
@@ -257,7 +264,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					ResourceKind: "AuthorizationPolicy",
 					ResourceName: ignoreAuthAuthorizationPolicyName,
 					DesiredResource: utils.Ptr(
-						ignore_auth.GetDesired(
+						ignore.GetDesired(
 							scope,
 							utils.BuildObjectMeta(ignoreAuthAuthorizationPolicyName, authPolicy.Namespace),
 						),
@@ -280,7 +287,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					ResourceKind: "AuthorizationPolicy",
 					ResourceName: requireAuthAuthorizationPolicyName,
 					DesiredResource: utils.Ptr(
-						require_auth.GetDesired(
+						require.GetDesired(
 							scope,
 							utils.BuildObjectMeta(requireAuthAuthorizationPolicyName, authPolicy.Namespace),
 						),
@@ -338,7 +345,7 @@ func (r *AuthPolicyReconciler) doReconcile(
 
 	if len(errs) > 0 {
 		r.Recorder.Eventf(&scope.AuthPolicy, "Warning", "ReconcileFailed", "AuthPolicy failed during reconciliation")
-		return ctrl.Result{}, errors.NewAggregate(errs)
+		return ctrl.Result{}, k8sErrors.NewAggregate(errs)
 	}
 	r.Recorder.Eventf(&scope.AuthPolicy, "Normal", "ReconcileSuccess", "AuthPolicy reconciled successfully")
 	return result, nil
@@ -404,15 +411,16 @@ func (r *AuthPolicyReconciler) updateStatus(
 			Type:               d.ID,
 			LastTransitionTime: metav1.Now(),
 		}
-		if d.ErrorMessage != nil {
+		switch {
+		case d.ErrorMessage != nil:
 			cond.Status = metav1.ConditionFalse
 			cond.Reason = "Error"
 			cond.Message = *d.ErrorMessage
-		} else if d.SuccessMessage != nil {
+		case d.SuccessMessage != nil:
 			cond.Status = metav1.ConditionTrue
 			cond.Reason = "Success"
 			cond.Message = *d.SuccessMessage
-		} else {
+		default:
 			cond.Status = metav1.ConditionUnknown
 			cond.Reason = "Unknown"
 			cond.Message = "No status message set"
@@ -479,7 +487,7 @@ func reconcileAuthPolicy[T client.Object](
 	if desired == nil || reflect.ValueOf(*desired).IsNil() {
 		// Resource is not desired. Try deleting the existing one if it exists.
 		resourceType := reflect.TypeOf((*T)(nil)).Elem()
-		current := reflect.New(resourceType.Elem()).Interface().(T)
+		current, _ := reflect.New(resourceType.Elem()).Interface().(T)
 
 		accessor := current
 		accessor.SetNamespace(scope.AuthPolicy.Namespace)
@@ -524,16 +532,16 @@ func reconcileAuthPolicy[T client.Object](
 				accessor.GetName(),
 			),
 		)
-		if err := k8sClient.Delete(ctx, current); err != nil {
+		if deleteErr := k8sClient.Delete(ctx, current); deleteErr != nil {
 			deleteErrorMessage := fmt.Sprintf(
 				"Failed to delete %s %s/%s",
 				resourceKind,
 				accessor.GetNamespace(),
 				accessor.GetName(),
 			)
-			rLog.Error(err, deleteErrorMessage)
+			rLog.Error(deleteErr, deleteErrorMessage)
 			scope.ReplaceDescendant(accessor, &deleteErrorMessage, nil, resourceKind, resourceName)
-			return ctrl.Result{}, err
+			return ctrl.Result{}, deleteErr
 		}
 
 		rLog.Debug(
@@ -552,7 +560,7 @@ func reconcileAuthPolicy[T client.Object](
 	deReferencedDesired := *desired
 
 	kind := reflect.TypeOf(deReferencedDesired).Elem().Name()
-	current := reflect.New(reflect.TypeOf(deReferencedDesired).Elem()).Interface().(T)
+	current, _ := reflect.New(reflect.TypeOf(deReferencedDesired).Elem()).Interface().(T)
 
 	rLog.Info(
 		fmt.Sprintf(
@@ -581,7 +589,7 @@ func reconcileAuthPolicy[T client.Object](
 				deReferencedDesired.GetName(),
 			),
 		)
-		if err := ctrl.SetControllerReference(&scope.AuthPolicy, deReferencedDesired, scheme); err != nil {
+		if controllerRefErr := ctrl.SetControllerReference(&scope.AuthPolicy, deReferencedDesired, scheme); controllerRefErr != nil {
 			errorReason := fmt.Sprintf(
 				"Unable to set AuthPolicy ownerReference on %s %s/%s.",
 				kind,
@@ -589,13 +597,13 @@ func reconcileAuthPolicy[T client.Object](
 				deReferencedDesired.GetName(),
 			)
 			scope.ReplaceDescendant(deReferencedDesired, &errorReason, nil, resourceKind, resourceName)
-			return ctrl.Result{}, err
+			return ctrl.Result{}, controllerRefErr
 		}
 
 		rLog.Info(
 			fmt.Sprintf("Creating %s %s/%s", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()),
 		)
-		if err := k8sClient.Create(ctx, deReferencedDesired); err != nil {
+		if createErr := k8sClient.Create(ctx, deReferencedDesired); createErr != nil {
 			errorReason := fmt.Sprintf(
 				"Unable to create %s %s/%s",
 				kind,
@@ -603,7 +611,7 @@ func reconcileAuthPolicy[T client.Object](
 				deReferencedDesired.GetName(),
 			)
 			scope.ReplaceDescendant(deReferencedDesired, &errorReason, nil, resourceKind, resourceName)
-			return ctrl.Result{}, err
+			return ctrl.Result{}, createErr
 		}
 		successMessage := fmt.Sprintf(
 			"Successfully created %s %s/%s.",
@@ -655,10 +663,10 @@ func reconcileAuthPolicy[T client.Object](
 		)
 		updateFields(current, deReferencedDesired)
 
-		if err := k8sClient.Update(ctx, current); err != nil {
+		if updateErr := k8sClient.Update(ctx, current); updateErr != nil {
 			errorReason := fmt.Sprintf("Unable to update %s %s/%s.", kind, current.GetNamespace(), current.GetName())
 			scope.ReplaceDescendant(current, &errorReason, nil, resourceKind, resourceName)
-			return ctrl.Result{}, err
+			return ctrl.Result{}, updateErr
 		}
 	} else {
 		rLog.Debug(fmt.Sprintf("Current %s %s/%s == desired. No update needed.", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()))
@@ -678,7 +686,7 @@ func resolveAuthPolicy(
 ) (*state.Scope, error) {
 	rLog := log.GetLogger(ctx)
 	if authPolicy == nil {
-		return nil, fmt.Errorf("encountered AuthPolicy as null when resolving")
+		return nil, errors.New("encountered AuthPolicy as null when resolving")
 	}
 	rLog.Info(fmt.Sprintf("Trying to resolve auth policy %s/%s", authPolicy.Namespace, authPolicy.Name))
 	if !authPolicy.Spec.Enabled {
@@ -690,39 +698,38 @@ func resolveAuthPolicy(
 
 	var oAuthCredentials state.OAuthCredentials
 
-	if authPolicy.Spec.OAuthCredentials != nil {
-		oAuthSecret, err := utils.GetSecret(k8sClient, ctx, types.NamespacedName{
+	if authPolicy.Spec.OAuthCredentials != nil &&
+		authPolicy.Spec.AutoLogin != nil &&
+		authPolicy.Spec.AutoLogin.Enabled {
+		oAuthSecret, err := utils.GetSecret(ctx, k8sClient, types.NamespacedName{
 			Namespace: authPolicy.Namespace,
 			Name:      authPolicy.Spec.OAuthCredentials.SecretRef,
 		})
 		if err != nil {
 			return nil, err
 		}
+		clientID := string(oAuthSecret.Data[authPolicy.Spec.OAuthCredentials.ClientIDKey])
+		oAuthCredentials.ClientID = &clientID
 
-		if authPolicy.Spec.AutoLogin != nil && authPolicy.Spec.AutoLogin.Enabled {
-			clientId := string(oAuthSecret.Data[authPolicy.Spec.OAuthCredentials.ClientIdKey])
-			oAuthCredentials.ClientId = &clientId
+		clientSecret := string(oAuthSecret.Data[authPolicy.Spec.OAuthCredentials.ClientSecretKey])
+		oAuthCredentials.ClientSecret = &clientSecret
 
-			clientSecret := string(oAuthSecret.Data[authPolicy.Spec.OAuthCredentials.ClientSecretKey])
-			oAuthCredentials.ClientSecret = &clientSecret
+		if oAuthCredentials.ClientID == nil || *oAuthCredentials.ClientID == "" {
+			return nil, fmt.Errorf(
+				"client id with key: %s was nil or empty when retrieving it from Secret with name %s/%s",
+				authPolicy.Spec.OAuthCredentials.ClientIDKey,
+				authPolicy.Namespace,
+				authPolicy.Spec.OAuthCredentials.SecretRef,
+			)
+		}
 
-			if oAuthCredentials.ClientId == nil || *oAuthCredentials.ClientId == "" {
-				return nil, fmt.Errorf(
-					"client id with key: %s was nil or empty when retrieving it from Secret with name %s/%s",
-					authPolicy.Spec.OAuthCredentials.ClientIdKey,
-					authPolicy.Namespace,
-					authPolicy.Spec.OAuthCredentials.SecretRef,
-				)
-			}
-
-			if oAuthCredentials.ClientSecret == nil || *oAuthCredentials.ClientSecret == "" {
-				return nil, fmt.Errorf(
-					"client secret with key: %s was nil or empty when retrieving it from Secret with name %s/%s",
-					authPolicy.Spec.OAuthCredentials.ClientSecretKey,
-					authPolicy.Namespace,
-					authPolicy.Spec.OAuthCredentials.SecretRef,
-				)
-			}
+		if oAuthCredentials.ClientSecret == nil || *oAuthCredentials.ClientSecret == "" {
+			return nil, fmt.Errorf(
+				"client secret with key: %s was nil or empty when retrieving it from Secret with name %s/%s",
+				authPolicy.Spec.OAuthCredentials.ClientSecretKey,
+				authPolicy.Namespace,
+				authPolicy.Spec.OAuthCredentials.SecretRef,
+			)
 		}
 	}
 
@@ -746,7 +753,7 @@ func resolveAuthPolicy(
 		)
 	}
 
-	if discoveryDocument.Issuer == nil || discoveryDocument.JwksUri == nil || discoveryDocument.TokenEndpoint == nil ||
+	if discoveryDocument.Issuer == nil || discoveryDocument.JwksURI == nil || discoveryDocument.TokenEndpoint == nil ||
 		discoveryDocument.AuthorizationEndpoint == nil {
 		return nil, fmt.Errorf(
 			"failed to parse discovery document from well-known uri: %s for AuthPolicy with name %s/%s",
@@ -755,10 +762,10 @@ func resolveAuthPolicy(
 			authPolicy.Name,
 		)
 	}
-	identityProviderUris.IssuerUri = *discoveryDocument.Issuer
-	identityProviderUris.JwksUri = *discoveryDocument.JwksUri
-	identityProviderUris.TokenUri = *discoveryDocument.TokenEndpoint
-	identityProviderUris.AuthorizationUri = *discoveryDocument.AuthorizationEndpoint
+	identityProviderUris.IssuerURI = *discoveryDocument.Issuer
+	identityProviderUris.JwksURI = *discoveryDocument.JwksURI
+	identityProviderUris.TokenURI = *discoveryDocument.TokenEndpoint
+	identityProviderUris.AuthorizationURI = *discoveryDocument.AuthorizationEndpoint
 
 	autoLoginConfig := state.AutoLoginConfig{
 		Enabled: false,

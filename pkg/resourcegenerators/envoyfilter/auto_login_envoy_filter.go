@@ -2,7 +2,7 @@ package envoyfilter
 
 import (
 	"github.com/kartverket/ztoperator/internal/state"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/config_patch"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/utils"
 	"google.golang.org/protobuf/types/known/structpb"
 	"istio.io/api/networking/v1alpha3"
@@ -17,14 +17,14 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 		return nil
 	}
 
-	issuerHostName, err := utils.GetHostname(scope.IdentityProviderUris.IssuerUri)
+	issuerHostName, err := utils.GetHostname(scope.IdentityProviderUris.IssuerURI)
 	if err != nil {
 		panic(
-			"failed to get issuer hostname from issuer URI " + scope.IdentityProviderUris.IssuerUri + " due to the following error: " + err.Error(),
+			"failed to get issuer hostname from issuer URI " + scope.IdentityProviderUris.IssuerURI + " due to the following error: " + err.Error(),
 		)
 	}
 	oAuthClusterConfigPatchValueAsPbStruct, err := structpb.NewStruct(
-		config_patch.GetOAuthClusterConfigPatchValue(*issuerHostName),
+		configpatch.GetOAuthClusterConfigPatchValue(*issuerHostName),
 	)
 	if err != nil {
 		panic(
@@ -33,12 +33,12 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 	}
 
 	oAuthSidecarConfigPatchValueAsPbStruct, err := structpb.NewStruct(
-		config_patch.GetOAuthSidecarConfigPatchValue(
-			scope.IdentityProviderUris.TokenUri,
-			scope.IdentityProviderUris.AuthorizationUri,
+		configpatch.GetOAuthSidecarConfigPatchValue(
+			scope.IdentityProviderUris.TokenURI,
+			scope.IdentityProviderUris.AuthorizationURI,
 			scope.AutoLoginConfig.RedirectPath,
 			scope.AutoLoginConfig.LogoutPath,
-			*scope.OAuthCredentials.ClientId,
+			*scope.OAuthCredentials.ClientID,
 			scope.AutoLoginConfig.Scopes,
 			scope.AuthPolicy.Spec.AcceptedResources,
 			scope.AuthPolicy.Spec.IgnoreAuthRules,
@@ -54,7 +54,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 	var configPatches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
 
 	if scope.AutoLoginConfig.LoginPath == nil && scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
-		luaScript, structPbErr := structpb.NewStruct(config_patch.GetLuaScript())
+		luaScript, structPbErr := structpb.NewStruct(configpatch.GetLuaScript())
 		if structPbErr != nil {
 			panic(
 				"failed to serialize Custom Lua Script to protobuf struct due to the following error: " + structPbErr.Error(),

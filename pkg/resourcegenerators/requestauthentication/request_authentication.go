@@ -18,18 +18,18 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 	if scope.AuthPolicy.Spec.Audience != nil {
 		audiences = scope.AuthPolicy.Spec.Audience
 	}
-	if scope.OAuthCredentials.ClientId != nil {
+	if scope.OAuthCredentials.ClientID != nil {
 		for _, audience := range audiences {
-			if *scope.OAuthCredentials.ClientId != audience {
-				audiences = append(audiences, *scope.OAuthCredentials.ClientId)
+			if *scope.OAuthCredentials.ClientID != audience {
+				audiences = append(audiences, *scope.OAuthCredentials.ClientID)
 			}
 		}
 	}
 
 	jwtRule := &securityv1.JWTRule{
-		Issuer:               scope.IdentityProviderUris.IssuerUri,
+		Issuer:               scope.IdentityProviderUris.IssuerURI,
 		Audiences:            audiences,
-		JwksUri:              scope.IdentityProviderUris.JwksUri,
+		JwksUri:              scope.IdentityProviderUris.JwksURI,
 		ForwardOriginalToken: scope.AuthPolicy.Spec.ForwardJwt,
 	}
 

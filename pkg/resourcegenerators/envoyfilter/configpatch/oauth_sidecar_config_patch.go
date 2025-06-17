@@ -1,4 +1,4 @@
-package config_patch
+package configpatch
 
 import (
 	"fmt"
@@ -20,7 +20,7 @@ func GetOAuthSidecarConfigPatchValue(
 	authorizationEndpoint string,
 	redirectPath string,
 	signoutPath string,
-	clientId string,
+	clientID string,
 	authScopes []string,
 	resources *[]string,
 	ignoreAuthRules *[]v1alpha1.RequestMatcher,
@@ -78,7 +78,7 @@ func GetOAuthSidecarConfigPatchValue(
 		"use_refresh_token":    true,
 		"pass_through_matcher": passThroughMatchers,
 		"credentials": map[string]interface{}{
-			"client_id": clientId,
+			"client_id": clientID,
 			"token_secret": map[string]interface{}{
 				"name": "token",
 				"sds_config": map[string]interface{}{
@@ -142,7 +142,7 @@ func getPassThroughMatcherFromIgnoreAuthRules(rules []v1alpha1.RequestMatcher) m
 		for _, path := range rule.Paths {
 			var methodsPattern []string
 			if len(rule.Methods) == 0 {
-				rule.Methods = v1alpha1.AcceptedHttpMethods
+				rule.Methods = v1alpha1.GetAcceptedHTTPMethods()
 			}
 			methodsPattern = append(methodsPattern, rule.Methods...)
 			var methodsPatternString string

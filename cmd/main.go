@@ -103,7 +103,7 @@ func main() {
 
 	// webhookServer := webhook.NewServer(webhook.Options{
 	//	TLSOpts: tlsOpts,
-	//})
+	// })
 
 	// Metrics endpoint is enabled in 'config/default/kustomization.yaml'. The Metrics options configure the server.
 	// More info:
@@ -134,9 +134,8 @@ func main() {
 	if !*isDeployment && !strings.Contains(kubeconfig.Host, "https://127.0.0.1") {
 		setupLog.Info("Tried to start ztoperator with non-local kubecontext. Exiting to prevent havoc.")
 		os.Exit(1)
-	} else {
-		setupLog.Info(fmt.Sprintf("Starting ztoperator using kube-apiserver at %s", kubeconfig.Host))
 	}
+	setupLog.Info(fmt.Sprintf("Starting ztoperator using kube-apiserver at %s", kubeconfig.Host))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:  scheme,
