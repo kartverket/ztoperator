@@ -57,6 +57,8 @@ HTTP 200
 POST https://127.0.0.1:8443/secure
 Host: foo.bar
 HTTP 302
+[Asserts]
+Header Location == {{location_header}}
 
 # --- Expecting 200
 POST https://127.0.0.1:8443/secure
