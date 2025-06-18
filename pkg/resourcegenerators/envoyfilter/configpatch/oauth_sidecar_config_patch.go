@@ -2,8 +2,6 @@ package configpatch
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 )
 
@@ -40,7 +38,12 @@ func GetOAuthSidecarConfigPatchValue(
 			getPassThroughMatcherFromLoginPath(*loginPath, redirectPath, signoutPath),
 		)
 	} else if ignoreAuthRules != nil {
-		passThroughMatchers = append(passThroughMatchers, getPassThroughMatcherFromIgnoreAuthRules(*ignoreAuthRules))
+		passThroughMatchers = append(passThroughMatchers, map[string]interface{}{
+			"name": BypassOauthLoginHeaderName,
+			"string_match": map[string]interface{}{
+				"exact": "true",
+			},
+		})
 	}
 
 	var resourcesInterface []interface{}
@@ -126,75 +129,12 @@ func getPassThroughMatcherFromLoginPath(loginPath, redirectPath, logoutPath stri
 				"google_re2": map[string]interface{}{},
 				"regex": fmt.Sprintf(
 					"^(%s|%s.*|%s)$",
-					convertPathToRegex(loginPath),
-					convertPathToRegex(redirectPath),
-					convertPathToRegex(logoutPath),
+					ConvertRequestMatcherPathToRegex(loginPath),
+					ConvertRequestMatcherPathToRegex(redirectPath),
+					ConvertRequestMatcherPathToRegex(logoutPath),
 				),
 			},
 		},
 		"invert_match": true,
 	}
-}
-
-func getPassThroughMatcherFromIgnoreAuthRules(rules []v1alpha1.RequestMatcher) map[string]interface{} {
-	var regexPattern []string
-	for _, rule := range rules {
-		for _, path := range rule.Paths {
-			var methodsPattern []string
-			if len(rule.Methods) == 0 {
-				rule.Methods = v1alpha1.GetAcceptedHTTPMethods()
-			}
-			methodsPattern = append(methodsPattern, rule.Methods...)
-			var methodsPatternString string
-			if len(methodsPattern) > 1 {
-				concatenated := strings.Join(methodsPattern, "|")
-				methodsPatternString = fmt.Sprintf("(%s)", concatenated)
-			} else {
-				methodsPatternString = methodsPattern[0]
-			}
-			regexPattern = append(regexPattern, fmt.Sprintf(`%s:%s`, methodsPatternString, convertPathToRegex(path)))
-		}
-	}
-	var result string
-	if len(regexPattern) > 1 {
-		concatenated := strings.Join(regexPattern, "|")
-		result = fmt.Sprintf(`^(%s)$`, concatenated)
-	} else {
-		result = fmt.Sprintf(`^%s$`, regexPattern[0])
-	}
-
-	return map[string]interface{}{
-		"name": BypassOauthLoginHeaderName,
-		"string_match": map[string]interface{}{
-			"safe_regex": map[string]interface{}{
-				"google_re2": map[string]interface{}{},
-				"regex":      result,
-			},
-		},
-	}
-}
-
-func convertPathToRegex(path string) string {
-	if strings.Contains(path, "*") || strings.Contains(path, "{") {
-		path = convertToEnvoyWildcards(path)
-		return envoyWildcardsToRE2Regex(path)
-	}
-	return path
-}
-
-func convertToEnvoyWildcards(pathWithIstioWildcards string) string {
-	if strings.Contains(pathWithIstioWildcards, "{") {
-		// New path wildcard syntax
-		removedStartBracket := strings.ReplaceAll(pathWithIstioWildcards, "{", "")
-		return strings.ReplaceAll(removedStartBracket, "}", "")
-	}
-	// Old wildcard syntax
-	return strings.ReplaceAll(pathWithIstioWildcards, "*", "**")
-}
-
-func envoyWildcardsToRE2Regex(path string) string {
-	const doubleStarPlaceholder = "<<DOUBLE_STAR>>"
-	path = strings.ReplaceAll(path, "**", doubleStarPlaceholder)
-	path = strings.ReplaceAll(path, "*", "[^/]+")
-	return strings.ReplaceAll(path, doubleStarPlaceholder, ".*")
 }

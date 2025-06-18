@@ -1,6 +1,7 @@
 package envoyfilter
 
 import (
+	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/utils"
@@ -54,7 +55,18 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 	var configPatches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
 
 	if scope.AutoLoginConfig.LoginPath == nil && scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
-		luaScript, structPbErr := structpb.NewStruct(configpatch.GetLuaScript())
+		var ignoreAuthRequestMatchers []v1alpha1.RequestMatcher
+		if scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
+			ignoreAuthRequestMatchers = append(ignoreAuthRequestMatchers, *scope.AuthPolicy.Spec.IgnoreAuthRules...)
+		}
+		luaScript, structPbErr := structpb.NewStruct(configpatch.GetLuaScript(
+			ignoreAuthRequestMatchers,
+			v1alpha1.GetRequestMatchers(
+				scope.AuthPolicy.Spec.AuthRules,
+			),
+			scope.AutoLoginConfig.RedirectPath,
+			scope.AutoLoginConfig.LogoutPath,
+		))
 		if structPbErr != nil {
 			panic(
 				"failed to serialize Custom Lua Script to protobuf struct due to the following error: " + structPbErr.Error(),
