@@ -33,9 +33,6 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 		ForwardOriginalToken: scope.AuthPolicy.Spec.ForwardJwt,
 	}
 
-	if scope.AuthPolicy.Spec.FromCookies != nil && len(*scope.AuthPolicy.Spec.FromCookies) > 0 {
-		jwtRule.FromCookies = *scope.AuthPolicy.Spec.FromCookies
-	}
 	if scope.AuthPolicy.Spec.OutputClaimToHeaders != nil && len(*scope.AuthPolicy.Spec.OutputClaimToHeaders) > 0 {
 		claimsToHeaders := make([]*v1beta1.ClaimToHeader, len(*scope.AuthPolicy.Spec.OutputClaimToHeaders))
 		for i, claimToHeader := range *scope.AuthPolicy.Spec.OutputClaimToHeaders {

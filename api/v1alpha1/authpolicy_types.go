@@ -37,24 +37,9 @@ type AuthPolicySpec struct {
 	// +kubebuilder:default=true
 	ForwardJwt bool `json:"forwardJwt,omitempty"`
 
-	// FromCookies denotes the cookies from which the auth policy will look for a JWT.
-	//
-	// +kubebuilder:validation:Optional
-	FromCookies *[]string `json:"fromCookies,omitempty"`
-
 	// OutputClaimsToHeaders specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.
 	// The header specified in each operation in the list must be unique. Nested claims of type string/int/bool is supported as well.
-	// ```
 	//
-	//	outputClaimToHeaders:
-	//	- header: x-my-company-jwt-group
-	//	  claim: my-group
-	//	- header: x-test-environment-flag
-	//	  claim: test-flag
-	//	- header: x-jwt-claim-group
-	//	  claim: nested.key.group
-	//
-	// ```
 	// +kubebuilder:validation:Optional
 	OutputClaimToHeaders *[]ClaimToHeader `json:"outputClaimToHeaders,omitempty"`
 

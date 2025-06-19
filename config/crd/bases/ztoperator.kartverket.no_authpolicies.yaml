@@ -186,12 +186,6 @@ spec:
                 description: If set to `true`, the original token will be kept for
                   the upstream request. Defaults to `true`.
                 type: boolean
-              fromCookies:
-                description: FromCookies denotes the cookies from which the auth policy
-                  will look for a JWT.
-                items:
-                  type: string
-                type: array
               ignoreAuthRules:
                 description: |-
                   IgnoreAuthRules defines request matchers for HTTP requests that do not require JWT authentication.
@@ -256,13 +250,9 @@ spec:
                 - secretRef
                 type: object
               outputClaimToHeaders:
-                description: "OutputClaimsToHeaders specifies a list of operations
-                  to copy the claim to HTTP headers on a successfully verified token.\nThe
-                  header specified in each operation in the list must be unique. Nested
-                  claims of type string/int/bool is supported as well.\n```\n\n\n\toutputClaimToHeaders:\n\t-
-                  header: x-my-company-jwt-group\n\t  claim: my-group\n\t- header:
-                  x-test-environment-flag\n\t  claim: test-flag\n\t- header: x-jwt-claim-group\n\t
-                  \ claim: nested.key.group\n\n\n```"
+                description: |-
+                  OutputClaimsToHeaders specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.
+                  The header specified in each operation in the list must be unique. Nested claims of type string/int/bool is supported as well.
                 items:
                   description: |-
                     ClaimToHeader specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.

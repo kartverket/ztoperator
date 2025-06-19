@@ -10,6 +10,10 @@ if [ ! -x "$GET_ISTIO_SCRIPT" ]; then
 fi
 
 for test_path in "$TEST_DIR"/*; do
+  if [[ "$(basename "$test_path")" == "path_validation" ]]; then
+    echo "⏭️ Skipping directory: $test_path"
+    continue
+  fi
   test_name=$(basename "$test_path")
   echo "🔍 Processing test: $test_name"
 
