@@ -28,6 +28,6 @@ spec:
             content: |
               hurl --error-format long \
               --insecure --test tests.hurl \
-              --variable entraid_token_client="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client)" \
-              --variable entraid_token_user="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_user)" \
-              --variable idporten_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer idporten --code idporten_code)"
+              --variable entraid_token_client="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client --token_name access_token)" \
+              --variable entraid_token_user="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_user --token_name access_token)" \
+              --variable idporten_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer idporten --code idporten_code --token_name access_token)"

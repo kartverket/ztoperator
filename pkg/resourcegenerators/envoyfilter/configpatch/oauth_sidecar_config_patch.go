@@ -24,28 +24,6 @@ func GetOAuthSidecarConfigPatchValue(
 	ignoreAuthRules *[]v1alpha1.RequestMatcher,
 	loginPath *string,
 ) map[string]interface{} {
-	passThroughMatchers := []interface{}{
-		map[string]interface{}{
-			"name": "authorization",
-			"string_match": map[string]interface{}{
-				"prefix": "Bearer ",
-			},
-		},
-	}
-	if loginPath != nil {
-		passThroughMatchers = append(
-			passThroughMatchers,
-			getPassThroughMatcherFromLoginPath(*loginPath, redirectPath, signoutPath),
-		)
-	} else if ignoreAuthRules != nil {
-		passThroughMatchers = append(passThroughMatchers, map[string]interface{}{
-			"name": BypassOauthLoginHeaderName,
-			"string_match": map[string]interface{}{
-				"exact": "true",
-			},
-		})
-	}
-
 	var resourcesInterface []interface{}
 	if resources != nil {
 		for _, resource := range *resources {
@@ -79,7 +57,22 @@ func GetOAuthSidecarConfigPatchValue(
 		},
 		"forward_bearer_token": true,
 		"use_refresh_token":    true,
-		"pass_through_matcher": passThroughMatchers,
+		"pass_through_matcher": []interface{}{
+			map[string]interface{}{
+				"name": BypassOauthLoginHeaderName,
+				"string_match": map[string]interface{}{
+					"exact": "true",
+				},
+			},
+		},
+		"deny_redirect_matcher": []interface{}{
+			map[string]interface{}{
+				"name": DenyRedirectHeaderName,
+				"string_match": map[string]interface{}{
+					"exact": "true",
+				},
+			},
+		},
 		"credentials": map[string]interface{}{
 			"client_id": clientID,
 			"token_secret": map[string]interface{}{

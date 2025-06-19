@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import argparse
+
 import httpx
 
 parser = argparse.ArgumentParser(description="Mock OAuth2 token fetcher")
 parser.add_argument("--issuer", required=True, help="Issuer (e.g., idporten)")
 parser.add_argument("--code", required=True, help="Authorization code to exchange for token (e.g., idporten_code)")
+parser.add_argument("--token_name", required=True, help="Which token in the token response should be returned by the script?")
 args = parser.parse_args()
 
 hostname = "fake.auth"
@@ -35,5 +37,6 @@ token_resp = client.post(
 
 token_resp.raise_for_status()
 
-access_token = token_resp.json()["access_token"]
-print(access_token)
+token = token_resp.json()[args.token_name]
+
+print(token)

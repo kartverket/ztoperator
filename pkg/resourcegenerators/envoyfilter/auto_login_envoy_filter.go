@@ -54,16 +54,28 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 
 	var configPatches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
 
-	if scope.AutoLoginConfig.LoginPath == nil && scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
+	if scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
 		var ignoreAuthRequestMatchers []v1alpha1.RequestMatcher
 		if scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
 			ignoreAuthRequestMatchers = append(ignoreAuthRequestMatchers, *scope.AuthPolicy.Spec.IgnoreAuthRules...)
 		}
+
+		var denyRedirectMatchers []v1alpha1.RequestMatcher
+		if scope.AuthPolicy.Spec.AuthRules != nil {
+			for _, authRule := range *scope.AuthPolicy.Spec.AuthRules {
+				if authRule.DenyRedirect != nil && *authRule.DenyRedirect {
+					denyRedirectMatchers = append(denyRedirectMatchers, authRule.RequestMatcher)
+				}
+			}
+		}
+
 		luaScript, structPbErr := structpb.NewStruct(configpatch.GetLuaScript(
 			ignoreAuthRequestMatchers,
 			v1alpha1.GetRequestMatchers(
 				scope.AuthPolicy.Spec.AuthRules,
 			),
+			denyRedirectMatchers,
+			scope.AutoLoginConfig.LoginPath,
 			scope.AutoLoginConfig.RedirectPath,
 			scope.AutoLoginConfig.LogoutPath,
 		))

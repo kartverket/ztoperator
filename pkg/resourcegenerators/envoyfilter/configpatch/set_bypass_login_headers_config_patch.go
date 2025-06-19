@@ -8,23 +8,33 @@ import (
 
 const (
 	BypassOauthLoginHeaderName = "x-bypass-login"
+	DenyRedirectHeaderName     = "x-deny-redirect"
 )
 
-func GetLuaScript(ignoreAuth, requireAuth []v1alpha1.RequestMatcher, redirectPath, logoutPath string) map[string]interface{} {
+func GetLuaScript(ignoreAuth, requireAuth, denyRedirect []v1alpha1.RequestMatcher, loginPath *string, redirectPath, logoutPath string) map[string]interface{} {
+	requireAuthOAuthPaths := []string{
+		redirectPath, logoutPath,
+	}
+	if loginPath != nil {
+		requireAuthOAuthPaths = append(requireAuthOAuthPaths, *loginPath)
+	}
 	requireAuth = append(requireAuth, v1alpha1.RequestMatcher{
-		Paths:   []string{redirectPath, logoutPath},
+		Paths:   requireAuthOAuthPaths,
 		Methods: []string{},
 	})
-	ignoreAuth, requireAuth = convertToRE2Regex(ignoreAuth), convertToRE2Regex(requireAuth)
+
+	ignoreAuth, requireAuth, denyRedirect = convertToRE2Regex(ignoreAuth), convertToRE2Regex(requireAuth), convertToRE2Regex(denyRedirect)
 
 	// Produce equivalent Lua tables that the generated script can iterate over.
 	ignoreRulesLua := buildLuaRules(ignoreAuth)
 	requireRulesLua := buildLuaRules(requireAuth)
+	denyRedirectRulesLua := buildLuaRules(denyRedirect)
 
 	// Build the Lua script. We embed the two rule‑tables and a helper matcher.
 	luaScript := fmt.Sprintf(`
 local ignore_rules = %s
 local require_rules = %s
+local deny_redirect_rules = %s
 
 -- returns true when {p,m} matches any rule in the supplied table
 local function match(rules, p, m)
@@ -40,7 +50,7 @@ local function match(rules, p, m)
 end
 
 -- returns true if {p,m} is in ignore_rules *and* NOT in require_rules
-local function shouldBypass(p, m)
+local function should_bypass(p, m)
   local bypass = false
   if p ~= "" and m ~= "" then
     -- bypass only when it is in ignore_rules *and* NOT in require_rules
@@ -51,14 +61,31 @@ local function shouldBypass(p, m)
   return bypass
 end
 
+-- returns true if {p,m} is in deny_redirect_rules
+local function should_deny_redirect(p, m)
+  local deny_redirect = false
+  if p ~= "" and m ~= "" then
+    -- deny redirect only when it is in deny_redirect_rules
+    if match(deny_redirect_rules, p, m) then
+      deny_redirect = true
+    end
+  end
+  return deny_redirect
+end
+
 function envoy_on_request(request_handle)
   local p = request_handle:headers():get(":path")   or ""
   local m = request_handle:headers():get(":method") or ""
-  local bypass = shouldBypass(p, m)
-  request_handle:logCritical("Login bypassed?: " .. tostring(bypass))	
+  
+  local bypass = should_bypass(p, m)
+  request_handle:logCritical("Login bypassed?: " .. tostring(bypass))
   request_handle:headers():add("%s", tostring(bypass))
+  
+  local deny_redirect = should_deny_redirect(p, m)
+  request_handle:logCritical("Deny redirect?: " .. tostring(deny_redirect))	
+  request_handle:headers():add("%s", tostring(deny_redirect))
 end
-`, ignoreRulesLua, requireRulesLua, BypassOauthLoginHeaderName)
+`, ignoreRulesLua, requireRulesLua, denyRedirectRulesLua, BypassOauthLoginHeaderName, DenyRedirectHeaderName)
 
 	return map[string]interface{}{
 		"name": "envoy.filters.http.lua",

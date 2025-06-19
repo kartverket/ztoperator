@@ -1,7 +1,7 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: auto-login-with-login-path
+  name: auto-login-saas
 spec:
   skip: false
   concurrent: true
@@ -31,7 +31,7 @@ spec:
         - script:
             content: |
               hurl --error-format long \
-              --insecure --test tests.hurl \
+              --insecure --verbose --test tests.hurl \
               --variable entraid_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client --token_name access_token)" \
               --variable entraid_refresh_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client --token_name refresh_token)" \
-              --variable location_header="https://fake.auth/entraid/authorize?client_id=entraid_server&code_challenge="
+              --variable location_header="http://mock-oauth2.auth:8080/entraid/authorize?client_id=entraid_server&code_challenge="

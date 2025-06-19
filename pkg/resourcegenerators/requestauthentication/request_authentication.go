@@ -27,10 +27,15 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 	}
 
 	jwtRule := &securityv1.JWTRule{
-		Issuer:               scope.IdentityProviderUris.IssuerURI,
-		Audiences:            audiences,
-		JwksUri:              scope.IdentityProviderUris.JwksURI,
-		ForwardOriginalToken: scope.AuthPolicy.Spec.ForwardJwt,
+		Issuer:    scope.IdentityProviderUris.IssuerURI,
+		Audiences: audiences,
+		JwksUri:   scope.IdentityProviderUris.JwksURI,
+	}
+
+	if scope.AuthPolicy.Spec.ForwardJwt != nil {
+		jwtRule.ForwardOriginalToken = *scope.AuthPolicy.Spec.ForwardJwt
+	} else {
+		jwtRule.ForwardOriginalToken = true
 	}
 
 	if scope.AuthPolicy.Spec.OutputClaimToHeaders != nil && len(*scope.AuthPolicy.Spec.OutputClaimToHeaders) > 0 {

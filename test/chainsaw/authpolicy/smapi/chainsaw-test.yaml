@@ -29,6 +29,6 @@ spec:
               hurl --error-format long \
               --insecure --test tests.hurl \
               --variable baseUrl="https://127.0.0.1:8443" \
-              --variable admin="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer smapi --code admin)" \
-              --variable user="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer smapi --code user)" \
-              --variable backstage="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer smapi --code backstage)"
+              --variable admin="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer smapi --code admin --token_name access_token)" \
+              --variable user="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer smapi --code user --token_name access_token)" \
+              --variable backstage="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer smapi --code backstage --token_name access_token)"

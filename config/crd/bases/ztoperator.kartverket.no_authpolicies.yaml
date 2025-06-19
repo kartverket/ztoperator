@@ -72,6 +72,11 @@ spec:
                   description: RequestAuthRule defines a rule for controlling access
                     to HTTP requests using JWT authentication.
                   properties:
+                    denyRedirect:
+                      description: |-
+                        DenyRedirect specifies whether a denied request should trigger auto-login (if configured) or not when it is denied due to missing or invalid authentication.
+                        Defaults to false, meaning auto-login will be triggered (if configured).
+                      type: boolean
                     methods:
                       description: |-
                         Methods specifies HTTP methods that applies for the defined paths.
@@ -136,7 +141,6 @@ spec:
                       type: array
                   required:
                   - paths
-                  - when
                   type: object
                 type: array
               autoLogin:
@@ -182,7 +186,6 @@ spec:
                   If enabled, incoming JWTs will be validated against the issuer specified in the app registration and the generated audience.
                 type: boolean
               forwardJwt:
-                default: true
                 description: If set to `true`, the original token will be kept for
                   the upstream request. Defaults to `true`.
                 type: boolean
