@@ -6,11 +6,12 @@ require (
 	github.com/go-logr/logr v1.4.3
 	go.uber.org/zap v1.27.0
 	google.golang.org/protobuf v1.36.6
-	istio.io/api v1.26.1
-	istio.io/client-go v1.26.1
+	istio.io/api v1.26.2-0.20250616094816-cb08ed2587d4
+	istio.io/client-go v1.26.2
 	k8s.io/api v0.33.0
 	k8s.io/apimachinery v0.33.1
 	k8s.io/client-go v0.33.0
+	resty.dev/v3 v3.0.0-beta.3
 	sigs.k8s.io/controller-runtime v0.20.4
 	sigs.k8s.io/kustomize/kyaml v0.19.0
 )
@@ -91,7 +92,6 @@ require (
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979 // indirect
-	resty.dev/v3 v3.0.0-beta.3 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.32.1 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
