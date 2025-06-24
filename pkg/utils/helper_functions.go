@@ -122,13 +122,12 @@ func GetSecret(ctx context.Context, client client.Client, namespacedName types.N
 	return secret, err
 }
 
-func GetHostname(uri string) (*string, error) {
+func GetParsedURL(uri string) (*url.URL, error) {
 	parsedURL, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
 	}
-	hostname := parsedURL.Hostname()
-	return &hostname, nil
+	return parsedURL, nil
 }
 
 func GenerateHMACSecret(size int) (*string, error) {

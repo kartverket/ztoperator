@@ -8,7 +8,7 @@ spec:
     - audiences:
         - entraid_server
       forwardOriginalToken: true
-      issuer: https://fake.auth/entraid
+      issuer: http://mock-oauth2.auth:8080/entraid
       jwksUri: http://mock-oauth2.auth:8080/entraid/jwks
   selector:
     matchLabels:
@@ -64,7 +64,7 @@ spec:
       when:
         - key: request.auth.claims[iss]
           values:
-            - https://fake.auth/entraid
+            - http://mock-oauth2.auth:8080/entraid
         - key: request.auth.claims[aud]
           values:
             - entraid_server

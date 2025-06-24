@@ -6,10 +6,18 @@ metadata:
 spec:
   jwtRules:
     - audiences:
-        - entraid_server
+        - maskinporten_client
+        - maskinporten_server
       forwardOriginalToken: true
-      issuer: http://mock-oauth2.auth:8080/entraid
-      jwksUri: http://mock-oauth2.auth:8080/entraid/jwks
+      issuer: http://mock-oauth2.auth:8080/maskinporten
+      jwksUri: http://mock-oauth2.auth:8080/maskinporten/jwks
+      outputClaimToHeaders:
+        - claim: sub
+          header: x-token-sub
+        - claim: role
+          header: x-token-role
+        - claim: aud
+          header: x-token-aud
   selector:
     matchLabels:
       app: application
@@ -28,10 +36,11 @@ spec:
       when:
         - key: request.auth.claims[iss]
           values:
-            - http://mock-oauth2.auth:8080/entraid
+            - http://mock-oauth2.auth:8080/maskinporten
         - key: request.auth.claims[aud]
           values:
-            - entraid_server
+            - maskinporten_client
+            - maskinporten_server
   selector:
     matchLabels:
       app: application

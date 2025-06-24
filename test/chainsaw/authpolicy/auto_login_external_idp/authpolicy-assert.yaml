@@ -6,10 +6,10 @@ metadata:
 spec:
   jwtRules:
     - audiences:
-        - entraid_server
+      - some-audience
       forwardOriginalToken: true
-      issuer: https://fake.auth/entraid
-      jwksUri: http://mock-oauth2.auth:8080/entraid/jwks
+      issuer: https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0
+      jwksUri: https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/discovery/v2.0/keys
   selector:
     matchLabels:
       app: application
@@ -58,10 +58,10 @@ spec:
       when:
         - key: request.auth.claims[iss]
           values:
-            - https://fake.auth/entraid
+            - https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0
         - key: request.auth.claims[aud]
           values:
-            - entraid_server
+            - some-audience
   selector:
     matchLabels:
       app: application
@@ -87,16 +87,30 @@ spec:
           typed_config:
             '@type': type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
             default_source_code:
-              inline_string: |
-                function envoy_on_request(request_handle)
-                  local p = request_handle:headers():get(":path")
-                  local m = request_handle:headers():get(":method")
-                  if p == nil or p == "" or m == nil or m == "" then
-                    request_handle:headers():add("x-bypass-login", "false")
-                  else
-                    request_handle:headers():add("x-bypass-login", m .. ":" .. p)
-                  end
-                end
+              inline_string: "\nlocal ignore_rules = {{regex=\"/public.*\",methods={}}}\nlocal
+              require_rules = {{regex=\"/oauth2/callback\",methods={}},{regex=\"/logout\",methods={}}}\nlocal
+              deny_redirect_rules = {}\n\n-- returns true when {p,m} matches any rule
+              in the supplied table\nlocal function match(rules, p, m)\n  for _, rule
+              in ipairs(rules) do\n    if string.match(p, rule.regex) then\n      --
+              empty \"methods\" table == all methods\n      if next(rule.methods)
+              == nil or rule.methods[m] then\n        return true\n      end\n    end\n
+              \ end\n  return false\nend\n\n-- returns true if {p,m} is in ignore_rules
+              *and* NOT in require_rules\nlocal function should_bypass(p, m)\n  local
+              bypass = false\n  if p ~= \"\" and m ~= \"\" then\n    -- bypass only
+              when it is in ignore_rules *and* NOT in require_rules\n    if match(ignore_rules,
+              p, m) and not match(require_rules, p, m) then\n      bypass = true\n
+              \   end\n  end\n  return bypass\nend\n\n-- returns true if {p,m} is
+              in deny_redirect_rules\nlocal function should_deny_redirect(p, m)\n
+              \ local deny_redirect = false\n  if p ~= \"\" and m ~= \"\" then\n    --
+              deny redirect only when it is in deny_redirect_rules\n    if match(deny_redirect_rules,
+              p, m) then\n      deny_redirect = true\n    end\n  end\n  return deny_redirect\nend\n\nfunction
+              envoy_on_request(request_handle)\n  local p = request_handle:headers():get(\":path\")
+              \  or \"\"\n  local m = request_handle:headers():get(\":method\") or
+              \"\"\n  \n  local bypass = should_bypass(p, m)\n  request_handle:logCritical(\"Login
+              bypassed?: \" .. tostring(bypass))\n  request_handle:headers():add(\"x-bypass-login\",
+              tostring(bypass))\n  \n  local deny_redirect = should_deny_redirect(p,
+              m)\n  request_handle:logCritical(\"Deny redirect?: \" .. tostring(deny_redirect))\t\n
+              \ request_handle:headers():add(\"x-deny-redirect\", tostring(deny_redirect))\nend\n"
     - applyTo: CLUSTER
       match:
         cluster:
@@ -105,7 +119,7 @@ spec:
         operation: ADD
         value:
           connect_timeout: 10s
-          dns_lookup_family: AUTO
+          dns_lookup_family: V4_ONLY
           lb_policy: ROUND_ROBIN
           load_assignment:
             cluster_name: oauth
@@ -114,14 +128,14 @@ spec:
                   - endpoint:
                       address:
                         socket_address:
-                          address: fake.auth
+                          address: login.microsoftonline.com
                           port_value: 443
           name: oauth
           transport_socket:
             name: envoy.transport_sockets.tls
             typed_config:
               '@type': type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-              sni: fake.auth
+              sni: login.microsoftonline.com
           type: LOGICAL_DNS
     - applyTo: HTTP_FILTER
       match:
@@ -141,7 +155,9 @@ spec:
             config:
               auth_scopes:
                 - openid
-              authorization_endpoint: https://fake.auth/entraid/authorize
+                - offline_access
+                - User.Read
+              authorization_endpoint: https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/oauth2/v2.0/authorize
               credentials:
                 client_id: entraid_server
                 hmac_secret:
@@ -158,16 +174,15 @@ spec:
                       path: /etc/istio/config/token-secret.yaml
                       watched_directory:
                         path: /etc/istio/config
+              deny_redirect_matcher:
+                - name: x-deny-redirect
+                  string_match:
+                    exact: "true"
               forward_bearer_token: true
               pass_through_matcher:
-                - name: authorization
-                  string_match:
-                    prefix: 'Bearer '
                 - name: x-bypass-login
                   string_match:
-                    safe_regex:
-                      google_re2: {}
-                      regex: ^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT):/public.*$
+                    exact: "true"
               redirect_path_matcher:
                 path:
                   exact: /oauth2/callback
@@ -179,10 +194,9 @@ spec:
               token_endpoint:
                 cluster: oauth
                 timeout: 5s
-                uri: https://fake.auth/entraid/token
+                uri: https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/oauth2/v2.0/token
               use_refresh_token: true
   workloadSelector:
     labels:
       app: application
 ---
-

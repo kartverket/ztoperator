@@ -23,10 +23,10 @@ spec:
         - assert:
             file: authpolicy-assert.yaml
         - script:
-            content: sleep 10
+            content: sleep 5
         - script:
             content: |
               hurl --error-format long \
               --insecure --test tests.hurl \
-              --variable entraid_token_client="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client)" \
-              --variable entraid_token_user="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_user)"
+              --variable entraid_token_client="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client --token_name access_token)" \
+              --variable entraid_token_user="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_user --token_name access_token)"

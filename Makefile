@@ -251,7 +251,7 @@ test-single: chainsaw install
 .PHONY: test
 test:
 	@echo "Checking if ztoperator is running..."
-	@pgrep -f "ztoperator" > /dev/null || (echo "ztoperator is not running. Please start it first." && exit 1)
+	@lsof -i :8081 | grep ___Ztoper  > /dev/null || (echo "ztoperator is not running. Please start it first." && exit 1)
 	@echo "ztoperator is running. Proceeding with tests..."
 	@bash -ec ' \
 		for dir in test/chainsaw/authpolicy/*/ ; do \

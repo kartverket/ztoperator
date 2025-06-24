@@ -4,19 +4,19 @@ metadata:
   name: auth-policy
 spec:
   enabled: true
+  ignoreAuthRules:
+    - paths:
+        - /public*
   oAuthCredentials:
     clientIDKey: CLIENT_ID
     clientSecretKey: CLIENT_SECRET
     secretRef: oauth-secret
   autoLogin:
     enabled: true
-    loginPath: /login
     logoutPath: /logout
     redirectPath: /oauth2/callback
     scopes:
       - openid
-  audience:
-    - entraid_server
   wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
   selector:
     matchLabels:
