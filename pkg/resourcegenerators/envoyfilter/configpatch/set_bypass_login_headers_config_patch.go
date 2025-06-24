@@ -2,8 +2,13 @@ package configpatch
 
 import (
 	"fmt"
-	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"strings"
+
+	"google.golang.org/protobuf/types/known/structpb"
+	"istio.io/api/networking/v1alpha3"
+
+	"github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/state"
 )
 
 const (
@@ -11,7 +16,68 @@ const (
 	DenyRedirectHeaderName     = "x-deny-redirect"
 )
 
-func GetLuaScript(ignoreAuth, requireAuth, denyRedirect []v1alpha1.RequestMatcher, loginPath *string, redirectPath, logoutPath string) map[string]interface{} {
+func GetLuaScriptConfigPatch(scope *state.Scope) (*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch, error) {
+	var ignoreAuthRequestMatchers []v1alpha1.RequestMatcher
+	if scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
+		ignoreAuthRequestMatchers = append(ignoreAuthRequestMatchers, *scope.AuthPolicy.Spec.IgnoreAuthRules...)
+	}
+
+	var denyRedirectMatchers []v1alpha1.RequestMatcher
+	if scope.AuthPolicy.Spec.AuthRules != nil {
+		for _, authRule := range *scope.AuthPolicy.Spec.AuthRules {
+			if authRule.DenyRedirect != nil && *authRule.DenyRedirect {
+				denyRedirectMatchers = append(denyRedirectMatchers, authRule.RequestMatcher)
+			}
+		}
+	}
+
+	luaScript, structPbErr := structpb.NewStruct(getLuaScript(
+		ignoreAuthRequestMatchers,
+		v1alpha1.GetRequestMatchers(
+			scope.AuthPolicy.Spec.AuthRules,
+		),
+		denyRedirectMatchers,
+		scope.AutoLoginConfig.LoginPath,
+		scope.AutoLoginConfig.RedirectPath,
+		scope.AutoLoginConfig.LogoutPath,
+	))
+	if structPbErr != nil {
+		return nil, fmt.Errorf(
+			"failed to serialize Custom Lua Script to protobuf struct for AuthPolicy %s/%s due to the following error: %s",
+			scope.AuthPolicy.Namespace,
+			scope.AuthPolicy.Name,
+			structPbErr.Error(),
+		)
+	}
+	return &v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
+		ApplyTo: v1alpha3.EnvoyFilter_HTTP_FILTER,
+		Match: &v1alpha3.EnvoyFilter_EnvoyConfigObjectMatch{
+			Context: v1alpha3.EnvoyFilter_SIDECAR_INBOUND,
+			ObjectTypes: &v1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
+				Listener: &v1alpha3.EnvoyFilter_ListenerMatch{
+					FilterChain: &v1alpha3.EnvoyFilter_ListenerMatch_FilterChainMatch{
+						Filter: &v1alpha3.EnvoyFilter_ListenerMatch_FilterMatch{
+							Name: "envoy.filters.network.http_connection_manager",
+						},
+					},
+				},
+			},
+		},
+		Patch: &v1alpha3.EnvoyFilter_Patch{
+			Operation: v1alpha3.EnvoyFilter_Patch_INSERT_BEFORE,
+			Value:     luaScript,
+		},
+	}, nil
+}
+
+func getLuaScript(
+	ignoreAuth,
+	requireAuth,
+	denyRedirect []v1alpha1.RequestMatcher,
+	loginPath *string,
+	redirectPath,
+	logoutPath string,
+) map[string]interface{} {
 	requireAuthOAuthPaths := []string{
 		redirectPath, logoutPath,
 	}
@@ -23,7 +89,9 @@ func GetLuaScript(ignoreAuth, requireAuth, denyRedirect []v1alpha1.RequestMatche
 		Methods: []string{},
 	})
 
-	ignoreAuth, requireAuth, denyRedirect = convertToRE2Regex(ignoreAuth), convertToRE2Regex(requireAuth), convertToRE2Regex(denyRedirect)
+	ignoreAuth = convertToRE2Regex(ignoreAuth)
+	requireAuth = convertToRE2Regex(requireAuth)
+	denyRedirect = convertToRE2Regex(denyRedirect)
 
 	// Produce equivalent Lua tables that the generated script can iterate over.
 	ignoreRulesLua := buildLuaRules(ignoreAuth)
@@ -146,7 +214,7 @@ func escapeLuaString(s string) string {
 }
 
 // buildLuaRules converts a slice of RequestMatcher into a Lua literal table.
-// Each entry becomes {regex="<path‑regex>", methods={["GET"]=true, ...}}
+// Each entry becomes {regex="<path‑regex>", methods={["GET"]=true, ...}}.
 func buildLuaRules(requestMatchers []v1alpha1.RequestMatcher) string {
 	var sb strings.Builder
 	sb.WriteString("{")

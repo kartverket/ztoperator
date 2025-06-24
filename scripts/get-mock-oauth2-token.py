@@ -16,7 +16,6 @@ token_endpoint = f"https://{local_server}/{args.issuer}/token"
 client_id = "my-client"
 client_secret = "my-secret"
 
-# Request token (client_credentials flow)
 data = {
     "grant_type": "authorization_code",
     "code": args.code,

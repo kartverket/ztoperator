@@ -5,10 +5,8 @@ metadata:
   name: auth-policy
 spec:
   jwtRules:
-    - audiences:
-        - entraid_server
-      forwardOriginalToken: true
-      issuer: https://fake.auth/entraid
+    - forwardOriginalToken: true
+      issuer: http://mock-oauth2.auth:8080/entraid
       jwksUri: http://mock-oauth2.auth:8080/entraid/jwks
   selector:
     matchLabels:
@@ -29,15 +27,7 @@ spec:
       when:
         - key: request.auth.claims[iss]
           notValues:
-            - https://fake.auth/entraid
-    - to:
-        - operation:
-            paths:
-              - /api*
-      when:
-        - key: request.auth.claims[aud]
-          notValues:
-            - entraid_server
+            - http://mock-oauth2.auth:8080/entraid
   selector:
     matchLabels:
       app: application
@@ -100,10 +90,7 @@ spec:
       when:
         - key: request.auth.claims[iss]
           values:
-            - https://fake.auth/entraid
-        - key: request.auth.claims[aud]
-          values:
-            - entraid_server
+            - http://mock-oauth2.auth:8080/entraid
     - to:
         - operation:
             paths:
@@ -111,10 +98,7 @@ spec:
       when:
         - key: request.auth.claims[iss]
           values:
-            - https://fake.auth/entraid
-        - key: request.auth.claims[aud]
-          values:
-            - entraid_server
+            - http://mock-oauth2.auth:8080/entraid
   selector:
     matchLabels:
       app: application
@@ -149,7 +133,7 @@ spec:
         operation: ADD
         value:
           connect_timeout: 10s
-          dns_lookup_family: AUTO
+          dns_lookup_family: V4_ONLY
           lb_policy: ROUND_ROBIN
           load_assignment:
             cluster_name: oauth
@@ -158,14 +142,9 @@ spec:
                   - endpoint:
                       address:
                         socket_address:
-                          address: fake.auth
-                          port_value: 443
+                          address: mock-oauth2.auth
+                          port_value: 8080
           name: oauth
-          transport_socket:
-            name: envoy.transport_sockets.tls
-            typed_config:
-              '@type': type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-              sni: fake.auth
           type: LOGICAL_DNS
     - applyTo: HTTP_FILTER
       match:
@@ -185,7 +164,7 @@ spec:
             config:
               auth_scopes:
                 - openid
-              authorization_endpoint: https://fake.auth/entraid/authorize
+              authorization_endpoint: http://mock-oauth2.auth:8080/entraid/authorize
               credentials:
                 client_id: entraid_server
                 hmac_secret:
@@ -222,7 +201,7 @@ spec:
               token_endpoint:
                 cluster: oauth
                 timeout: 5s
-                uri: https://fake.auth/entraid/token
+                uri: http://mock-oauth2.auth:8080/entraid/token
               use_refresh_token: true
   workloadSelector:
     labels:

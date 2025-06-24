@@ -12,13 +12,13 @@ type DiscoveryDocument struct {
 func GetWellknownURIToDiscoveryDocument() map[string]DiscoveryDocument {
 	return map[string]DiscoveryDocument{
 		"http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration": {
-			Issuer:                utils.Ptr("https://fake.auth/entraid"),
+			Issuer:                utils.Ptr("http://mock-oauth2.auth:8080/entraid"),
 			AuthorizationEndpoint: utils.Ptr("http://mock-oauth2.auth:8080/entraid/authorize"),
 			TokenEndpoint:         utils.Ptr("http://mock-oauth2.auth:8080/entraid/token"),
 			JwksURI:               utils.Ptr("http://mock-oauth2.auth:8080/entraid/jwks"),
 		},
 		"http://mock-oauth2.auth:8080/smapi/.well-known/openid-configuration": {
-			Issuer:                utils.Ptr("https://fake.auth/smapi"),
+			Issuer:                utils.Ptr("http://mock-oauth2.auth:8080/smapi"),
 			AuthorizationEndpoint: utils.Ptr("http://mock-oauth2.auth:8080/smapi/authorize"),
 			TokenEndpoint:         utils.Ptr("http://mock-oauth2.auth:8080/smapi/token"),
 			JwksURI:               utils.Ptr("http://mock-oauth2.auth:8080/smapi/jwks"),

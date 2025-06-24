@@ -1,10 +1,5 @@
 package configpatch
 
-import (
-	"fmt"
-	"github.com/kartverket/ztoperator/api/v1alpha1"
-)
-
 const (
 	TokenSecretFileName       = "token-secret.yaml"
 	HmacSecretFileName        = "hmac-secret.yaml"
@@ -21,8 +16,6 @@ func GetOAuthSidecarConfigPatchValue(
 	clientID string,
 	authScopes []string,
 	resources *[]string,
-	ignoreAuthRules *[]v1alpha1.RequestMatcher,
-	loginPath *string,
 ) map[string]interface{} {
 	var resourcesInterface []interface{}
 	if resources != nil {
@@ -111,23 +104,5 @@ func GetOAuthSidecarConfigPatchValue(
 			"@type":  "type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2",
 			"config": oauthSidecarConfigPatchValue,
 		},
-	}
-}
-
-func getPassThroughMatcherFromLoginPath(loginPath, redirectPath, logoutPath string) map[string]interface{} {
-	return map[string]interface{}{
-		"name": ":path",
-		"string_match": map[string]interface{}{
-			"safe_regex": map[string]interface{}{
-				"google_re2": map[string]interface{}{},
-				"regex": fmt.Sprintf(
-					"^(%s|%s.*|%s)$",
-					ConvertRequestMatcherPathToRegex(loginPath),
-					ConvertRequestMatcherPathToRegex(redirectPath),
-					ConvertRequestMatcherPathToRegex(logoutPath),
-				),
-			},
-		},
-		"invert_match": true,
 	}
 }
