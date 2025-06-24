@@ -23,6 +23,12 @@ func GetWellknownURIToDiscoveryDocument() map[string]DiscoveryDocument {
 			TokenEndpoint:         utils.Ptr("http://mock-oauth2.auth:8080/smapi/token"),
 			JwksURI:               utils.Ptr("http://mock-oauth2.auth:8080/smapi/jwks"),
 		},
+		"http://mock-oauth2.auth:8080/maskinporten/.well-known/openid-configuration": {
+			Issuer:                utils.Ptr("http://mock-oauth2.auth:8080/maskinporten"),
+			AuthorizationEndpoint: utils.Ptr("http://mock-oauth2.auth:8080/maskinporten/authorize"),
+			TokenEndpoint:         utils.Ptr("http://mock-oauth2.auth:8080/maskinporten/token"),
+			JwksURI:               utils.Ptr("http://mock-oauth2.auth:8080/maskinporten/jwks"),
+		},
 		"https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0/.well-known/openid-configuration": {
 			Issuer: utils.Ptr(
 				"https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0",

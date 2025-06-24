@@ -29,7 +29,8 @@
             "sub": "maskinporten_client",
             "role": "maskinporten_role",
             "aud": [
-              "maskinporten_server"
+              "maskinporten_server",
+              "maskinporten_client"
             ]
           }
         }

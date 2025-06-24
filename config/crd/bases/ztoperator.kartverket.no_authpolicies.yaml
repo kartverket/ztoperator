@@ -256,6 +256,7 @@ spec:
                 description: |-
                   OutputClaimsToHeaders specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.
                   The header specified in each operation in the list must be unique. Nested claims of type string/int/bool is supported as well.
+                  If the claim is an object or array, it will be added to the header as a base64-encoded JSON string.
                 items:
                   description: |-
                     ClaimToHeader specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.
