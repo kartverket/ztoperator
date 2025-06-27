@@ -52,6 +52,12 @@ func GetOAuthSidecarConfigPatchValue(
 		"use_refresh_token":    true,
 		"pass_through_matcher": []interface{}{
 			map[string]interface{}{
+				"name": "authorization",
+				"string_match": map[string]interface{}{
+					"prefix": "Bearer ",
+				},
+			},
+			map[string]interface{}{
 				"name": BypassOauthLoginHeaderName,
 				"string_match": map[string]interface{}{
 					"exact": "true",

@@ -180,6 +180,9 @@ spec:
                     exact: "true"
               forward_bearer_token: true
               pass_through_matcher:
+                - name: "authorization"
+                  string_match:
+                    prefix: "Bearer "
                 - name: x-bypass-login
                   string_match:
                     exact: "true"
