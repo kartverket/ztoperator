@@ -2,8 +2,6 @@
   <img src="ztoperator_logo.png" alt="Ztoperator Logo" width="600"/>
 </p>
 
-# Ztoperator
-
 **Ztoperator** is a Kubernetes Operator that simplifies and enforces Zero Trust security for workloads by integrating with **Istio** and **OAuth 2.0**.
 
 At the heart of Ztoperator is the custom resource definition (**CRD**) `AuthPolicy`, which provides a high-level abstraction for configuring authentication and authorization rules using **OAuth 2.0** and **OpenID Connect (OIDC)**.
