@@ -5,20 +5,43 @@ on:
   push:
     branches: [main]
     paths-ignore:
+      - .flox/**
+      - .run/**
+      - .security/**
+      - scripts/**
+      - test/**
+      - .dockerignore
+      - .gitignore
+      - .golangci.yml
+      - .goreleaser.yaml
+      - CONTRIBUTING.md
+      - Dockerfile.goreleaser
+      - LICENSE
       - README.md
+      - catalog.info
+      - ztoperator_logo.png
   pull_request:
     branches: [main]
     paths-ignore:
+      - .flox/**
+      - .run/**
+      - .security/**
+      - scripts/**
+      - test/**
+      - .dockerignore
+      - .gitignore
+      - .golangci.yml
+      - .goreleaser.yaml
+      - CONTRIBUTING.md
+      - Dockerfile.goreleaser
+      - LICENSE
       - README.md
+      - catalog.info
+      - ztoperator_logo.png
 
 env:
-  # Use docker.io for Docker Hub if empty
   REGISTRY: ghcr.io
-  # github.repository as <account>/<repo>
   IMAGE_NAME: ${{ github.repository }}
-  RBAC_FILE_PATH: config/rbac/role.yaml
-  CRD_FILE_PATH: config/crd/bases/ztoperator.kartverket.no_authpolicies.yaml
-  ARTIFACT_NAME: ztoperator-artifact-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   build:
@@ -51,7 +74,7 @@ jobs:
 
       - name: Build and push Docker image
         id: build-docker
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
         with:
           context: .
           push: ${{ !github.event.pull_request.draft }}
@@ -80,42 +103,14 @@ jobs:
           image_url: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{needs.build.outputs.image_digest}}"
           tfsec: false
 
-  generate:
-    if: (!github.event.pull_request.draft)
-    name: CRD and ClusterRole
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Golang environment
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24.3'
-
-      - name: Generate CRD and ClusterRole
-        run: make generate
-
-      - name: Upload CRD and ClusterRole
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: |
-            ${{ env.RBAC_FILE_PATH }}
-            ${{ env.CRD_APP_FILE_PATH }}
-            ${{ env.CRD_JOB_FILE_PATH }}
-            ${{ env.CRD_ROUTING_FILE_PATH }}
-
   deploy-argo:
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch')
-    needs: [build, generate]
+    if: ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main')
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       id-token: write
     steps:
-      - uses: octo-sts/action@6177b4481c00308b3839969c3eca88c96a91775f # v1.0.0
+      - uses: octo-sts/action@6177b4481c00308b3839969c3eca88c96a91775f
         id: octo-sts
         with:
           scope: kartverket/tilgangsstyring-apps
@@ -135,7 +130,7 @@ jobs:
       - name: Commit Changes to Repo
         run: |
           git config --global user.email "noreply@kartverket.no"
-          git config --global user.name "Ztoperator Actions"
+          git config --global user.name "Ztoperator Deploy Action"
           git commit -aF- <<EOF
           ztoperator ${{ github.ref_name }}[${{ github.event.after }}]: ${{ github.event.head_commit.message }}
           EOF
