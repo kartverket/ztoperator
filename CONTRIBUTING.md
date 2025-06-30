@@ -43,24 +43,24 @@ To run the integration tests locally, you first need to set up a local Kubernete
 You also need to install a mock OAuth2-provider to issue and validate OAuth2-tokens, 
 and expose a test application which can be reached from outside the cluster. This can all be done by running:
 
-```bash
+```shell
 make setup-local-test
 ```
 
 Then run the tests:
 
 - Run all tests without running ztoperator:
-```bash
+```shell
 make run-test
 ```
 
 - Run all tests with ztoperator running in the background:
-```bash
+```shell
 make test
 ```
 
 - Run specific tests. This will require you to run the ztoperator controller seperately in another terminal or in your IDE.
-```bash
+```shell
 # Run ztoperator in IDE or on another terminal
 make run-local
 
