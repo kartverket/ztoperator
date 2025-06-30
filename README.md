@@ -112,4 +112,4 @@ The Envoy filters are applied in a strict sequence:
 3. **`rbac` filter**: Processes access control rules based on claims in the validated JWT.
 
 > [!NOTE]
-> The `rbac` filter only evaluates rules **after** successful JWT validation and enforce rules based on claims provided by the `jwt-filter`. If JWT validation fails, the request is denied before RBAC rules are checked.
+> The `rbac` filter only evaluates rules **after** successful JWT validation, and enforce rules based on claims provided by the `jwt-auth` filter. Consequently, if JWT validation fails, the request is denied before authorization rules are checked.
