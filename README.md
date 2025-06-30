@@ -14,8 +14,8 @@ Ztoperator introduces a single CRD: `AuthPolicy`. It allows you to:
 
 - Define authentication and authorization policies for workloads.
 - Integrate with any identity provider that supports OAuth 2.0 and OIDC.
-- Validate request authenticity using Istio's `RequestAuthentication`.
-- Authorize access based on JWT claims using Istio's `AuthorizationPolicy`.
+- Validate request authenticity using [Istio's `RequestAuthentication`](https://istio.io/latest/docs/reference/config/security/request_authentication/).
+- Authorize access based on JWT claims using [Istio's `AuthorizationPolicy`](https://istio.io/latest/docs/reference/config/security/authorization-policy/).
 - Optionally support the **OAuth 2.0 Authorization Code Flow** using Envoy’s [OAuth2 filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter).
 
 ---
