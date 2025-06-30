@@ -74,7 +74,7 @@ while `Pod B` has configured authentication and authorization of incoming reques
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./ztoperator_arch_dark.png">
-  <img alt="The EnvoyFilters used and their placement in the Istio sidecar proxy." src="./ztoperator_arch_light.png" width="800">
+  <img alt="The EnvoyFilters used and their placement in the Istio sidecar proxy." src="./ztoperator_arch_light.png" width="600">
 </picture>
 
 
