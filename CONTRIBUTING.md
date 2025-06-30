@@ -31,14 +31,14 @@ make run-local
 ```
 
 > [!TIP]
-> If you wish to test the features of Ztoperator manually, you want to ensure that requests are routed to the pod through Istio servcie mesh. 
+> If you wish to test the features of Ztoperator manually, you may want to ensure that requests are routed to the pod through Istio service mesh. 
 > One way to achieve this is to use [cloud-provider-kind](https://github.com/kubernetes-sigs/cloud-provider-kind) which sets up an external IP-address 
 > that routes requests to Istio's configured load balancer.
 
 ## Running integration tests locally
 
-To run the integration tests locally, you first need to set up a local Kubernetes cluster as explained in 
-[earlier](#local-cluster-and-dependencies). 
+To run the integration tests locally, you first need to set up a local Kubernetes cluster as explained 
+[above](#local-cluster-and-dependencies). 
 
 You also need to install a mock OAuth2-provider to issue and validate OAuth2-tokens, 
 and expose a test application which can be reached from outside the cluster. This can all be done by running:
