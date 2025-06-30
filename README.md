@@ -23,8 +23,7 @@ Ztoperator introduces a single CRD: `AuthPolicy`. It allows you to:
 ### 🔧 Example `AuthPolicy`
 
 The following `AuthPolicy` manifest configures access control for workloads labeled `app: some-app`. 
-It integrates with an external OAuth 2.0 and OpenID Connect (OIDC) provider with a well-known endpoint at `https://example.com/.well-known/openid-configuration`, 
-enabling JWT-based authentication and claim-based authorization using Istio `RequestAuthentication` and `AuthorizationPolicies`. 
+It integrates with an external OAuth 2.0 and OpenID Connect (OIDC) provider with a well-known endpoint at `https://example.com/.well-known/openid-configuration`.
 It allows unauthenticated GET requests to `/public` and enforces that GET, POST and PUT towards `/admin` requires an authenticated JWT with the claim `role` set to `admin`. 
 It also supports automatic OAuth 2.0 login with specified scopes and redirect/logout paths. Automatic OAuth 2.0 login will trigger on requests towards protected endpoints, 
 except for requests towards `/api*` where `denyRedirect` is set to `true`.  
