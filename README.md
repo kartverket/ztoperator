@@ -26,7 +26,7 @@ The following `AuthPolicy` manifest configures access control for workloads labe
 It integrates with an external OAuth 2.0 and OpenID Connect (OIDC) provider with a well-known endpoint at `https://example.com/.well-known/openid-configuration`.
 It allows unauthenticated GET requests to `/public` and enforces that GET, POST and PUT towards `/admin` requires an authenticated JWT with the claim `role` set to `admin`. 
 It also supports automatic OAuth 2.0 login with specified scopes and redirect/logout paths. Automatic OAuth 2.0 login will trigger on requests towards protected endpoints, 
-except for requests towards `/api*` where `denyRedirect` is set to `true`.  
+except for requests towards `/api*` where `denyRedirect` is set to `true`. Endpoints not explicitly mentioned in the manifest require authentication by default. 
 
 ```yaml
 apiVersion: ztoperator.kartverket.no/v1alpha1
