@@ -68,5 +68,13 @@ Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) on how to run and test ztoper
 Ztoperator enforces authentication and authorization of incoming requests towards one of more workloads by utilizing Istio and Envoy's 
 CRD's to enrich the capabilities of the Istio sidecar proxy. Under the hood, [`EnvoyFilters`](https://istio.io/latest/docs/reference/config/networking/envoy-filter/) 
 is used to enforce OAuth 2.0 authorization code flow, validation of JWT authenticity and enforcement of allow and deny rules based on JWT claims. 
-The following figure shows how Ztoperator sets up multiple `EnvoyFilters` in the istio sidecar proxy of a Kubernetes pod.
+The following figure shows how Ztoperator sets up multiple `EnvoyFilters` in the istio sidecar proxy of a Kubernetes pod. Traffic always flows through 
+the Istio sidecar proxy before reaching the app container. `Pod A` has configured authentication and authorization of incoming requests, as well as auto-login, 
+while `Pod B` has configured authentication and authorization of incoming requests, but no auto-login.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./ztoperator_arch_dark.png">
+  <img alt="The EnvoyFilters used and their placement in the Istio sidecar proxy." src="./ztoperator_arch_light.png" width="600">
+</picture>
+
 
