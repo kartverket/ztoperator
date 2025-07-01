@@ -124,8 +124,8 @@ jobs:
 
       - name: Patch Image Digest
         run: |
-          echo "\"${{ needs.build.outputs.image_digest }}\"" > "env/atgcp1-sandbox/ztoperator-system/tag"
-          echo "\"${{ needs.build.outputs.image_digest }}\"" > "env/atkv3-sandbox/ztoperator-system/tag"
+          echo "\"${{ needs.build.outputs.image_digest }}\"" > "env/atgcp1-sandbox/ztoperator-system/digest"
+          echo "\"${{ needs.build.outputs.image_digest }}\"" > "env/atkv3-sandbox/ztoperator-system/digest"
 
       - name: Commit Changes to Repo
         run: |
