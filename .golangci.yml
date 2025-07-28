@@ -163,7 +163,12 @@ linters:
       # The maximal average package complexity.
       # If it's higher than 0.0 (float) the check is enabled.
       # Default: 0.0
-      package-average: 10.0
+      package-average: 12.0
+
+    nestif:
+      # Minimal complexity of if statements to report.
+      # Default: 5
+      min-complexity: 6
 
     depguard:
       # Rules to apply.
@@ -430,3 +435,36 @@ linters:
           - gosec
           - noctx
           - wrapcheck
+      - path: "api/v1alpha1/groupversion_info.go"
+        linters:
+          - gochecknoglobals
+      - path: "cmd/main.go"
+        linters:
+          - gochecknoglobals
+      - path: "pkg/resourcegenerators/envoyfilter/configpatch/oauth_sidecar_config_patch.go"
+        linters:
+          - gosec
+      - path: "pkg/resourcegenerators/envoyfilter/configpatch/lua_script_config_patch.go"
+        linters:
+          - gosec
+      - path: "pkg/resourcegenerators/envoyfilter/configpatch/set_bypass_login_headers_config_patch.go"
+        linters:
+          - gosec
+      - path: "pkg/resourcegenerators/secret/auto_login_secret.go"
+        linters:
+          - mnd
+      - path: "pkg/rest/client.go"
+        linters:
+          - mnd
+      - path: "pkg/resourcegenerators/envoyfilter/configpatch/oauth_cluster_config_patch.go"
+        linters:
+          - mnd
+      - path: "pkg/log/log.go"
+        linters:
+          - mnd
+      - path: "cmd/main.go"
+        linters:
+          - gochecknoinits
+      - path: "api/v1alpha1/authpolicy_types.go"
+        linters:
+          - gochecknoinits

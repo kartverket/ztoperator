@@ -21,7 +21,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: AuthPolicy is the Schema for the authpolicies API
+        description: AuthPolicy is the Schema for the authpolicies API.
         properties:
           apiVersion:
             description: |-
@@ -72,6 +72,11 @@ spec:
                   description: RequestAuthRule defines a rule for controlling access
                     to HTTP requests using JWT authentication.
                   properties:
+                    denyRedirect:
+                      description: |-
+                        DenyRedirect specifies whether a denied request should trigger auto-login (if configured) or not when it is denied due to missing or invalid authentication.
+                        Defaults to false, meaning auto-login will be triggered (if configured).
+                      type: boolean
                     methods:
                       description: |-
                         Methods specifies HTTP methods that applies for the defined paths.
@@ -136,25 +141,54 @@ spec:
                       type: array
                   required:
                   - paths
-                  - when
                   type: object
                 type: array
+              autoLogin:
+                description: AutoLogin specifies the required configuration needed
+                  to log in users.
+                properties:
+                  enabled:
+                    description: |-
+                      Whether to enable auto login.
+                      If enabled, users accessing authenticated endpoints will be redirected to log in towards the configured identity provider.
+                    type: boolean
+                  loginPath:
+                    description: |-
+                      LoginPath specifies a list of URI paths that should trigger the auto-login behavior.
+                      When a request matches any of these paths, the user will be redirected to log in if not already authenticated.
+                    pattern: ^/.*$
+                    type: string
+                  logoutPath:
+                    description: |-
+                      LogoutPath specifies which URI to redirect the user to when signing out.
+                      This will end the session for the application, but not end the session towards the configured identity provider.
+                      This feature will hopefully soon be available in later releases of Istio, ref. [envoy/envoyproxy](https://github.com/envoyproxy/envoy/commit/c12fefc11f7adc9cd404287eb674ba838c2c8bd0).
+                    type: string
+                  redirectPath:
+                    description: RedirectPath specifies which path to redirect the
+                      user to after completing the OIDC flow.
+                    type: string
+                  scopes:
+                    description: Scopes specifies the OAuth2 scopes used during authorization
+                      code flow.
+                    items:
+                      type: string
+                    type: array
+                required:
+                - enabled
+                - logoutPath
+                - redirectPath
+                - scopes
+                type: object
               enabled:
                 description: |-
                   Whether to enable JWT validation.
                   If enabled, incoming JWTs will be validated against the issuer specified in the app registration and the generated audience.
                 type: boolean
               forwardJwt:
-                default: true
                 description: If set to `true`, the original token will be kept for
                   the upstream request. Defaults to `true`.
                 type: boolean
-              fromCookies:
-                description: FromCookies denotes the cookies from which the auth policy
-                  will look for a JWT.
-                items:
-                  type: string
-                type: array
               ignoreAuthRules:
                 description: |-
                   IgnoreAuthRules defines request matchers for HTTP requests that do not require JWT authentication.
@@ -197,24 +231,32 @@ spec:
                   - paths
                   type: object
                 type: array
-              issuerURI:
-                description: |-
-                  IssuerUri specifies the expected issuer (`iss`) claim in the JWT.
-                  This should match the issuer identifier used when the token was generated.
-                type: string
-              jwksURI:
-                description: |-
-                  JwksUri is the URI where the JSON Web Key Set (JWKS) can be fetched.
-                  It is used to validate the signature of incoming JWTs.
-                type: string
+              oAuthCredentials:
+                description: OAuthCredentials specifies a reference to a kubernetes
+                  secret in the same namespace holding OAuth credentials used for
+                  authentication.
+                properties:
+                  clientIDKey:
+                    description: ClientIDKey specifies the data key to access the
+                      client ID.
+                    type: string
+                  clientSecretKey:
+                    description: ClientSecretKey specifies the data key to access
+                      the client secret.
+                    type: string
+                  secretRef:
+                    description: SecretRef specifies the name of the kubernetes secret.
+                    type: string
+                required:
+                - clientIDKey
+                - clientSecretKey
+                - secretRef
+                type: object
               outputClaimToHeaders:
-                description: "OutputClaimsToHeaders specifies a list of operations
-                  to copy the claim to HTTP headers on a successfully verified token.\nThe
-                  header specified in each operation in the list must be unique. Nested
-                  claims of type string/int/bool is supported as well.\n```\n\n\n\toutputClaimToHeaders:\n\t-
-                  header: x-my-company-jwt-group\n\t  claim: my-group\n\t- header:
-                  x-test-environment-flag\n\t  claim: test-flag\n\t- header: x-jwt-claim-group\n\t
-                  \ claim: nested.key.group\n\n\n```"
+                description: |-
+                  OutputClaimsToHeaders specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.
+                  The header specified in each operation in the list must be unique. Nested claims of type string/int/bool is supported as well.
+                  If the claim is an object or array, it will be added to the header as a base64-encoded JSON string.
                 items:
                   description: |-
                     ClaimToHeader specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.
@@ -256,15 +298,17 @@ spec:
                     - message: key must not be empty
                       rule: self.all(key, key.size() != 0)
                 type: object
+              wellKnownURI:
+                description: WellKnownURI specifies the URi to the identity provider's
+                  discovery document (also known as well-known endpoint).
+                type: string
             required:
-            - audience
             - enabled
-            - issuerURI
-            - jwksURI
             - selector
+            - wellKnownURI
             type: object
           status:
-            description: AuthPolicyStatus defines the observed state of AuthPolicy
+            description: AuthPolicyStatus defines the observed state of AuthPolicy.
             properties:
               conditions:
                 items:

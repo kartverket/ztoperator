@@ -1,0 +1,20 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+spec:
+  enabled: true
+  outputClaimToHeaders:
+    - claim: sub
+      header: x-token-sub
+    - claim: role
+      header: x-token-role
+    - claim: aud
+      header: x-token-aud
+  audience:
+    - maskinporten_client
+    - maskinporten_server
+  wellKnownURI: http://mock-oauth2.auth:8080/maskinporten/.well-known/openid-configuration
+  selector:
+    matchLabels:
+      app: application

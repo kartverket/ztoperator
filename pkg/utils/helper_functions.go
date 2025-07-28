@@ -1,19 +1,29 @@
 package utils
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"net/url"
 	"regexp"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"strings"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	matchOneTemplate = "{*}"
+	matchAnyTemplate = "{**}"
 )
 
 var (
-	MatchOneTemplate = "{*}"
-	MatchAnyTemplate = "{**}"
-
 	// Valid pchar from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
-	// pchar = unreserved / pct-encoded / sub-delims / ":" / "@"
+	// pchar = unreserved / pct-encoded / sub-delims / ":" / "@".
 	validLiteral = regexp.MustCompile("^[a-zA-Z0-9-._~%!$&'()+,;:@=]+$")
 )
 
@@ -48,13 +58,17 @@ func Ptr[T any](v T) *T {
 
 func ValidatePaths(paths []string) error {
 	for _, path := range paths {
+		if !strings.HasPrefix(path, "/") {
+			return fmt.Errorf("invalid path: %s; must start with '/'", path)
+		}
 		if strings.Contains(path, "{") {
 			if err := validateNewPathSyntax(paths); err != nil {
 				return err
 			}
 			continue
 		}
-		if strings.Count(path, "*") > 1 || (strings.Contains(path, "*") && !(path == "*" || strings.HasPrefix(path, "*") || strings.HasSuffix(path, "*"))) {
+		if strings.Count(path, "*") > 1 ||
+			(strings.Contains(path, "*") && (path != "*" && !strings.HasPrefix(path, "*") && !strings.HasSuffix(path, "*"))) {
 			return fmt.Errorf("invalid path: %s; '*' must appear only once, be at the start, end, or be '*'", path)
 		}
 	}
@@ -63,7 +77,7 @@ func ValidatePaths(paths []string) error {
 
 func validateNewPathSyntax(paths []string) error {
 	for _, path := range paths {
-		containsPathTemplate := strings.Contains(path, MatchOneTemplate) || strings.Contains(path, MatchAnyTemplate)
+		containsPathTemplate := strings.Contains(path, matchOneTemplate) || strings.Contains(path, matchAnyTemplate)
 		foundMatchAnyTemplate := false
 		// Strip leading and trailing slashes if they exist
 		path = strings.Trim(path, "/")
@@ -71,12 +85,13 @@ func validateNewPathSyntax(paths []string) error {
 		for _, glob := range globs {
 			// If glob is a supported path template, skip the check
 			// If glob is {**}, it must be the last operator in the template
-			if glob == MatchOneTemplate && !foundMatchAnyTemplate {
+			switch {
+			case glob == matchOneTemplate && !foundMatchAnyTemplate:
 				continue
-			} else if glob == MatchAnyTemplate && !foundMatchAnyTemplate {
+			case glob == matchAnyTemplate && !foundMatchAnyTemplate:
 				foundMatchAnyTemplate = true
 				continue
-			} else if (glob == MatchAnyTemplate || glob == MatchOneTemplate) && foundMatchAnyTemplate {
+			case (glob == matchAnyTemplate || glob == matchOneTemplate) && foundMatchAnyTemplate:
 				return fmt.Errorf("invalid or unsupported path %s. "+
 					"{**} is not the last operator", path)
 			}
@@ -97,4 +112,30 @@ func validateNewPathSyntax(paths []string) error {
 		}
 	}
 	return nil
+}
+
+func GetSecret(ctx context.Context, client client.Client, namespacedName types.NamespacedName) (v1.Secret, error) {
+	secret := v1.Secret{}
+
+	err := client.Get(ctx, namespacedName, &secret)
+
+	return secret, err
+}
+
+func GetParsedURL(uri string) (*url.URL, error) {
+	parsedURL, err := url.Parse(uri)
+	if err != nil {
+		return nil, err
+	}
+	return parsedURL, nil
+}
+
+func GenerateHMACSecret(size int) (*string, error) {
+	secret := make([]byte, size)
+	_, err := rand.Read(secret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate HMAC secret: %w", err)
+	}
+	base64EncodedSecret := base64.StdEncoding.EncodeToString(secret)
+	return &base64EncodedSecret, nil
 }

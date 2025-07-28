@@ -2,16 +2,40 @@ package state
 
 import (
 	"fmt"
-	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"reflect"
+
+	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Scope struct {
-	AuthPolicy                 *ztoperatorv1alpha1.AuthPolicy
-	Descendants                []Descendant[client.Object]
-	HasValidPaths              bool
-	PathValidationErrorMessage *string
+	AuthPolicy             ztoperatorv1alpha1.AuthPolicy
+	AutoLoginConfig        AutoLoginConfig
+	OAuthCredentials       OAuthCredentials
+	IdentityProviderUris   IdentityProviderUris
+	Descendants            []Descendant[client.Object]
+	InvalidConfig          bool
+	ValidationErrorMessage *string
+}
+
+type IdentityProviderUris struct {
+	IssuerURI        string
+	JwksURI          string
+	TokenURI         string
+	AuthorizationURI string
+}
+
+type AutoLoginConfig struct {
+	Enabled      bool
+	LoginPath    *string
+	RedirectPath string
+	LogoutPath   string
+	Scopes       []string
+}
+
+type OAuthCredentials struct {
+	ClientID     *string
+	ClientSecret *string
 }
 
 type Descendant[T client.Object] struct {
@@ -33,7 +57,12 @@ func (s *Scope) GetErrors() []string {
 	return errs
 }
 
-func (s *Scope) ReplaceDescendant(obj client.Object, errorMessage *string, successMessage *string, resourceKind, resourceName string) {
+func (s *Scope) ReplaceDescendant(
+	obj client.Object,
+	errorMessage *string,
+	successMessage *string,
+	resourceKind, resourceName string,
+) {
 	if s != nil {
 		for i, d := range s.Descendants {
 			if reflect.TypeOf(d) == reflect.TypeOf(obj) && d.ID == obj.GetName() {
@@ -56,4 +85,8 @@ func (s *Scope) ReplaceDescendant(obj client.Object, errorMessage *string, succe
 
 func GetID(resourceKind, resourceName string) string {
 	return fmt.Sprintf("%s-%s", resourceKind, resourceName)
+}
+
+func (s *Scope) IsMisconfigured() bool {
+	return !s.AuthPolicy.Spec.Enabled || s.InvalidConfig
 }

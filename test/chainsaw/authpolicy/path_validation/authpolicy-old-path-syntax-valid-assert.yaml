@@ -1,73 +1,16 @@
-# RequestAuthentication
-apiVersion: security.istio.io/v1
-kind: RequestAuthentication
-metadata:
-  name: auth-policy-valid-old-syntax
-spec:
-  jwtRules:
-    - audiences:
-        - entraid_server
-      forwardOriginalToken: true
-      issuer: https://fake.auth/entraid
-      jwksUri: http://mock-oauth2.auth:8080/entraid/jwks
-  selector:
-    matchLabels:
-      app: application
 ---
-# AuthorizationPolicy (ignore-auth)
+# AuthorizationPolicy (deny-auth-rules)
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
-  name: auth-policy-valid-old-syntax-ignore-auth
+  name: auth-policy-valid-old-syntax-deny-auth-rules
 spec:
+  action: DENY
   rules:
     - to:
         - operation:
             paths:
-              - '*/prefix'
-              - /suffix*
               - '*'
-  selector:
-    matchLabels:
-      app: application
----
-# AuthorizationPolicy (require-auth)
-apiVersion: security.istio.io/v1
-kind: AuthorizationPolicy
-metadata:
-  name: auth-policy-valid-old-syntax-require-auth
-spec:
-  rules:
-    - to:
-        - operation:
-            notMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - HEAD
-              - OPTIONS
-              - TRACE
-              - CONNECT
-            paths:
-              - '*/prefix'
-              - /suffix*
-              - '*'
-        - operation:
-            notPaths:
-              - '*/prefix'
-              - /suffix*
-              - '*'
-            paths:
-              - '*'
-      when:
-        - key: request.auth.claims[iss]
-          values:
-            - https://fake.auth/entraid
-        - key: request.auth.claims[aud]
-          values:
-            - entraid_server
   selector:
     matchLabels:
       app: application

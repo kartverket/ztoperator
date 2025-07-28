@@ -1,7 +1,8 @@
-package require_auth
+package require
 
 import (
 	"fmt"
+
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy"
@@ -12,13 +13,17 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
-	if !scope.AuthPolicy.Spec.Enabled || !scope.HasValidPaths {
+	if scope.IsMisconfigured() {
 		return nil
 	}
 
 	var authorizationPolicyRules []*v1beta1.Rule
 
-	baseConditions := authorizationpolicy.GetBaseConditions(*scope.AuthPolicy, false)
+	baseConditions := authorizationpolicy.GetBaseConditions(
+		scope.AuthPolicy,
+		scope.IdentityProviderUris.IssuerURI,
+		false,
+	)
 
 	if (scope.AuthPolicy.Spec.AuthRules == nil || len(*scope.AuthPolicy.Spec.AuthRules) == 0) &&
 		(scope.AuthPolicy.Spec.IgnoreAuthRules == nil || len(*scope.AuthPolicy.Spec.IgnoreAuthRules) == 0) {
@@ -42,7 +47,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 			mentionedPaths = append(mentionedPaths, matcher.Paths...)
 			methods := matcher.Methods
 			if len(matcher.Methods) == 0 {
-				methods = v1alpha1.AcceptedHttpMethods
+				methods = v1alpha1.GetAcceptedHTTPMethods()
 			}
 			toList = append(toList, &v1beta1.Rule_To{
 				Operation: &v1beta1.Operation{
@@ -65,12 +70,14 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 		})
 		if scope.AuthPolicy.Spec.AuthRules != nil {
 			for _, authRule := range *scope.AuthPolicy.Spec.AuthRules {
-				var authPolicyConditionsAsIstioConditions []*v1beta1.Condition
-				for _, condition := range authRule.When {
-					authPolicyConditionsAsIstioConditions = append(authPolicyConditionsAsIstioConditions, &v1beta1.Condition{
-						Key:    fmt.Sprintf("request.auth.claims[%s]", condition.Claim),
-						Values: condition.Values,
-					})
+				authPolicyConditionsAsIstioConditions := baseConditions
+				if authRule.When != nil {
+					for _, condition := range *authRule.When {
+						authPolicyConditionsAsIstioConditions = append(authPolicyConditionsAsIstioConditions, &v1beta1.Condition{
+							Key:    fmt.Sprintf("request.auth.claims[%s]", condition.Claim),
+							Values: condition.Values,
+						})
+					}
 				}
 				authorizationPolicyRules = append(authorizationPolicyRules, &v1beta1.Rule{
 					To: []*v1beta1.Rule_To{
@@ -81,7 +88,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 							},
 						},
 					},
-					When: append(baseConditions, authPolicyConditionsAsIstioConditions...),
+					When: authPolicyConditionsAsIstioConditions,
 				})
 			}
 		}

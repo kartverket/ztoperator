@@ -89,3 +89,19 @@ if [[ -n "$OUTPUT" ]]; then
     )
   ' -
 fi
+
+OUTPUT=$(kubectl get envoyfilter "${NAME}-login" -n "$NAMESPACE" --context "$KUBECONTEXT" -o yaml)
+if [[ -n "$OUTPUT" ]]; then
+  echo -e "---\n# EnvoyFilter (auto-login)"
+  echo "$OUTPUT" | yq eval '
+    del(
+      .metadata.creationTimestamp,
+      .metadata.generation,
+      .metadata.labels,
+      .metadata.namespace,
+      .metadata.ownerReferences,
+      .metadata.resourceVersion,
+      .metadata.uid
+    )
+  ' -
+fi
