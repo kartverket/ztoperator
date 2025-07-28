@@ -1,7 +1,7 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: auto-login
+  name: auto-login-saas
 spec:
   skip: false
   concurrent: true
@@ -27,9 +27,14 @@ spec:
         - assert:
             file: authpolicy-assert.yaml
         - script:
-            content: sleep 10
+            content: sleep 5
         - script:
             content: |
               hurl --error-format long \
               --insecure --test tests.hurl \
-              --variable entraid_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client)"
+              --variable location_header="http://mock-oauth2.auth:8080/entraid/authorize?client_id=entraid_server&code_challenge="
+        - script:
+            content: |
+              hurl --error-format long \
+              --insecure --test tests-authenticated.hurl \
+              --variable entraid_refresh_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client --token_name refresh_token)"

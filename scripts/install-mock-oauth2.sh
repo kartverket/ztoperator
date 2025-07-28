@@ -15,7 +15,7 @@ if [[ -z "$JSON_CONFIG_PATH" ]]; then
 fi
 
 KUBECONTEXT=${KUBECONTEXT:-"kind-kind"}
-MOCK_OAUTH2_SERVER_VERSION=${MOCK_OAUTH2_SERVER_VERSION:-"2.1.10"}
+MOCK_OAUTH2_SERVER_VERSION=${MOCK_OAUTH2_SERVER_VERSION:-"2.2.1"}
 JSON_CONTENT=$(<"$JSON_CONFIG_PATH")
 
 DEPLOYMENT="$(cat <<EOF
@@ -45,6 +45,9 @@ spec:
   replicas: 1
   ingresses:
       - fake.auth
+  env:
+    - name: "LOG_LEVEL"
+      value: "TRACE"
   envFrom:
     - configMap: mock-oauth2-config
 ---

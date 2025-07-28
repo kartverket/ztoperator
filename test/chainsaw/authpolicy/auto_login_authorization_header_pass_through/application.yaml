@@ -5,6 +5,7 @@ metadata:
 spec:
   podSettings:
     annotations:
+      sidecar.istio.io/logLevel: 'debug'
       sidecar.istio.io/userVolume: '[{ "name": "istio-oauth2", "secret": { "secretName":
         "auth-policy-envoy-secret" } }]'
       sidecar.istio.io/userVolumeMount: '[{ "name": "istio-oauth2", "mountPath": "/etc/istio/config",

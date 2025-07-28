@@ -86,3 +86,7 @@ func (s *Scope) ReplaceDescendant(
 func GetID(resourceKind, resourceName string) string {
 	return fmt.Sprintf("%s-%s", resourceKind, resourceName)
 }
+
+func (s *Scope) IsMisconfigured() bool {
+	return !s.AuthPolicy.Spec.Enabled || s.InvalidConfig
+}

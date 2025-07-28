@@ -689,12 +689,6 @@ func resolveAuthPolicy(
 		return nil, errors.New("encountered AuthPolicy as null when resolving")
 	}
 	rLog.Info(fmt.Sprintf("Trying to resolve auth policy %s/%s", authPolicy.Namespace, authPolicy.Name))
-	if !authPolicy.Spec.Enabled {
-		rLog.Debug(fmt.Sprintf("AuthPolicy %s/%s is disabled", authPolicy.Namespace, authPolicy.Name))
-		return &state.Scope{
-			AuthPolicy: *authPolicy,
-		}, nil
-	}
 
 	var oAuthCredentials state.OAuthCredentials
 

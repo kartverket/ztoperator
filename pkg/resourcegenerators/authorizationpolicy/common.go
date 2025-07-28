@@ -21,9 +21,10 @@ func GetBaseConditions(authPolicy ztoperatorv1alpha1.AuthPolicy, issuer string, 
 
 	conditions := []*v1beta1.Condition{
 		makeCondition("request.auth.claims[iss]", []string{issuer}),
-		makeCondition("request.auth.claims[aud]", authPolicy.Spec.Audience),
 	}
-
+	if len(authPolicy.Spec.Audience) > 0 {
+		conditions = append(conditions, makeCondition("request.auth.claims[aud]", authPolicy.Spec.Audience))
+	}
 	if authPolicy.Spec.AcceptedResources != nil {
 		conditions = append(conditions, makeCondition("request.auth.claims[aud]", *authPolicy.Spec.AcceptedResources))
 	}

@@ -8,6 +8,7 @@
           "requestParam": "code",
           "match": "idporten_code",
           "claims": {
+            "iss": "http://mock-oauth2.auth:8080/idporten",
             "sub": "idporten_client",
             "role": "idporten_role",
             "aud": [
@@ -24,10 +25,12 @@
           "requestParam": "code",
           "match": "maskinporten_code",
           "claims": {
+            "iss":  "http://mock-oauth2.auth:8080/maskinporten",
             "sub": "maskinporten_client",
             "role": "maskinporten_role",
             "aud": [
-              "maskinporten_server"
+              "maskinporten_server",
+              "maskinporten_client"
             ]
           }
         }
@@ -40,6 +43,7 @@
           "requestParam": "code",
           "match": "entraid_client",
           "claims": {
+            "iss":  "http://mock-oauth2.auth:8080/entraid",
             "sub": "entraid_client",
             "role": "entraid_role",
             "aud": [
@@ -51,8 +55,12 @@
           "requestParam": "code",
           "match": "entraid_user",
           "claims": {
+            "iss": "http://mock-oauth2.auth:8080/entraid",
             "sub": "entraid_user",
-            "role": ["entraid_role", "entra_user_role"],
+            "role": [
+              "entraid_role",
+              "entra_user_role"
+            ],
             "aud": [
               "entraid_server"
             ]
@@ -67,6 +75,7 @@
           "requestParam": "code",
           "match": "admin",
           "claims": {
+            "iss":  "http://mock-oauth2.auth:8080/smapi",
             "roles": [
               "sikkerhetsmetrikker.lese.alt",
               "sikkerhetsmetrikker.skrive.alt"
@@ -80,6 +89,7 @@
           "requestParam": "code",
           "match": "user",
           "claims": {
+            "iss":  "http://mock-oauth2.auth:8080/smapi",
             "aud": [
               "audience"
             ]
@@ -89,6 +99,7 @@
           "requestParam": "code",
           "match": "backstage",
           "claims": {
+            "iss":  "http://mock-oauth2.auth:8080/smapi",
             "roles": [
               "githubkvmail.lese.alt"
             ],

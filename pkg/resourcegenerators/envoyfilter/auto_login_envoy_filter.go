@@ -1,30 +1,47 @@
 package envoyfilter
 
 import (
-	"github.com/kartverket/ztoperator/internal/state"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
-	"github.com/kartverket/ztoperator/pkg/utils"
+	"strconv"
+
 	"google.golang.org/protobuf/types/known/structpb"
 	"istio.io/api/networking/v1alpha3"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
+	"github.com/kartverket/ztoperator/pkg/utils"
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFilter {
-	if !scope.AuthPolicy.Spec.Enabled || scope.AuthPolicy.Spec.AutoLogin == nil ||
-		!scope.AuthPolicy.Spec.AutoLogin.Enabled ||
-		scope.InvalidConfig {
+	if scope.IsMisconfigured() || scope.AuthPolicy.Spec.AutoLogin == nil ||
+		!scope.AuthPolicy.Spec.AutoLogin.Enabled {
 		return nil
 	}
 
-	issuerHostName, err := utils.GetHostname(scope.IdentityProviderUris.IssuerURI)
+	idpAsParsedURL, err := utils.GetParsedURL(scope.IdentityProviderUris.TokenURI)
 	if err != nil {
 		panic(
 			"failed to get issuer hostname from issuer URI " + scope.IdentityProviderUris.IssuerURI + " due to the following error: " + err.Error(),
 		)
 	}
+	var oAuthClusterConfigPatchValue map[string]interface{}
+	if idpAsParsedURL.Port() != "" {
+		// Internal IDP
+		port, strconvErr := strconv.Atoi(idpAsParsedURL.Port())
+		if strconvErr != nil {
+			panic(strconvErr)
+		}
+		oAuthClusterConfigPatchValue = configpatch.GetInternalOAuthClusterConfigPatchValue(
+			idpAsParsedURL.Hostname(),
+			port,
+		)
+	} else {
+		oAuthClusterConfigPatchValue = configpatch.GetExternalOAuthClusterPatchValue(idpAsParsedURL.Host)
+	}
+
 	oAuthClusterConfigPatchValueAsPbStruct, err := structpb.NewStruct(
-		configpatch.GetOAuthClusterConfigPatchValue(*issuerHostName),
+		oAuthClusterConfigPatchValue,
 	)
 	if err != nil {
 		panic(
@@ -41,8 +58,6 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 			*scope.OAuthCredentials.ClientID,
 			scope.AutoLoginConfig.Scopes,
 			scope.AuthPolicy.Spec.AcceptedResources,
-			scope.AuthPolicy.Spec.IgnoreAuthRules,
-			scope.AutoLoginConfig.LoginPath,
 		),
 	)
 	if err != nil {
@@ -53,32 +68,12 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 
 	var configPatches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
 
-	if scope.AutoLoginConfig.LoginPath == nil && scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
-		luaScript, structPbErr := structpb.NewStruct(configpatch.GetLuaScript())
-		if structPbErr != nil {
-			panic(
-				"failed to serialize Custom Lua Script to protobuf struct due to the following error: " + structPbErr.Error(),
-			)
+	if scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
+		luaScriptConfigPatch, luaScriptConfigPatchErr := configpatch.GetLuaScriptConfigPatch(scope)
+		if luaScriptConfigPatchErr != nil {
+			panic(luaScriptConfigPatchErr.Error())
 		}
-		configPatches = append(configPatches, &v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
-			ApplyTo: v1alpha3.EnvoyFilter_HTTP_FILTER,
-			Match: &v1alpha3.EnvoyFilter_EnvoyConfigObjectMatch{
-				Context: v1alpha3.EnvoyFilter_SIDECAR_INBOUND,
-				ObjectTypes: &v1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
-					Listener: &v1alpha3.EnvoyFilter_ListenerMatch{
-						FilterChain: &v1alpha3.EnvoyFilter_ListenerMatch_FilterChainMatch{
-							Filter: &v1alpha3.EnvoyFilter_ListenerMatch_FilterMatch{
-								Name: "envoy.filters.network.http_connection_manager",
-							},
-						},
-					},
-				},
-			},
-			Patch: &v1alpha3.EnvoyFilter_Patch{
-				Operation: v1alpha3.EnvoyFilter_Patch_INSERT_BEFORE,
-				Value:     luaScript,
-			},
-		})
+		configPatches = append(configPatches, luaScriptConfigPatch)
 	}
 
 	configPatches = append(configPatches, &v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{

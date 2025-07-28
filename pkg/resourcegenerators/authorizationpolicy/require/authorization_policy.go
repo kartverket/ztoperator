@@ -13,7 +13,7 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
-	if !scope.AuthPolicy.Spec.Enabled || scope.InvalidConfig {
+	if scope.IsMisconfigured() {
 		return nil
 	}
 
@@ -70,12 +70,14 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 		})
 		if scope.AuthPolicy.Spec.AuthRules != nil {
 			for _, authRule := range *scope.AuthPolicy.Spec.AuthRules {
-				var authPolicyConditionsAsIstioConditions []*v1beta1.Condition
-				for _, condition := range authRule.When {
-					authPolicyConditionsAsIstioConditions = append(authPolicyConditionsAsIstioConditions, &v1beta1.Condition{
-						Key:    fmt.Sprintf("request.auth.claims[%s]", condition.Claim),
-						Values: condition.Values,
-					})
+				authPolicyConditionsAsIstioConditions := baseConditions
+				if authRule.When != nil {
+					for _, condition := range *authRule.When {
+						authPolicyConditionsAsIstioConditions = append(authPolicyConditionsAsIstioConditions, &v1beta1.Condition{
+							Key:    fmt.Sprintf("request.auth.claims[%s]", condition.Claim),
+							Values: condition.Values,
+						})
+					}
 				}
 				authorizationPolicyRules = append(authorizationPolicyRules, &v1beta1.Rule{
 					To: []*v1beta1.Rule_To{
@@ -86,7 +88,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 							},
 						},
 					},
-					When: append(baseConditions, authPolicyConditionsAsIstioConditions...),
+					When: authPolicyConditionsAsIstioConditions,
 				})
 			}
 		}

@@ -1,6 +1,6 @@
 module github.com/kartverket/ztoperator
 
-go 1.24.3
+go 1.24.4
 
 require (
 	github.com/go-logr/logr v1.4.3
@@ -8,8 +8,8 @@ require (
 	google.golang.org/protobuf v1.36.6
 	istio.io/api v1.26.1
 	istio.io/client-go v1.26.1
-	k8s.io/api v0.33.0
-	k8s.io/apimachinery v0.33.1
+	k8s.io/api v0.33.3
+	k8s.io/apimachinery v0.33.3
 	k8s.io/client-go v0.33.0
 	resty.dev/v3 v3.0.0-beta.3
 	sigs.k8s.io/controller-runtime v0.21.0
