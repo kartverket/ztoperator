@@ -1,7 +1,7 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: auto-login-with-login-path
+  name: output-claims-to-headers
 spec:
   skip: false
   concurrent: true
@@ -14,22 +14,18 @@ spec:
     - try:
         - create:
             file: application.yaml
-        - create:
-            file: oauth2-credentials.yaml
-        - create:
-            file: authpolicy.yaml
         - apply:
             file: wildcard-ingress.yaml
         - assert:
             file: application-assert.yaml
-        - assert:
-            file: oauth2-credentials-assert.yaml
+        - create:
+            file: authpolicy.yaml
         - assert:
             file: authpolicy-assert.yaml
         - script:
-            content: sleep 10
+            content: sleep 5
         - script:
             content: |
               hurl --error-format long \
               --insecure --test tests.hurl \
-              --variable entraid_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client)"
+              --variable token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer maskinporten --code maskinporten_code --token_name access_token)"

@@ -1,9 +1,38 @@
 package configpatch
 
-func GetOAuthClusterConfigPatchValue(identityProviderHost string) map[string]interface{} {
+func GetInternalOAuthClusterConfigPatchValue(idpHostname string, port int) map[string]interface{} {
 	return map[string]interface{}{
 		"name":              "oauth",
-		"dns_lookup_family": "AUTO",
+		"dns_lookup_family": "V4_ONLY",
+		"type":              "LOGICAL_DNS",
+		"connect_timeout":   "10s",
+		"lb_policy":         "ROUND_ROBIN",
+		"load_assignment": map[string]interface{}{
+			"cluster_name": "oauth",
+			"endpoints": []interface{}{
+				map[string]interface{}{
+					"lb_endpoints": []interface{}{
+						map[string]interface{}{
+							"endpoint": map[string]interface{}{
+								"address": map[string]interface{}{
+									"socket_address": map[string]interface{}{
+										"address":    idpHostname,
+										"port_value": port,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func GetExternalOAuthClusterPatchValue(idpHostname string) map[string]interface{} {
+	return map[string]interface{}{
+		"name":              "oauth",
+		"dns_lookup_family": "V4_ONLY",
 		"type":              "LOGICAL_DNS",
 		"connect_timeout":   "10s",
 		"lb_policy":         "ROUND_ROBIN",
@@ -11,7 +40,7 @@ func GetOAuthClusterConfigPatchValue(identityProviderHost string) map[string]int
 			"name": "envoy.transport_sockets.tls",
 			"typed_config": map[string]interface{}{
 				"@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext",
-				"sni":   identityProviderHost,
+				"sni":   idpHostname,
 			},
 		},
 		"load_assignment": map[string]interface{}{
@@ -23,7 +52,7 @@ func GetOAuthClusterConfigPatchValue(identityProviderHost string) map[string]int
 							"endpoint": map[string]interface{}{
 								"address": map[string]interface{}{
 									"socket_address": map[string]interface{}{
-										"address":    identityProviderHost,
+										"address":    idpHostname,
 										"port_value": 443,
 									},
 								},

@@ -9,7 +9,7 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
-	if !scope.AuthPolicy.Spec.Enabled || scope.InvalidConfig {
+	if scope.IsMisconfigured() {
 		return nil
 	}
 

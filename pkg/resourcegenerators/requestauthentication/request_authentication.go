@@ -10,7 +10,7 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.RequestAuthentication {
-	if !scope.AuthPolicy.Spec.Enabled || scope.InvalidConfig {
+	if scope.IsMisconfigured() {
 		return nil
 	}
 
@@ -18,24 +18,19 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 	if scope.AuthPolicy.Spec.Audience != nil {
 		audiences = scope.AuthPolicy.Spec.Audience
 	}
-	if scope.OAuthCredentials.ClientID != nil {
-		for _, audience := range audiences {
-			if *scope.OAuthCredentials.ClientID != audience {
-				audiences = append(audiences, *scope.OAuthCredentials.ClientID)
-			}
-		}
-	}
 
 	jwtRule := &securityv1.JWTRule{
-		Issuer:               scope.IdentityProviderUris.IssuerURI,
-		Audiences:            audiences,
-		JwksUri:              scope.IdentityProviderUris.JwksURI,
-		ForwardOriginalToken: scope.AuthPolicy.Spec.ForwardJwt,
+		Issuer:    scope.IdentityProviderUris.IssuerURI,
+		Audiences: audiences,
+		JwksUri:   scope.IdentityProviderUris.JwksURI,
 	}
 
-	if scope.AuthPolicy.Spec.FromCookies != nil && len(*scope.AuthPolicy.Spec.FromCookies) > 0 {
-		jwtRule.FromCookies = *scope.AuthPolicy.Spec.FromCookies
+	if scope.AuthPolicy.Spec.ForwardJwt != nil {
+		jwtRule.ForwardOriginalToken = *scope.AuthPolicy.Spec.ForwardJwt
+	} else {
+		jwtRule.ForwardOriginalToken = true
 	}
+
 	if scope.AuthPolicy.Spec.OutputClaimToHeaders != nil && len(*scope.AuthPolicy.Spec.OutputClaimToHeaders) > 0 {
 		claimsToHeaders := make([]*v1beta1.ClaimToHeader, len(*scope.AuthPolicy.Spec.OutputClaimToHeaders))
 		for i, claimToHeader := range *scope.AuthPolicy.Spec.OutputClaimToHeaders {

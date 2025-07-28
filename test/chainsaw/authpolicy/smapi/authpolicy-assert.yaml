@@ -8,7 +8,7 @@ spec:
     - audiences:
         - audience
       forwardOriginalToken: true
-      issuer: https://fake.auth/smapi
+      issuer: http://mock-oauth2.auth:8080/smapi
       jwksUri: http://mock-oauth2.auth:8080/smapi/jwks
   selector:
     matchLabels:
@@ -33,7 +33,7 @@ spec:
       when:
         - key: request.auth.claims[iss]
           notValues:
-            - https://fake.auth/smapi
+            - http://mock-oauth2.auth:8080/smapi
     - to:
         - operation:
             methods:
@@ -67,7 +67,7 @@ spec:
       when:
         - key: request.auth.claims[iss]
           notValues:
-            - https://fake.auth/smapi
+            - http://mock-oauth2.auth:8080/smapi
     - to:
         - operation:
             methods:
@@ -175,7 +175,7 @@ spec:
       when:
         - key: request.auth.claims[iss]
           values:
-            - https://fake.auth/smapi
+            - http://mock-oauth2.auth:8080/smapi
         - key: request.auth.claims[aud]
           values:
             - audience
@@ -190,7 +190,7 @@ spec:
       when:
         - key: request.auth.claims[iss]
           values:
-            - https://fake.auth/smapi
+            - http://mock-oauth2.auth:8080/smapi
         - key: request.auth.claims[aud]
           values:
             - audience
@@ -206,7 +206,7 @@ spec:
       when:
         - key: request.auth.claims[iss]
           values:
-            - https://fake.auth/smapi
+            - http://mock-oauth2.auth:8080/smapi
         - key: request.auth.claims[aud]
           values:
             - audience

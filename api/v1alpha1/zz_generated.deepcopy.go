@@ -102,14 +102,10 @@ func (in *AuthPolicySpec) DeepCopyInto(out *AuthPolicySpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.FromCookies != nil {
-		in, out := &in.FromCookies, &out.FromCookies
-		*out = new([]string)
-		if **in != nil {
-			in, out := *in, *out
-			*out = make([]string, len(*in))
-			copy(*out, *in)
-		}
+	if in.ForwardJwt != nil {
+		in, out := &in.ForwardJwt, &out.ForwardJwt
+		*out = new(bool)
+		**out = **in
 	}
 	if in.OutputClaimToHeaders != nil {
 		in, out := &in.OutputClaimToHeaders, &out.OutputClaimToHeaders
@@ -267,10 +263,19 @@ func (in *RequestAuthRule) DeepCopyInto(out *RequestAuthRule) {
 	in.RequestMatcher.DeepCopyInto(&out.RequestMatcher)
 	if in.When != nil {
 		in, out := &in.When, &out.When
-		*out = make([]Condition, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
+		*out = new([]Condition)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make([]Condition, len(*in))
+			for i := range *in {
+				(*in)[i].DeepCopyInto(&(*out)[i])
+			}
 		}
+	}
+	if in.DenyRedirect != nil {
+		in, out := &in.DenyRedirect, &out.DenyRedirect
+		*out = new(bool)
+		**out = **in
 	}
 }
 
