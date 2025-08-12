@@ -55,6 +55,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 			scope.IdentityProviderUris.AuthorizationURI,
 			scope.AutoLoginConfig.RedirectPath,
 			scope.AutoLoginConfig.LogoutPath,
+			scope.IdentityProviderUris.EndSessionURI,
 			*scope.OAuthCredentials.ClientID,
 			scope.AutoLoginConfig.Scopes,
 			scope.AuthPolicy.Spec.AcceptedResources,

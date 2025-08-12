@@ -16,7 +16,6 @@ export ARCH := $(shell if [ "$(shell uname -m)" = "x86_64" ]; then echo "amd64";
 extract-version = $(shell cat go.mod | grep $(1) | awk '{$$1=$$1};1' | cut -d' ' -f2 | sed 's/^v//')
 
 CONTAINER_TOOL             ?= docker
-OPERATOR_SDK_VERSION       ?= v1.38.0
 IMG                        ?= ztoperator:latest
 KIND_CLUSTER_NAME          ?= ztoperator
 KUBECONTEXT                ?= kind-$(KIND_CLUSTER_NAME)
