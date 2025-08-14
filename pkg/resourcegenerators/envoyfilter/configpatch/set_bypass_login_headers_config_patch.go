@@ -144,7 +144,18 @@ end
 function envoy_on_request(request_handle)
   local p = request_handle:headers():get(":path")   or ""
   local m = request_handle:headers():get(":method") or ""
-  
+
+  if p == "/front_channel_logout" then
+  	request_handle:respond({
+	  [":status"] = "200",
+	  ["set-cookie"] = {
+	    "OauthHMAC=; Path=/; Secure; HttpOnly; SameSite=None; expires=Thu, 01 Jan 1970 00:00:00 GMT",
+		"RefreshToken=; Path=/; Secure; HttpOnly; SameSite=None; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+	  }
+	}, "")
+    return
+  end
+	  
   local bypass = should_bypass(p, m)
   request_handle:logCritical("Login bypassed?: " .. tostring(bypass))
   request_handle:headers():add("%s", tostring(bypass))
