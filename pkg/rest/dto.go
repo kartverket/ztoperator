@@ -7,6 +7,7 @@ type DiscoveryDocument struct {
 	AuthorizationEndpoint *string `json:"authorization_endpoint"`
 	TokenEndpoint         *string `json:"token_endpoint"`
 	JwksURI               *string `json:"jwks_uri"`
+	EndSessionEndpoint    *string `json:"end_session_endpoint"`
 }
 
 func GetWellknownURIToDiscoveryDocument() map[string]DiscoveryDocument {
@@ -16,18 +17,21 @@ func GetWellknownURIToDiscoveryDocument() map[string]DiscoveryDocument {
 			AuthorizationEndpoint: utils.Ptr("http://mock-oauth2.auth:8080/entraid/authorize"),
 			TokenEndpoint:         utils.Ptr("http://mock-oauth2.auth:8080/entraid/token"),
 			JwksURI:               utils.Ptr("http://mock-oauth2.auth:8080/entraid/jwks"),
+			EndSessionEndpoint:    utils.Ptr("http://mock-oauth2.auth:8080/entraid/endsession"),
 		},
 		"http://mock-oauth2.auth:8080/smapi/.well-known/openid-configuration": {
 			Issuer:                utils.Ptr("http://mock-oauth2.auth:8080/smapi"),
 			AuthorizationEndpoint: utils.Ptr("http://mock-oauth2.auth:8080/smapi/authorize"),
 			TokenEndpoint:         utils.Ptr("http://mock-oauth2.auth:8080/smapi/token"),
 			JwksURI:               utils.Ptr("http://mock-oauth2.auth:8080/smapi/jwks"),
+			EndSessionEndpoint:    utils.Ptr("http://mock-oauth2.auth:8080/smapi/endsession"),
 		},
 		"http://mock-oauth2.auth:8080/maskinporten/.well-known/openid-configuration": {
 			Issuer:                utils.Ptr("http://mock-oauth2.auth:8080/maskinporten"),
 			AuthorizationEndpoint: utils.Ptr("http://mock-oauth2.auth:8080/maskinporten/authorize"),
 			TokenEndpoint:         utils.Ptr("http://mock-oauth2.auth:8080/maskinporten/token"),
 			JwksURI:               utils.Ptr("http://mock-oauth2.auth:8080/maskinporten/jwks"),
+			EndSessionEndpoint:    utils.Ptr("http://mock-oauth2.auth:8080/maskinporten/endsession"),
 		},
 		"https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0/.well-known/openid-configuration": {
 			Issuer: utils.Ptr(
@@ -42,12 +46,16 @@ func GetWellknownURIToDiscoveryDocument() map[string]DiscoveryDocument {
 			JwksURI: utils.Ptr(
 				"https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/discovery/v2.0/keys",
 			),
+			EndSessionEndpoint: utils.Ptr(
+				"https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/oauth2/v2.0/logout",
+			),
 		},
 		"https://idporten.no/.well-known/openid-configuration": {
 			Issuer:                utils.Ptr("https://idporten.no"),
 			AuthorizationEndpoint: utils.Ptr("https://login.idporten.no/authorize"),
 			TokenEndpoint:         utils.Ptr("https://idporten.no/token"),
 			JwksURI:               utils.Ptr("https://idporten.no/jwks.json"),
+			EndSessionEndpoint:    utils.Ptr("https://login.idporten.no/logout"),
 		},
 		"https://maskinporten.no/.well-known/oauth-authorization-server": {
 			Issuer:        utils.Ptr("https://maskinporten.no/"),

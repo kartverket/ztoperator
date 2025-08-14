@@ -748,7 +748,7 @@ func resolveAuthPolicy(
 	}
 
 	if discoveryDocument.Issuer == nil || discoveryDocument.JwksURI == nil || discoveryDocument.TokenEndpoint == nil ||
-		discoveryDocument.AuthorizationEndpoint == nil {
+		discoveryDocument.AuthorizationEndpoint == nil || discoveryDocument.EndSessionEndpoint == nil {
 		return nil, fmt.Errorf(
 			"failed to parse discovery document from well-known uri: %s for AuthPolicy with name %s/%s",
 			authPolicy.Spec.WellKnownURI,
@@ -760,6 +760,7 @@ func resolveAuthPolicy(
 	identityProviderUris.JwksURI = *discoveryDocument.JwksURI
 	identityProviderUris.TokenURI = *discoveryDocument.TokenEndpoint
 	identityProviderUris.AuthorizationURI = *discoveryDocument.AuthorizationEndpoint
+	identityProviderUris.EndSessionURI = discoveryDocument.EndSessionEndpoint
 
 	autoLoginConfig := state.AutoLoginConfig{
 		Enabled: false,

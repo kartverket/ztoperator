@@ -1,5 +1,7 @@
 package configpatch
 
+import "slices"
+
 const (
 	TokenSecretFileName       = "token-secret.yaml"
 	HmacSecretFileName        = "hmac-secret.yaml"
@@ -13,6 +15,7 @@ func GetOAuthSidecarConfigPatchValue(
 	authorizationEndpoint string,
 	redirectPath string,
 	signoutPath string,
+	endSessionEndpoint *string,
 	clientID string,
 	authScopes []string,
 	resources *[]string,
@@ -24,9 +27,13 @@ func GetOAuthSidecarConfigPatchValue(
 		}
 	}
 
+	if !slices.Contains(authScopes, "openid") {
+		authScopes = append(authScopes, "openid")
+	}
+
 	authScopesInterface := make([]interface{}, len(authScopes))
-	for i, v := range authScopes {
-		authScopesInterface[i] = v
+	for i, authScope := range authScopes {
+		authScopesInterface[i] = authScope
 	}
 
 	oauthSidecarConfigPatchValue := map[string]interface{}{
@@ -98,10 +105,25 @@ func GetOAuthSidecarConfigPatchValue(
 			},
 		},
 		"auth_scopes": authScopesInterface,
+		"cookie_configs": map[string]interface{}{
+			"oauth_hmac_cookie_config": map[string]interface{}{
+				"same_site": "NONE",
+			},
+			"refresh_token_cookie_config": map[string]interface{}{
+				"same_site": "NONE",
+			},
+			// TODO: Sett opp muligheten til å konfigurere front_channel_logout_path selv
+			// TODO: Sett opp vanlig test med hurl for å verifisere at /logout returnerer 302 med konfigurert end_session_endpoint
+			// TODO: Sett opp test med puppeteer som bruker to test-applikasjoner med to distinkte ID-porten (test) registreringer for å teste fron_channel_logout
+		},
 	}
 
 	if resources != nil && len(*resources) > 0 {
 		oauthSidecarConfigPatchValue["resources"] = resourcesInterface
+	}
+
+	if endSessionEndpoint != nil {
+		oauthSidecarConfigPatchValue["end_session_endpoint"] = *endSessionEndpoint
 	}
 
 	return map[string]interface{}{
