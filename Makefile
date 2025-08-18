@@ -228,7 +228,7 @@ mock-oauth2:
 	@echo -e "✅  'mock-oauth2' is ready and running"
 
 .PHONY: setup-local-test
-setup-local-test: ensureflox skiperator mock-oauth2 expose-ingress virtualenv
+setup-local-test: ensureflox setup-local skiperator mock-oauth2 expose-ingress virtualenv
 
 #### ZTOPERATOR DEPENDENCIES ####
 
