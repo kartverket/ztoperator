@@ -1,5 +1,7 @@
 package configpatch
 
+import "slices"
+
 const (
 	TokenSecretFileName       = "token-secret.yaml"
 	HmacSecretFileName        = "hmac-secret.yaml"
@@ -13,6 +15,7 @@ func GetOAuthSidecarConfigPatchValue(
 	authorizationEndpoint string,
 	redirectPath string,
 	signoutPath string,
+	endSessionEndpoint *string,
 	clientID string,
 	authScopes []string,
 	resources *[]string,
@@ -24,9 +27,13 @@ func GetOAuthSidecarConfigPatchValue(
 		}
 	}
 
+	if !slices.Contains(authScopes, "openid") {
+		authScopes = append(authScopes, "openid")
+	}
+
 	authScopesInterface := make([]interface{}, len(authScopes))
-	for i, v := range authScopes {
-		authScopesInterface[i] = v
+	for i, authScope := range authScopes {
+		authScopesInterface[i] = authScope
 	}
 
 	oauthSidecarConfigPatchValue := map[string]interface{}{
@@ -102,6 +109,10 @@ func GetOAuthSidecarConfigPatchValue(
 
 	if resources != nil && len(*resources) > 0 {
 		oauthSidecarConfigPatchValue["resources"] = resourcesInterface
+	}
+
+	if endSessionEndpoint != nil {
+		oauthSidecarConfigPatchValue["end_session_endpoint"] = *endSessionEndpoint
 	}
 
 	return map[string]interface{}{

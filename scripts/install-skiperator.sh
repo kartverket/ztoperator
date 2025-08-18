@@ -1,10 +1,9 @@
 #!/bin/bash
 
-
-KUBECONTEXT=${KUBECONTEXT:-"kind-kind"}
-SKIPERATOR_VERSION=${SKIPERATOR_VERSION:-"latest"}
-CERT_MANAGER_VERSION=${CERT_MANAGER_VERSION:-"v1.17.1"}
-PROMETHEUS_VERSION=${PROMETHEUS_VERSION:-"v0.81.0"}
+KUBECONTEXT=${KUBECONTEXT:-"kind-ztoperator"}
+SKIPERATOR_VERSION=${SKIPERATOR_VERSION:-"v2.8.4"}
+CERT_MANAGER_VERSION=${CERT_MANAGER_VERSION:-"v1.18.2"}
+PROMETHEUS_VERSION=${PROMETHEUS_VERSION:-"v0.84.0"}
 
 SKIPERATOR_RESOURCES=(
   https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/config/crd/skiperator.kartverket.no_applications.yaml
@@ -12,20 +11,36 @@ SKIPERATOR_RESOURCES=(
   https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/config/crd/skiperator.kartverket.no_skipjobs.yaml
   https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/config/static/priorities.yaml
   https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/config/rbac/role.yaml
+  https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/tests/cluster-config/gcp-identity-config.yaml
   https://github.com/cert-manager/cert-manager/releases/download/"${CERT_MANAGER_VERSION}"/cert-manager.yaml
   https://github.com/prometheus-operator/prometheus-operator/releases/download/"${PROMETHEUS_VERSION}"/stripped-down-crds.yaml
   https://raw.githubusercontent.com/nais/liberator/main/config/crd/bases/nais.io_idportenclients.yaml
   https://raw.githubusercontent.com/nais/liberator/main/config/crd/bases/nais.io_maskinportenclients.yaml
 )
 
-echo "Installing skiperator in cluster $KUBECONTEXT"
+echo "🤞  Creating namespace: $namespace_name"
+
+# Attempt to create the namespace and capture both stdout and stderr
+output=$(kubectl create namespace "skiperator-system" 2>&1)
+exit_code=$?
+
+# Check the exit code and output
+if [ $exit_code -eq 0 ]; then
+    echo "✅  Namespace 'skiperator-system' created successfully"
+elif echo "$output" | grep -q "already exists"; then
+    echo "✅  Namespace 'skiperator-system' already exists, continuing..."
+else
+    echo -e "❌  Error creating 'skiperator-system' namespace."
+    exit 1
+fi
+
 # Install required skiperator resources
 for resource in "${SKIPERATOR_RESOURCES[@]}"; do
   kubectl apply --context "$KUBECONTEXT" -f "$resource"
 done
 
-echo "Waiting for cert-manager to be ready..."
-sleep 20
+echo "🕑  Waiting for cert-manager to be ready..."
+kubectl -n cert-manager wait deploy --all --for=condition=Available --timeout=30s
 
 # Configure cert-manager clusterissuer
 kubectl apply --context "$KUBECONTEXT" -f <(cat <<EOF
