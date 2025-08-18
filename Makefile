@@ -216,21 +216,19 @@ kind-cluster: ensureflox check-kind
 .PHONY: skiperator
 skiperator:
 	@echo -e "🤞  Installing Skiperator..."
-	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-skiperator.sh
-	@kubectl wait pod --for=create --timeout=60s -n skiperator-system -l app=skiperator --context $(KUBECONTEXT) &> /dev/null || (echo -e "❌  Error deploying Skiperator." && exit 1)
-	@kubectl wait pod --for=condition=Ready --timeout=60s -n skiperator-system -l app=skiperator --context $(KUBECONTEXT) &> /dev/null || (echo -e "❌  Error deploying Skiperator." && exit 1)
+	@kubectl create namespace skiperator-system --context $(KUBECONTEXT) || (echo -e "❌  Error creating 'skiperator-system' namespace." && exit 1)
+	@KUBECONTEXT=$(KUBECONTEXT) bash ./scripts/install-skiperator.sh
+	@kubectl wait pod --for=condition=ready --timeout=30s -n skiperator-system -l app=skiperator || (echo -e "❌  Error deploying Skiperator." && exit 1)
 	@echo -e "✅  Skiperator installed in namespace 'skiperator-system'!"
 
-.PHONY: oauth2server
-oauth2server:
-	@echo -e "🤞  Deploying mock-oauth2-server to the Kind cluster..."
-	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-mock-oauth2.sh --config ./scripts/mock-oauth2-server-config.json
-	@kubectl wait pod --for=create --timeout=60s -n auth -l app=mock-oauth2 --context $(KUBECONTEXT) || (echo -e "❌  Error deploying mock-oauth2." && exit 1)
-	@kubectl wait pod --for=condition=Ready --timeout=60s -n auth -l app=mock-oauth2 --context $(KUBECONTEXT) &> /dev/null || (echo -e "❌  Error deploying mock-oauth2-server." && exit 1)
-	@echo -e "✅  mock-oauth2-server deployed to the Kind cluster"
+.PHONY: mock-oauth2
+mock-oauth2:
+	@echo -e "🤞  Deploying 'mock-oauth2'..."
+	@KUBECONTEXT=$(KUBECONTEXT) bash ./scripts/install-mock-oauth2.sh
+	@echo -e "✅  'mock-oauth2' is ready and running"
 
 .PHONY: setup-local-test
-setup-local-test: ensureflox skiperator oauth2server expose-ingress virtualenv
+setup-local-test: ensureflox skiperator mock-oauth2 expose-ingress virtualenv
 
 #### ZTOPERATOR DEPENDENCIES ####
 

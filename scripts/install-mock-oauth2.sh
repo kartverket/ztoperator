@@ -1,22 +1,14 @@
 #!/bin/bash
 
-# Parse --config flag
-while [[ "$#" -gt 0 ]]; do
-  case $1 in
-    --config) JSON_CONFIG_PATH="$2"; shift ;;
-    *) echo "Unknown parameter passed: $1"; exit 1 ;;
-  esac
-  shift
-done
+MOCK_OAUTH2_SERVER_VERSION=${MOCK_OAUTH2_SERVER_VERSION:-"2.2.1"}
 
-if [[ -z "$JSON_CONFIG_PATH" ]]; then
-  echo "Error: --config flag is required."
+echo -e "🤞 Retrieving content from mock-oauth2-config.json..."
+JSON_CONTENT=$(cat "$MOCK_OAUTH2_CONFIG")
+if [[ -z "$JSON_CONTENT" ]]; then
+  echo "❌ Error: mock-oauth2-config.json is empty or not found at path: $MOCK_OAUTH2_CONFIG"
   exit 1
 fi
-
-KUBECONTEXT=${KUBECONTEXT:-"kind-ztoperator"}
-MOCK_OAUTH2_SERVER_VERSION=${MOCK_OAUTH2_SERVER_VERSION:-"2.2.1"}
-JSON_CONTENT=$(<"$JSON_CONFIG_PATH")
+echo -e "✅  Successfully retrieved content from mock-oauth2-config.json"
 
 DEPLOYMENT="$(cat <<EOF
 apiVersion: v1
@@ -43,11 +35,6 @@ spec:
   image: ghcr.io/navikt/mock-oauth2-server:${MOCK_OAUTH2_SERVER_VERSION}
   port: 8080
   replicas: 1
-  ingresses:
-      - fake.auth
-  env:
-    - name: "LOG_LEVEL"
-      value: "TRACE"
   envFrom:
     - configMap: mock-oauth2-config
 ---
@@ -70,3 +57,24 @@ EOF
 )"
 
 kubectl apply -f <(echo "$DEPLOYMENT") --context "$KUBECONTEXT"
+
+while true; do
+  SUMMARY_STATUS=$(kubectl get application.skiperator.kartverket.no/mock-oauth2 -n auth -o jsonpath='{.status.summary.status}')
+
+  if [[ "$SUMMARY_STATUS" == "Synced" ]]; then
+    echo "✅ Application summary status is Synced."
+    break
+  fi
+
+  sleep 1
+  ELAPSED=$((ELAPSED + 1))
+  if [[ "$ELAPSED" -ge 30 ]]; then
+    echo "❌ Timeout: Application did not reach 'Synced' status in time."
+    exit 1
+  fi
+done
+
+kubectl wait --for=condition=InternalRulesValid=True application.skiperator.kartverket.no/mock-oauth2 -n auth --timeout=30s || (echo -e "❌  Error: accessPolicies for 'mock-oauth2' remain in InvalidConfig state." && exit 1)
+
+kubectl wait pod --for=create --timeout=30s -n auth -l app=mock-oauth2 || (echo -e "❌  Error deploying 'mock-oauth2'." && exit 1)
+kubectl wait pod --for=condition=Ready --timeout=30s -n auth -l app=mock-oauth2 || (echo -e "❌  Error deploying 'mock-oauth2'." && exit 1)

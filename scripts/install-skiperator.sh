@@ -1,10 +1,9 @@
 #!/bin/bash
 
-
 KUBECONTEXT=${KUBECONTEXT:-"kind-ztoperator"}
 SKIPERATOR_VERSION=${SKIPERATOR_VERSION:-"v2.8.4"}
 CERT_MANAGER_VERSION=${CERT_MANAGER_VERSION:-"v1.18.2"}
-PROMETHEUS_VERSION=${PROMETHEUS_VERSION:-"v0.84.1"}
+PROMETHEUS_VERSION=${PROMETHEUS_VERSION:-"v0.84.0"}
 
 SKIPERATOR_RESOURCES=(
   https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/config/crd/skiperator.kartverket.no_applications.yaml
@@ -12,17 +11,17 @@ SKIPERATOR_RESOURCES=(
   https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/config/crd/skiperator.kartverket.no_skipjobs.yaml
   https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/config/static/priorities.yaml
   https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/config/rbac/role.yaml
+  https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/tests/cluster-config/gcp-identity-config.yaml
   https://github.com/cert-manager/cert-manager/releases/download/"${CERT_MANAGER_VERSION}"/cert-manager.yaml
   https://github.com/prometheus-operator/prometheus-operator/releases/download/"${PROMETHEUS_VERSION}"/stripped-down-crds.yaml
   https://raw.githubusercontent.com/nais/liberator/main/config/crd/bases/nais.io_idportenclients.yaml
   https://raw.githubusercontent.com/nais/liberator/main/config/crd/bases/nais.io_maskinportenclients.yaml
-  https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/tests/cluster-config/gcp-identity-config.yaml
 )
 
 echo "🤞  Creating namespace: $namespace_name"
 
 # Attempt to create the namespace and capture both stdout and stderr
-output=$(kubectl create namespace "skiperator-system" --context "$KUBECONTEXT" 2>&1)
+output=$(kubectl create namespace "skiperator-system" 2>&1)
 exit_code=$?
 
 # Check the exit code and output
@@ -41,10 +40,8 @@ for resource in "${SKIPERATOR_RESOURCES[@]}"; do
 done
 
 echo "🕑  Waiting for cert-manager to be ready..."
-kubectl wait pod --context "$KUBECONTEXT" --for=create --timeout=120s -n cert-manager -l app=cert-manager
-kubectl wait pod --context "$KUBECONTEXT" --for=condition=Ready --timeout=120s -n cert-manager -l app=cert-manager
-kubectl wait pod --context "$KUBECONTEXT" --for=create --timeout=120s -n cert-manager -l app=webhook
-kubectl wait pod --context "$KUBECONTEXT" --for=condition=Ready --timeout=120s -n cert-manager -l app=webhook
+kubectl wait pod --for=create --timeout=120s -n cert-manager -l app=cert-manager
+kubectl wait pod --for=condition=Ready --timeout=120s -n cert-manager -l app=cert-manager
 
 # Configure cert-manager clusterissuer
 kubectl apply --context "$KUBECONTEXT" -f <(cat <<EOF
