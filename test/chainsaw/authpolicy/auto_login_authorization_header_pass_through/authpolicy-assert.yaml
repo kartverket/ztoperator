@@ -87,7 +87,7 @@ spec:
           typed_config:
             '@type': type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
             default_source_code:
-              inline_string: "\nlocal ignore_rules = {{regex=\"/public.*\",methods={}}}\nlocal require_rules = {{regex=\"/oauth2/callback\",methods={}},{regex=\"/logout\",methods={}}}\nlocal deny_redirect_rules = {}\n\n-- returns true when {p,m} matches any rule in the supplied table\nlocal function match(rules, p, m)\n  for _, rule in ipairs(rules) do\n    if string.match(p, rule.regex) then\n      -- empty \"methods\" table == all methods\n      if next(rule.methods) == nil or rule.methods[m] then\n        return true\n      end\n    end\n  end\n  return false\nend\n\n-- returns true if {p,m} is in ignore_rules *and* NOT in require_rules\nlocal function should_bypass(p, m)\n  local bypass = false\n  if p ~= \"\" and m ~= \"\" then\n    -- bypass only when it is in ignore_rules *and* NOT in require_rules\n    if match(ignore_rules, p, m) and not match(require_rules, p, m) then\n      bypass = true\n    end\n  end\n  return bypass\nend\n\n-- returns true if {p,m} is in deny_redirect_rules\nlocal function should_deny_redirect(p, m)\n  local deny_redirect = false\n  if p ~= \"\" and m ~= \"\" then\n    -- deny redirect only when it is in deny_redirect_rules\n    if match(deny_redirect_rules, p, m) then\n      deny_redirect = true\n    end\n  end\n  return deny_redirect\nend\n\nfunction envoy_on_request(request_handle)\n  local p = request_handle:headers():get(\":path\")   or \"\"\n  local m = request_handle:headers():get(\":method\") or \"\"\n  \n  local bypass = should_bypass(p, m)\n  request_handle:logCritical(\"Login bypassed?: \" .. tostring(bypass))\n  request_handle:headers():add(\"x-bypass-login\", tostring(bypass))\n  \n  local deny_redirect = should_deny_redirect(p, m)\n  request_handle:logCritical(\"Deny redirect?: \" .. tostring(deny_redirect))\t\n  request_handle:headers():add(\"x-deny-redirect\", tostring(deny_redirect))\nend\n"
+              inline_string: "\nlocal ignore_rules = {{regex=\"/public.*\",methods={}}}\nlocal require_rules = {{regex=\"/oauth2/callback\",methods={}},{regex=\"/logout\",methods={}}}\nlocal deny_redirect_rules = {}\n\n-- returns true when {p,m} matches any rule in the supplied table\nlocal function match(rules, p, m)\n  \tfor _, rule in ipairs(rules) do\n    \tif string.match(p, rule.regex) then\n      \t\t-- empty \"methods\" table == all methods\n      \t\tif next(rule.methods) == nil or rule.methods[m] then\n        \t\treturn true\n      \t\tend\n    \tend\n  \tend\n\treturn false\nend\n\n-- returns true if {p,m} is in ignore_rules *and* NOT in require_rules\nlocal function should_bypass(p, m)\n  \tlocal bypass = false\n  \tif p ~= \"\" and m ~= \"\" then\n    \t-- bypass only when it is in ignore_rules *and* NOT in require_rules\n    \tif match(ignore_rules, p, m) and not match(require_rules, p, m) then\n      \t\tbypass = true\n\t\tend\n  \tend\n  \treturn bypass\nend\n\n-- returns true if {p,m} is in deny_redirect_rules\nlocal function should_deny_redirect(p, m)\n  \tlocal deny_redirect = false\n  \tif p ~= \"\" and m ~= \"\" then\n    \t-- deny redirect only when it is in deny_redirect_rules\n    \tif match(deny_redirect_rules, p, m) then\n      \t\tdeny_redirect = true\n    \tend\n  \tend\n  \treturn deny_redirect\nend\n\nfunction envoy_on_request(request_handle)\n  \tlocal p = request_handle:headers():get(\":path\")   or \"\"\n  \tlocal m = request_handle:headers():get(\":method\") or \"\"\n\n  \tlocal bypass = should_bypass(p, m)\n  \trequest_handle:logCritical(\"Login bypassed?: \" .. tostring(bypass))\n  \trequest_handle:headers():add(\"x-bypass-login\", tostring(bypass))\n\n  \tlocal deny_redirect = should_deny_redirect(p, m)\n  \trequest_handle:logCritical(\"Deny redirect?: \" .. tostring(deny_redirect))\t\n  \trequest_handle:headers():add(\"x-deny-redirect\", tostring(deny_redirect))\nend\n"
     - applyTo: CLUSTER
       match:
         cluster:
@@ -127,7 +127,7 @@ spec:
             config:
               auth_scopes:
                 - openid
-              authorization_endpoint:  http://mock-oauth2.auth:8080/entraid/authorize
+              authorization_endpoint: http://mock-oauth2.auth:8080/entraid/authorize
               credentials:
                 client_id: entraid_server
                 hmac_secret:
@@ -148,11 +148,12 @@ spec:
                 - name: x-deny-redirect
                   string_match:
                     exact: "true"
+              end_session_endpoint: http://mock-oauth2.auth:8080/entraid/endsession
               forward_bearer_token: true
               pass_through_matcher:
-                - name: "authorization"
+                - name: authorization
                   string_match:
-                    prefix: "Bearer "
+                    prefix: 'Bearer '
                 - name: x-bypass-login
                   string_match:
                     exact: "true"
@@ -173,3 +174,4 @@ spec:
     labels:
       app: application
 ---
+

@@ -211,7 +211,7 @@ kind-cluster: ensureflox check-kind
 	@kind create cluster --image $(KIND_IMAGE) --name ${KIND_CLUSTER_NAME}
 
 .PHONY: skiperator
-skiperator: ensureflox
+skiperator:
 	@echo -e "🤞  Installing Skiperator..."
 	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-skiperator.sh
 	@kubectl wait pod --for=create --timeout=60s -n skiperator-system -l app=skiperator --context $(KUBECONTEXT) &> /dev/null || (echo -e "❌  Error deploying Skiperator." && exit 1)
@@ -219,7 +219,7 @@ skiperator: ensureflox
 	@echo -e "✅  Skiperator installed in namespace 'skiperator-system'!"
 
 .PHONY: oauth2server
-oauth2server: ensureflox
+oauth2server:
 	@echo -e "🤞  Deploying mock-oauth2-server to the Kind cluster..."
 	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-mock-oauth2.sh --config ./scripts/mock-oauth2-server-config.json &> /dev/null
 	@kubectl wait pod --for=create --timeout=60s -n auth -l app=mock-oauth2 --context $(KUBECONTEXT) &> /dev/null || (echo -e "❌  Error deploying mock-oauth2." && exit 1)
@@ -266,7 +266,7 @@ test-single: chainsaw install
 .PHONY: test
 test:
 	@echo "Checking if ztoperator is running..."
-	@lsof -i :8081 | grep ___Ztoper  > /dev/null || (echo "ztoperator is not running. Please start it first." && exit 1)
+	@lsof -i :8081 | grep -E '___Ztoper|___1Ztope' > /dev/null || (echo "ztoperator is not running. Please start it first." && exit 1)
 	@echo "ztoperator is running. Proceeding with tests..."
 	@bash -ec ' \
 		for dir in test/chainsaw/authpolicy/*/ ; do \
