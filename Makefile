@@ -224,7 +224,7 @@ skiperator:
 .PHONY: oauth2server
 oauth2server:
 	@echo -e "🤞  Deploying mock-oauth2-server to the Kind cluster..."
-	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-mock-oauth2.sh --config ./scripts/mock-oauth2-server-config.json &> /dev/null
+	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-mock-oauth2.sh --config ./scripts/mock-oauth2-server-config.json
 	@kubectl wait pod --for=create --timeout=60s -n auth -l app=mock-oauth2 --context $(KUBECONTEXT) &> /dev/null || (echo -e "❌  Error deploying mock-oauth2." && exit 1)
 	@kubectl wait pod --for=condition=Ready --timeout=60s -n auth -l app=mock-oauth2 --context $(KUBECONTEXT) &> /dev/null || (echo -e "❌  Error deploying mock-oauth2-server." && exit 1)
 	@echo -e "✅  mock-oauth2-server deployed to the Kind cluster"
