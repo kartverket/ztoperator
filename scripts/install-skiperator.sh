@@ -40,8 +40,7 @@ for resource in "${SKIPERATOR_RESOURCES[@]}"; do
 done
 
 echo "🕑  Waiting for cert-manager to be ready..."
-kubectl wait pod --for=create --timeout=120s -n cert-manager -l app=cert-manager
-kubectl wait pod --for=condition=Ready --timeout=120s -n cert-manager -l app=cert-manager
+kubectl -n cert-manager wait deploy --all --for=condition=Available --timeout=30s
 
 # Configure cert-manager clusterissuer
 kubectl apply --context "$KUBECONTEXT" -f <(cat <<EOF
