@@ -224,7 +224,7 @@ skiperator:
 .PHONY: mock-oauth2
 mock-oauth2:
 	@echo -e "🤞  Deploying 'mock-oauth2'..."
-	@KUBECONTEXT=$(KUBECONTEXT) bash ./scripts/install-mock-oauth2.sh
+	@KUBECONTEXT=$(KUBECONTEXT) MOCK_OAUTH2_CONFIG=mock-oauth2-server-config.json bash ./scripts/install-mock-oauth2.sh
 	@echo -e "✅  'mock-oauth2' is ready and running"
 
 .PHONY: setup-local-test
