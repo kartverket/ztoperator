@@ -155,8 +155,11 @@ $(CHAINSAW): $(LOCALBIN)
 
 .PHONY: helm
 helm:
-	# Check if istio helm repo is installed and add if not
-	@helm repo list | grep istio || (echo "Adding istio helm repo..." && helm repo add istio https://istio-release.storage.googleapis.com/charts && helm repo update)
+	# Ensure istio helm repo exists
+	@helm repo list | grep -q '^istio\s' || (echo "Adding istio helm repo..." && helm repo add istio https://istio-release.storage.googleapis.com/charts)
+	# Make sure the requested ISTIO_VERSION is available; update index if not
+	@helm search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "Updating Helm repos to fetch Istio charts..." && helm repo update)
+	@helm search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "❌ Istio Helm chart version $(ISTIO_VERSION) not found in repo index." && echo "   Tip: check available versions with: helm search repo istio/gateway --versions" && exit 1)
 
 .PHONY: virtualenv
 virtualenv:
@@ -244,7 +247,7 @@ install-istio-gateways: helm install-istio
 	@echo "Creating istio-gateways namespace..."
 	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) || true
 	@echo "Installing istio-gateways"
-	@helm --kube-context $(KUBECONTEXT) install istio-ingressgateway istio/gateway -n istio-gateways --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	@helm --kube-context $(KUBECONTEXT) install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) -n istio-gateways --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
 	@echo "Istio gateways installed."
 
 .PHONY: install-sample
