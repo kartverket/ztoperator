@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kartverket/ztoperator/pkg/metrics"
 	"go.uber.org/zap/zapcore"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -180,8 +181,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	setupLog.Info("registering custom prometheus metrics")
+	metrics.MustRegister()
+
+	// start the custom metrics collector before the blocking mgr.Start call
+	// run it in its own goroutine so the manager can still start
+	ctx := ctrl.SetupSignalHandler()
+	go func() {
+		setupLog.Info("starting periodic custom metrics collector")
+		if startingCustomMetricsCollector := metrics.StartAuthPolicyCollector(mgr.GetClient(), mgr.GetCache(), mgr.Elected()); startingCustomMetricsCollector != nil {
+			setupLog.Error(startingCustomMetricsCollector, "problem starting custom metrics collector")
+			os.Exit(1)
+		}
+	}()
+
 	setupLog.Info("starting manager")
-	if startingMngErr := mgr.Start(ctrl.SetupSignalHandler()); startingMngErr != nil {
+	if startingMngErr := mgr.Start(ctx); startingMngErr != nil {
 		setupLog.Error(startingMngErr, "problem running manager")
 		os.Exit(1)
 	}

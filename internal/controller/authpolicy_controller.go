@@ -11,6 +11,7 @@ import (
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/log"
+	"github.com/kartverket/ztoperator/pkg/metrics"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/deny"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore"
@@ -109,6 +110,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			rLog.Debug(
 				fmt.Sprintf("AuthPolicy with name %s not found. Probably a delete.", req.NamespacedName.String()),
 			)
+			metrics.AuthPolicyInfo.DeletePartialMatch(map[string]string{
+				"name":      req.Name,
+				"namespace": req.Namespace,
+			})
 			return reconcile.Result{}, nil
 		}
 		rLog.Error(err, fmt.Sprintf("Failed to get AuthPolicy with name %s", req.NamespacedName.String()))
@@ -128,6 +133,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	if !authPolicy.DeletionTimestamp.IsZero() {
 		rLog.Info(fmt.Sprintf("Deleting AuthPolicy with name %s", req.NamespacedName.String()))
+		metrics.AuthPolicyInfo.DeletePartialMatch(map[string]string{
+			"name":      req.Name,
+			"namespace": req.Namespace,
+		})
 		return ctrl.Result{}, nil
 	}
 
@@ -400,6 +409,15 @@ func (r *AuthPolicyReconciler) updateStatus(
 		authPolicyCondition.Status = metav1.ConditionTrue
 		authPolicyCondition.Reason = "ReconciliationSuccess"
 		authPolicyCondition.Message = "Descendants of AuthPolicy reconciled successfully."
+	}
+
+	metrics.AuthPolicyInfo.DeletePartialMatch(map[string]string{
+		"name":      ap.Name,
+		"namespace": ap.Namespace,
+	})
+	err := metrics.RefreshAuthPolicyInfo(ctx, r.Client, ap)
+	if err != nil {
+		rLog.Error(err, "failed to update custom metric due to the following error: "+err.Error())
 	}
 
 	var conditions []metav1.Condition
