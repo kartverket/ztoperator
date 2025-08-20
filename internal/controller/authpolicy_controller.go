@@ -411,17 +411,6 @@ func (r *AuthPolicyReconciler) updateStatus(
 		authPolicyCondition.Message = "Descendants of AuthPolicy reconciled successfully."
 	}
 
-	metrics.DeleteAuthPolicyInfo(
-		types.NamespacedName{
-			Name:      ap.Name,
-			Namespace: ap.Namespace,
-		},
-	)
-	err := metrics.RefreshAuthPolicyInfo(ctx, r.Client, ap)
-	if err != nil {
-		rLog.Error(err, "failed to update custom metric due to the following error: "+err.Error())
-	}
-
 	var conditions []metav1.Condition
 	descendantIDs := map[string]bool{}
 
@@ -490,6 +479,16 @@ func (r *AuthPolicyReconciler) updateStatusWithRetriesOnConflict(
 	ctx context.Context,
 	authPolicy ztoperatorv1alpha1.AuthPolicy,
 ) error {
+	metrics.DeleteAuthPolicyInfo(
+		types.NamespacedName{
+			Name:      authPolicy.Name,
+			Namespace: authPolicy.Namespace,
+		},
+	)
+	refreshAuthPolicyCustomMetricsErr := metrics.RefreshAuthPolicyInfo(ctx, r.Client, authPolicy)
+	if refreshAuthPolicyCustomMetricsErr != nil {
+		return refreshAuthPolicyCustomMetricsErr
+	}
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		latest := &ztoperatorv1alpha1.AuthPolicy{}
 		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(&authPolicy), latest); err != nil {
