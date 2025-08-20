@@ -137,6 +137,12 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	scope, err := resolveAuthPolicy(ctx, r.Client, authPolicy)
 	if err != nil {
 		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.NamespacedName.String()))
+		authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
+		authPolicy.Status.Message = err.Error()
+		updateStatusOnResolveFailedErr := r.updateStatusWithRetriesOnConflict(ctx, *authPolicy)
+		if updateStatusOnResolveFailedErr != nil {
+			return ctrl.Result{}, updateStatusOnResolveFailedErr
+		}
 		return reconcile.Result{}, err
 	}
 

@@ -27,9 +27,18 @@ var (
 			Name:      "info",
 			Namespace: "ztoperator",
 			Subsystem: "authpolicy",
-			Help:      "AuthPolicy info: 1 per policy with labels name, namespace, state, owner, issuer, enabled, auto_login_enabled",
+			Help:      "AuthPolicy info: 1 per policy with labels name, namespace, state, owner, issuer, enabled, auto_login_enabled, protected_skiperator_application",
 		},
-		[]string{"name", "namespace", "state", "owner", "issuer", "enabled", "auto_login_enabled"},
+		[]string{
+			"name",
+			"namespace",
+			"state",
+			"owner",
+			"issuer",
+			"enabled",
+			"auto_login_enabled",
+			"protected_skiperator_application",
+		},
 	)
 	logger = log.Logger{Logger: ctrl.Log.WithName("metrics")}
 )
@@ -75,20 +84,55 @@ func RefreshAuthPolicyInfo(ctx context.Context, k8sClient client.Client, authPol
 		)
 	}
 
+	var podList v1.PodList
+	if listErr := k8sClient.List(
+		ctx,
+		&podList,
+		client.InNamespace(authPolicy.Namespace),
+		client.MatchingLabels(authPolicy.Spec.Selector.MatchLabels),
+	); listErr != nil {
+		return fmt.Errorf(
+			"failed to get list of pods with the label: %s from authpolicy {%s, %s} due to the following error: %w",
+			authPolicy.Spec.Selector.MatchLabels,
+			authPolicy.Namespace,
+			authPolicy.Name,
+			listErr,
+		)
+	}
+
 	var autoLoginEnabled = false
 	if authPolicy.Spec.AutoLogin != nil {
 		autoLoginEnabled = authPolicy.Spec.AutoLogin.Enabled
 	}
 
-	authPolicyInfo.WithLabelValues(
-		authPolicy.Name,
-		authPolicy.Namespace,
-		string(authPolicy.Status.Phase),
-		namespace.Labels["team"],
-		idpAsParsedURL.Scheme+"://"+idpAsParsedURL.Hostname(),
-		strconv.FormatBool(authPolicy.Spec.Enabled),
-		strconv.FormatBool(autoLoginEnabled),
-	).Set(1)
+	if len(podList.Items) == 0 {
+		authPolicyInfo.WithLabelValues(
+			authPolicy.Name,
+			authPolicy.Namespace,
+			string(authPolicy.Status.Phase),
+			namespace.Labels["team"],
+			idpAsParsedURL.Scheme+"://"+idpAsParsedURL.Hostname(),
+			strconv.FormatBool(authPolicy.Spec.Enabled),
+			strconv.FormatBool(autoLoginEnabled),
+			"",
+		).Set(1)
+	}
+
+	for _, pod := range podList.Items {
+		appName := pod.Labels["application.skiperator.no/app-name"]
+
+		authPolicyInfo.WithLabelValues(
+			authPolicy.Name,
+			authPolicy.Namespace,
+			string(authPolicy.Status.Phase),
+			namespace.Labels["team"],
+			idpAsParsedURL.Scheme+"://"+idpAsParsedURL.Hostname(),
+			strconv.FormatBool(authPolicy.Spec.Enabled),
+			strconv.FormatBool(autoLoginEnabled),
+			appName,
+		).Set(1)
+	}
+
 	logger.Debug(
 		"Successfully refreshed auth policy",
 		"namespace", authPolicy.Namespace,
