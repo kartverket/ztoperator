@@ -110,10 +110,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			rLog.Debug(
 				fmt.Sprintf("AuthPolicy with name %s not found. Probably a delete.", req.NamespacedName.String()),
 			)
-			metrics.AuthPolicyInfo.DeletePartialMatch(map[string]string{
-				"name":      req.Name,
-				"namespace": req.Namespace,
-			})
+			metrics.DeleteAuthPolicyInfo(req.NamespacedName)
 			return reconcile.Result{}, nil
 		}
 		rLog.Error(err, fmt.Sprintf("Failed to get AuthPolicy with name %s", req.NamespacedName.String()))
@@ -133,10 +130,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	if !authPolicy.DeletionTimestamp.IsZero() {
 		rLog.Info(fmt.Sprintf("Deleting AuthPolicy with name %s", req.NamespacedName.String()))
-		metrics.AuthPolicyInfo.DeletePartialMatch(map[string]string{
-			"name":      req.Name,
-			"namespace": req.Namespace,
-		})
+		metrics.DeleteAuthPolicyInfo(req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 
@@ -411,10 +405,12 @@ func (r *AuthPolicyReconciler) updateStatus(
 		authPolicyCondition.Message = "Descendants of AuthPolicy reconciled successfully."
 	}
 
-	metrics.AuthPolicyInfo.DeletePartialMatch(map[string]string{
-		"name":      ap.Name,
-		"namespace": ap.Namespace,
-	})
+	metrics.DeleteAuthPolicyInfo(
+		types.NamespacedName{
+			Name:      ap.Name,
+			Namespace: ap.Namespace,
+		},
+	)
 	err := metrics.RefreshAuthPolicyInfo(ctx, r.Client, ap)
 	if err != nil {
 		rLog.Error(err, "failed to update custom metric due to the following error: "+err.Error())
@@ -468,8 +464,15 @@ func (r *AuthPolicyReconciler) updateStatus(
 
 	if !equality.Semantic.DeepEqual(original.Status, ap.Status) {
 		rLog.Debug(fmt.Sprintf("Updating AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
-		if err := r.updateStatusWithRetriesOnConflict(ctx, ap); err != nil {
-			rLog.Error(err, fmt.Sprintf("Failed to update AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
+		if updateStatusWithRetriesErr := r.updateStatusWithRetriesOnConflict(ctx, ap); updateStatusWithRetriesErr != nil {
+			rLog.Error(
+				updateStatusWithRetriesErr,
+				fmt.Sprintf(
+					"Failed to update AuthPolicy status with name %s/%s",
+					ap.Namespace,
+					ap.Name,
+				),
+			)
 			r.Recorder.Eventf(&ap, "Warning", "StatusUpdateFailed", "Status update of AuthPolicy failed.")
 		} else {
 			r.Recorder.Eventf(&ap, "Normal", "StatusUpdateSuccess", "Status update of AuthPolicy updated successfully.")

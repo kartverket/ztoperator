@@ -12,27 +12,30 @@ import (
 	"github.com/kartverket/ztoperator/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
+const collectorInterval = 30 * time.Second
+
 var (
-	AuthPolicyInfo = prometheus.NewGaugeVec(
+	authPolicyInfo = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name:      "info",
 			Namespace: "ztoperator",
 			Subsystem: "authpolicy",
-			Help:      "AuthPolicy info: 1 per policy with labels name, namespace, state, owner, issuer, enabled, autoLoginEnabled",
+			Help:      "AuthPolicy info: 1 per policy with labels name, namespace, state, owner, issuer, enabled, auto_login_enabled",
 		},
-		[]string{"name", "namespace", "state", "owner", "issuer", "enabled", "autoLoginEnabled"},
+		[]string{"name", "namespace", "state", "owner", "issuer", "enabled", "auto_login_enabled"},
 	)
 	logger = log.Logger{Logger: ctrl.Log.WithName("metrics")}
 )
 
 func MustRegister() {
-	metrics.Registry.MustRegister(AuthPolicyInfo)
+	metrics.Registry.MustRegister(authPolicyInfo)
 }
 
 func StartAuthPolicyCollector(k8sClient client.Client, c cache.Cache, elected <-chan struct{}) error {
@@ -44,7 +47,7 @@ func StartAuthPolicyCollector(k8sClient client.Client, c cache.Cache, elected <-
 
 	go func() {
 		<-elected
-		t := time.NewTicker(30 * time.Second)
+		t := time.NewTicker(collectorInterval)
 		defer t.Stop()
 		for {
 			refreshOnce(ctx, k8sClient)
@@ -55,13 +58,21 @@ func StartAuthPolicyCollector(k8sClient client.Client, c cache.Cache, elected <-
 }
 
 func RefreshAuthPolicyInfo(ctx context.Context, k8sClient client.Client, authPolicy v1alpha1.AuthPolicy) error {
-	logger.Debug(fmt.Sprintf("Refreshing auth policy info for {%s, %s}", authPolicy.Namespace, authPolicy.Name))
+	logger.Debug(
+		"Refreshing auth policy info",
+		"namespace", authPolicy.Namespace,
+		"name", authPolicy.Name,
+	)
 	var namespace v1.Namespace
 	_ = k8sClient.Get(ctx, client.ObjectKey{Name: authPolicy.Namespace}, &namespace)
 
 	idpAsParsedURL, err := utils.GetParsedURL(authPolicy.Spec.WellKnownURI)
 	if err != nil {
-		return fmt.Errorf("failed to get issuer hostname from issuer URI %s due to the following error: %w", authPolicy.Spec.WellKnownURI, err)
+		return fmt.Errorf(
+			"failed to get issuer hostname from issuer URI %s due to the following error: %w",
+			authPolicy.Spec.WellKnownURI,
+			err,
+		)
 	}
 
 	var autoLoginEnabled = false
@@ -69,7 +80,7 @@ func RefreshAuthPolicyInfo(ctx context.Context, k8sClient client.Client, authPol
 		autoLoginEnabled = authPolicy.Spec.AutoLogin.Enabled
 	}
 
-	AuthPolicyInfo.WithLabelValues(
+	authPolicyInfo.WithLabelValues(
 		authPolicy.Name,
 		authPolicy.Namespace,
 		string(authPolicy.Status.Phase),
@@ -78,13 +89,24 @@ func RefreshAuthPolicyInfo(ctx context.Context, k8sClient client.Client, authPol
 		strconv.FormatBool(authPolicy.Spec.Enabled),
 		strconv.FormatBool(autoLoginEnabled),
 	).Set(1)
-	logger.Debug(fmt.Sprintf("Successfully refreshed auth policy info for {%s, %s}", authPolicy.Namespace, authPolicy.Name))
+	logger.Debug(
+		"Successfully refreshed auth policy",
+		"namespace", authPolicy.Namespace,
+		"name", authPolicy.Name,
+	)
 	return nil
+}
+
+func DeleteAuthPolicyInfo(namespacedName types.NamespacedName) {
+	authPolicyInfo.DeletePartialMatch(map[string]string{
+		"name":      namespacedName.Name,
+		"namespace": namespacedName.Namespace,
+	})
 }
 
 func refreshOnce(ctx context.Context, k8sClient client.Client) {
 	logger.Debug("Clearing the metrics")
-	AuthPolicyInfo.Reset()
+	authPolicyInfo.Reset()
 	var authPolicyList v1alpha1.AuthPolicyList
 
 	logger.Debug("Fetching AuthPolicies")
