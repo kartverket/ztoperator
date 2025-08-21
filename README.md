@@ -6,6 +6,18 @@
 
 At the heart of Ztoperator is the custom resource definition (**CRD**) `AuthPolicy`, which provides a high-level abstraction for configuring authentication and authorization rules using **OAuth 2.0** and **OpenID Connect (OIDC)**.
 
+## 📚 Table of Contents
+
+- [✨ Core Functionality](#-core-functionality)
+- [🔧 Example AuthPolicy](#-example-authpolicy)
+- [🧪 Local Development](#-local-development)
+- [🔍 How Ztoperator Works](#-how-ztoperator-works)
+- [⚡️ Istio Compatibility](#️-istio-compatibility)
+- [🛠️ EnvoyFilter Execution Order](#️-envoyfilter-execution-order)
+- [📊 Ztoperator Prometheus Metrics](#-ztoperator-prometheus-metrics)
+
+
+
 ---
 
 ## ✨ Core Functionality
@@ -18,9 +30,7 @@ Ztoperator introduces a single CRD: `AuthPolicy`. It allows you to:
 - Authorize access based on JWT claims using [Istio's `AuthorizationPolicy`](https://istio.io/latest/docs/reference/config/security/authorization-policy/).
 - Optionally support the **OAuth 2.0 Authorization Code Flow** using Envoy’s [OAuth2 filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter).
 
----
-
-### 🔧 Example `AuthPolicy`
+## 🔧 Example `AuthPolicy`
 
 The following `AuthPolicy` manifest configures access control for workloads labeled `app: some-app`. 
 It integrates with an external OAuth 2.0 and OpenID Connect (OIDC) provider with a well-known endpoint at `https://example.com/.well-known/openid-configuration`.
@@ -75,13 +85,9 @@ spec:
         - GET
 ```
 
----
-
 ## 🧪 Local Development
 
 Refer to [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to run and test Ztoperator locally.
-
----
 
 ## 🔍 How Ztoperator Works
 
@@ -101,9 +107,12 @@ The diagram below shows how Ztoperator configures multiple Envoy filters inside 
   <img alt="The EnvoyFilters used and their execution in the Istio sidecar proxy." src="./ztoperator_arch_light.png" width="600">
 </picture>
 
----
+## ⚡️ Istio Compatibility
 
-### 🛠️ EnvoyFilter Execution Order
+Ztoperator is tested and compatible with **Istio 1.27.x**. You should ensure that your cluster is running Istio version 1.27 (any patch release) 
+for Ztoperator to function as expected. Other versions of Istio may not be fully supported and could result in unexpected behavior.
+
+## 🛠️ EnvoyFilter Execution Order
 
 The Envoy filters are applied in a strict sequence:
 
@@ -113,3 +122,21 @@ The Envoy filters are applied in a strict sequence:
 
 > [!NOTE]
 > The `rbac` filter only evaluates rules **after** successful JWT validation, and enforce rules based on claims provided by the `jwt-auth` filter. Consequently, if JWT validation fails, the request is denied before authorization rules are checked.
+
+## 📊 Ztoperator Prometheus Metrics
+
+Ztoperator exposes both the **standard out-of-the-box metrics** provided by
+[operator-sdk](https://sdk.operatorframework.io/docs/building-operators/golang/advanced-topics/metrics/)
+as well as a **custom metric** called `ztoperator_authpolicy_info`.
+
+`ztoperator_authpolicy_info` is a gauge vector with the following labels:
+
+- `name`: Name of the `AuthPolicy`
+- `namespace`: Namespace where the `AuthPolicy` resides
+- `state`: Observed state of the `AuthPolicy` (`Pending`, `Ready`, `Failed`, `Invalid`)
+- `owner`: Value of the `team` label on the namespace resource where the `AuthPolicy` resides
+- `issuer`: Configured OAuth 2.0 issuer
+- `enabled`: Whether the `AuthPolicy` is enabled
+- `auto_login_enabled`: Whether auto-login is enabled
+- `protected_pod`: The name of the pod protected by the `AuthPolicy`
+- `protected_deployment`: The name of the deployment the protected pod belongs to
