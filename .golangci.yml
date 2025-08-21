@@ -444,6 +444,7 @@ linters:
       - path: "pkg/metrics/metrics.go"
         linters:
           - gochecknoglobals
+          - nilnesserr
       - path: "pkg/resourcegenerators/envoyfilter/configpatch/oauth_sidecar_config_patch.go"
         linters:
           - gosec

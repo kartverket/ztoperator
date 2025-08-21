@@ -86,20 +86,9 @@ func RefreshAuthPolicyInfo(ctx context.Context, k8sClient client.Client, authPol
 		)
 	}
 
-	var podList v1.PodList
-	if listErr := k8sClient.List(
-		ctx,
-		&podList,
-		client.InNamespace(authPolicy.Namespace),
-		client.MatchingLabels(authPolicy.Spec.Selector.MatchLabels),
-	); listErr != nil {
-		return fmt.Errorf(
-			"failed to get list of pods with the label: %s from authpolicy {%s, %s} due to the following error: %w",
-			authPolicy.Spec.Selector.MatchLabels,
-			authPolicy.Namespace,
-			authPolicy.Name,
-			listErr,
-		)
+	protectedPods, getProtectedPodsErr := getProtectedPods(ctx, k8sClient, authPolicy)
+	if getProtectedPodsErr != nil {
+		return err
 	}
 
 	var autoLoginEnabled = false
@@ -107,7 +96,7 @@ func RefreshAuthPolicyInfo(ctx context.Context, k8sClient client.Client, authPol
 		autoLoginEnabled = authPolicy.Spec.AutoLogin.Enabled
 	}
 
-	if len(podList.Items) == 0 {
+	if len(*protectedPods) == 0 {
 		authPolicyInfo.WithLabelValues(
 			authPolicy.Name,
 			authPolicy.Namespace,
@@ -121,34 +110,8 @@ func RefreshAuthPolicyInfo(ctx context.Context, k8sClient client.Client, authPol
 		).Set(1)
 	}
 
-	for _, pod := range podList.Items {
-		var replicaSetNames []string
-		for _, podOwnerRef := range pod.OwnerReferences {
-			if podOwnerRef.Kind == "ReplicaSet" {
-				replicaSetNames = append(replicaSetNames, podOwnerRef.Name)
-			}
-		}
-		var replicaSets []v2.ReplicaSet
-		for _, replicaSetName := range replicaSetNames {
-			var replicaSet v2.ReplicaSet
-			_ = k8sClient.Get(
-				ctx,
-				client.ObjectKey{
-					Namespace: authPolicy.Namespace,
-					Name:      replicaSetName,
-				},
-				&replicaSet,
-			)
-			replicaSets = append(replicaSets, replicaSet)
-		}
-		var deploymentNames []string
-		for _, replicaSet := range replicaSets {
-			for _, replicaSetOwnerRef := range replicaSet.OwnerReferences {
-				if replicaSetOwnerRef.Kind == "Deployment" {
-					deploymentNames = append(deploymentNames, replicaSetOwnerRef.Name)
-				}
-			}
-		}
+	for _, pod := range *protectedPods {
+		deploymentNames := getDeploymentNames(ctx, k8sClient, pod)
 		for _, deploymentName := range deploymentNames {
 			authPolicyInfo.WithLabelValues(
 				authPolicy.Name,
@@ -198,4 +161,54 @@ func refreshOnce(ctx context.Context, k8sClient client.Client) {
 			)
 		}
 	}
+}
+
+func getProtectedPods(ctx context.Context, k8sClient client.Client, authPolicy v1alpha1.AuthPolicy) (*[]v1.Pod, error) {
+	var podList v1.PodList
+	if listErr := k8sClient.List(
+		ctx,
+		&podList,
+		client.InNamespace(authPolicy.Namespace),
+		client.MatchingLabels(authPolicy.Spec.Selector.MatchLabels),
+	); listErr != nil {
+		return nil, fmt.Errorf(
+			"failed to get list of pods with the label: %s from authpolicy {%s, %s} due to the following error: %w",
+			authPolicy.Spec.Selector.MatchLabels,
+			authPolicy.Namespace,
+			authPolicy.Name,
+			listErr,
+		)
+	}
+	return &podList.Items, nil
+}
+
+func getDeploymentNames(ctx context.Context, k8sClient client.Client, pod v1.Pod) []string {
+	var replicaSetNames []string
+	for _, podOwnerRef := range pod.OwnerReferences {
+		if podOwnerRef.Kind == "ReplicaSet" {
+			replicaSetNames = append(replicaSetNames, podOwnerRef.Name)
+		}
+	}
+	var replicaSets []v2.ReplicaSet
+	for _, replicaSetName := range replicaSetNames {
+		var replicaSet v2.ReplicaSet
+		_ = k8sClient.Get(
+			ctx,
+			client.ObjectKey{
+				Namespace: pod.Namespace,
+				Name:      replicaSetName,
+			},
+			&replicaSet,
+		)
+		replicaSets = append(replicaSets, replicaSet)
+	}
+	var deploymentNames []string
+	for _, replicaSet := range replicaSets {
+		for _, replicaSetOwnerRef := range replicaSet.OwnerReferences {
+			if replicaSetOwnerRef.Kind == "Deployment" {
+				deploymentNames = append(deploymentNames, replicaSetOwnerRef.Name)
+			}
+		}
+	}
+	return deploymentNames
 }
