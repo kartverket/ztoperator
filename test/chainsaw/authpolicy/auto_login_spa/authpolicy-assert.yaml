@@ -185,11 +185,12 @@ spec:
                 - name: x-deny-redirect
                   string_match:
                     exact: "true"
+              end_session_endpoint: http://mock-oauth2.auth:8080/entraid/endsession
               forward_bearer_token: true
               pass_through_matcher:
-                - name: "authorization"
+                - name: authorization
                   string_match:
-                    prefix: "Bearer "
+                    prefix: 'Bearer '
                 - name: x-bypass-login
                   string_match:
                     exact: "true"

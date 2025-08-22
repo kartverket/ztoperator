@@ -16,7 +16,6 @@ export ARCH := $(shell if [ "$(shell uname -m)" = "x86_64" ]; then echo "amd64";
 extract-version = $(shell cat go.mod | grep $(1) | awk '{$$1=$$1};1' | cut -d' ' -f2 | sed 's/^v//')
 
 CONTAINER_TOOL             ?= docker
-OPERATOR_SDK_VERSION       ?= v1.38.0
 IMG                        ?= ztoperator:latest
 KIND_CLUSTER_NAME          ?= ztoperator
 KUBECONTEXT                ?= kind-$(KIND_CLUSTER_NAME)
@@ -156,8 +155,11 @@ $(CHAINSAW): $(LOCALBIN)
 
 .PHONY: helm
 helm:
-	# Check if istio helm repo is installed and add if not
-	@helm repo list | grep istio || (echo "Adding istio helm repo..." && helm repo add istio https://istio-release.storage.googleapis.com/charts && helm repo update)
+	# Ensure istio helm repo exists
+	@helm repo list | grep -q '^istio\s' || (echo "Adding istio helm repo..." && helm repo add istio https://istio-release.storage.googleapis.com/charts)
+	# Make sure the requested ISTIO_VERSION is available; update index if not
+	@helm search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "Updating Helm repos to fetch Istio charts..." && helm repo update)
+	@helm search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "❌ Istio Helm chart version $(ISTIO_VERSION) not found in repo index." && echo "   Tip: check available versions with: helm search repo istio/gateway --versions" && exit 1)
 
 .PHONY: virtualenv
 virtualenv:
@@ -184,35 +186,49 @@ endef
 
 
 ### CUSTOM TARGETS ###
+ensureflox:
+	@if ! command -v "flox" >/dev/null 2>&1; then \
+		echo -e "❌  Flox is not installed. Please install Flox (https://flox.dev/docs/install-flox/) and try again."; \
+		exit 1; \
+	fi
+ifndef FLOX_ENV
+	echo -e "❌  Flox is not activated. Please activate flox with 'flox activate' and try again." && exit 1
+endif
+
 .PHONY: run-local
 run-local: build install
 	./bin/ztoperator
 
 .PHONY: setup-local
-setup-local: kind-cluster install-istio-gateways install
+setup-local: ensureflox kind-cluster install-istio-gateways install
 	@echo "Cluster $(KUBECONTEXT) is setup"
 
 #### KIND ####
 .PHONY: check-kind
-check-kind:
+check-kind: ensureflox
 	@which kind >/dev/null || (echo "kind not installed, please install it to proceed"; exit 1)
 
 .PHONY: kind-cluster
-kind-cluster: check-kind
+kind-cluster: ensureflox check-kind
 	@echo Create kind cluster... >&2
 	@kind create cluster --image $(KIND_IMAGE) --name ${KIND_CLUSTER_NAME}
 
-.PHONY: install-skiperator
-install-skiperator:
-	@kubectl create namespace skiperator-system --context $(KUBECONTEXT) || true
-	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-skiperator.sh
+.PHONY: skiperator
+skiperator:
+	@echo -e "🤞  Installing Skiperator..."
+	@kubectl create namespace skiperator-system --context $(KUBECONTEXT) || (echo -e "❌  Error creating 'skiperator-system' namespace." && exit 1)
+	@KUBECONTEXT=$(KUBECONTEXT) bash ./scripts/install-skiperator.sh
+	@kubectl wait pod --for=condition=ready --timeout=30s -n skiperator-system -l app=skiperator || (echo -e "❌  Error deploying Skiperator." && exit 1)
+	@echo -e "✅  Skiperator installed in namespace 'skiperator-system'!"
 
-.PHONY: install-mock-oauth2
-install-mock-oauth2:
-	@KUBECONTEXT=$(KUBECONTEXT) ./scripts/install-mock-oauth2.sh --config ./scripts/mock-oauth2-server-config.json
+.PHONY: mock-oauth2
+mock-oauth2:
+	@echo -e "🤞  Deploying 'mock-oauth2'..."
+	@KUBECONTEXT=$(KUBECONTEXT) MOCK_OAUTH2_CONFIG=scripts/mock-oauth2-server-config.json bash ./scripts/install-mock-oauth2.sh
+	@echo -e "✅  'mock-oauth2' is ready and running"
 
 .PHONY: setup-local-test
-setup-local-test: install-skiperator install-mock-oauth2 expose-ingress virtualenv
+setup-local-test: ensureflox setup-local skiperator mock-oauth2 expose-ingress virtualenv
 
 #### ZTOPERATOR DEPENDENCIES ####
 
@@ -229,7 +245,7 @@ install-istio-gateways: helm install-istio
 	@echo "Creating istio-gateways namespace..."
 	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) || true
 	@echo "Installing istio-gateways"
-	@helm --kube-context $(KUBECONTEXT) install istio-ingressgateway istio/gateway -n istio-gateways --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	@helm --kube-context $(KUBECONTEXT) install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) -n istio-gateways --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
 	@echo "Istio gateways installed."
 
 .PHONY: install-sample
@@ -251,7 +267,7 @@ test-single: chainsaw install
 .PHONY: test
 test:
 	@echo "Checking if ztoperator is running..."
-	@lsof -i :8081 | grep ___Ztoper  > /dev/null || (echo "ztoperator is not running. Please start it first." && exit 1)
+	@lsof -i :8081 | grep -E '___Ztoper|___1Ztope' > /dev/null || (echo "ztoperator is not running. Please start it first." && exit 1)
 	@echo "ztoperator is running. Proceeding with tests..."
 	@bash -ec ' \
 		for dir in test/chainsaw/authpolicy/*/ ; do \
@@ -282,7 +298,7 @@ export IMAGE_PULL_1_TOKEN :=
 run-test: build
 	@echo "Starting ztoperator in background..."
 	@LOG_FILE=$$(mktemp -t ztoperator-test.XXXXXXX); \
-	./bin/ztoperator > "$$LOG_FILE" 2>&1 & \
+	./bin/ztoperator -metrics-bind-address=0.0.0.0:8181 -metrics-secure=false > "$$LOG_FILE" 2>&1 & \
 	PID=$$!; \
 	echo "ztoperator PID: $$PID"; \
 	echo "Log redirected to file: $$LOG_FILE"; \
