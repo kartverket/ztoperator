@@ -22,7 +22,7 @@ jobs:
         with:
           version: 'v3.17.3'
 
-      - uses: gacts/install-hurl@v1.3.1
+      - uses: gacts/install-hurl@8c80c69c281b4b618858de1e1a9ce931e9e61c97
 
       - name: Create k8s Kind Cluster
         uses: helm/kind-action@v1.12.0
