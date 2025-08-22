@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,18 +30,23 @@ var (
 
 func LowestNonZeroResult(i, j ctrl.Result) ctrl.Result {
 	switch {
+	case i.IsZero() && j.IsZero():
+		return ctrl.Result{}
 	case i.IsZero():
 		return j
 	case j.IsZero():
 		return i
-	case i.Requeue:
-		return i
-	case j.Requeue:
+	case i.RequeueAfter != 0 && j.RequeueAfter != 0:
+		if i.RequeueAfter < j.RequeueAfter {
+			return i
+		}
 		return j
-	case i.RequeueAfter < j.RequeueAfter:
+	case i.RequeueAfter != 0:
 		return i
+	case j.RequeueAfter != 0:
+		return j
 	default:
-		return j
+		return ctrl.Result{RequeueAfter: 0 * time.Second}
 	}
 }
 
