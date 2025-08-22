@@ -10,7 +10,7 @@ require (
 	istio.io/client-go v1.27.0
 	k8s.io/api v0.33.3
 	k8s.io/apimachinery v0.33.3
-	k8s.io/client-go v0.33.0
+	k8s.io/client-go v0.33.1
 	resty.dev/v3 v3.0.0-beta.3
 	sigs.k8s.io/controller-runtime v0.20.4
 	sigs.k8s.io/kustomize/kyaml v0.20.1
