@@ -11,6 +11,7 @@ import (
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/log"
+	"github.com/kartverket/ztoperator/pkg/metrics"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/deny"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore"
@@ -109,6 +110,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			rLog.Debug(
 				fmt.Sprintf("AuthPolicy with name %s not found. Probably a delete.", req.NamespacedName.String()),
 			)
+			metrics.DeleteAuthPolicyInfo(req.NamespacedName)
 			return reconcile.Result{}, nil
 		}
 		rLog.Error(err, fmt.Sprintf("Failed to get AuthPolicy with name %s", req.NamespacedName.String()))
@@ -128,12 +130,19 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	if !authPolicy.DeletionTimestamp.IsZero() {
 		rLog.Info(fmt.Sprintf("Deleting AuthPolicy with name %s", req.NamespacedName.String()))
+		metrics.DeleteAuthPolicyInfo(req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 
 	scope, err := resolveAuthPolicy(ctx, r.Client, authPolicy)
 	if err != nil {
 		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.NamespacedName.String()))
+		authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
+		authPolicy.Status.Message = err.Error()
+		updateStatusOnResolveFailedErr := r.updateStatusWithRetriesOnConflict(ctx, *authPolicy)
+		if updateStatusOnResolveFailedErr != nil {
+			return ctrl.Result{}, updateStatusOnResolveFailedErr
+		}
 		return reconcile.Result{}, err
 	}
 
@@ -450,8 +459,15 @@ func (r *AuthPolicyReconciler) updateStatus(
 
 	if !equality.Semantic.DeepEqual(original.Status, ap.Status) {
 		rLog.Debug(fmt.Sprintf("Updating AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
-		if err := r.updateStatusWithRetriesOnConflict(ctx, ap); err != nil {
-			rLog.Error(err, fmt.Sprintf("Failed to update AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
+		if updateStatusWithRetriesErr := r.updateStatusWithRetriesOnConflict(ctx, ap); updateStatusWithRetriesErr != nil {
+			rLog.Error(
+				updateStatusWithRetriesErr,
+				fmt.Sprintf(
+					"Failed to update AuthPolicy status with name %s/%s",
+					ap.Namespace,
+					ap.Name,
+				),
+			)
 			r.Recorder.Eventf(&ap, "Warning", "StatusUpdateFailed", "Status update of AuthPolicy failed.")
 		} else {
 			r.Recorder.Eventf(&ap, "Normal", "StatusUpdateSuccess", "Status update of AuthPolicy updated successfully.")
@@ -463,6 +479,16 @@ func (r *AuthPolicyReconciler) updateStatusWithRetriesOnConflict(
 	ctx context.Context,
 	authPolicy ztoperatorv1alpha1.AuthPolicy,
 ) error {
+	metrics.DeleteAuthPolicyInfo(
+		types.NamespacedName{
+			Name:      authPolicy.Name,
+			Namespace: authPolicy.Namespace,
+		},
+	)
+	refreshAuthPolicyCustomMetricsErr := metrics.RefreshAuthPolicyInfo(ctx, r.Client, authPolicy)
+	if refreshAuthPolicyCustomMetricsErr != nil {
+		return refreshAuthPolicyCustomMetricsErr
+	}
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		latest := &ztoperatorv1alpha1.AuthPolicy{}
 		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(&authPolicy), latest); err != nil {
@@ -748,7 +774,7 @@ func resolveAuthPolicy(
 	}
 
 	if discoveryDocument.Issuer == nil || discoveryDocument.JwksURI == nil || discoveryDocument.TokenEndpoint == nil ||
-		discoveryDocument.AuthorizationEndpoint == nil {
+		discoveryDocument.AuthorizationEndpoint == nil || discoveryDocument.EndSessionEndpoint == nil {
 		return nil, fmt.Errorf(
 			"failed to parse discovery document from well-known uri: %s for AuthPolicy with name %s/%s",
 			authPolicy.Spec.WellKnownURI,
@@ -760,6 +786,7 @@ func resolveAuthPolicy(
 	identityProviderUris.JwksURI = *discoveryDocument.JwksURI
 	identityProviderUris.TokenURI = *discoveryDocument.TokenEndpoint
 	identityProviderUris.AuthorizationURI = *discoveryDocument.AuthorizationEndpoint
+	identityProviderUris.EndSessionURI = discoveryDocument.EndSessionEndpoint
 
 	autoLoginConfig := state.AutoLoginConfig{
 		Enabled: false,

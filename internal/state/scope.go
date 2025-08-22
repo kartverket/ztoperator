@@ -23,6 +23,7 @@ type IdentityProviderUris struct {
 	JwksURI          string
 	TokenURI         string
 	AuthorizationURI string
+	EndSessionURI    *string
 }
 
 type AutoLoginConfig struct {
