@@ -52,7 +52,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Log into registry ${{ env.REGISTRY }}
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1
@@ -117,7 +117,7 @@ jobs:
           identity: ztoperator
 
       - name: Checkout apps repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: kartverket/tilgangsstyring-apps
           token: ${{ steps.octo-sts.outputs.token }}
