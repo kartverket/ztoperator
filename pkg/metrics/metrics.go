@@ -11,7 +11,6 @@ import (
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
-	v2 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,7 +27,7 @@ var (
 			Name:      "info",
 			Namespace: "ztoperator",
 			Subsystem: "authpolicy",
-			Help:      "AuthPolicy info: 1 per policy with labels name, namespace, state, owner, issuer, enabled, auto_login_enabled, protected_pod, protected_deployment",
+			Help:      "AuthPolicy info: 1 per policy with labels name, namespace, state, owner, issuer, enabled, auto_login_enabled, protected_pod",
 		},
 		[]string{
 			"name",
@@ -39,7 +38,6 @@ var (
 			"enabled",
 			"auto_login_enabled",
 			"protected_pod",
-			"protected_deployment",
 		},
 	)
 	logger = log.Logger{Logger: ctrl.Log.WithName("metrics")}
@@ -106,25 +104,20 @@ func RefreshAuthPolicyInfo(ctx context.Context, k8sClient client.Client, authPol
 			strconv.FormatBool(authPolicy.Spec.Enabled),
 			strconv.FormatBool(autoLoginEnabled),
 			"",
-			"",
 		).Set(1)
 	}
 
 	for _, pod := range *protectedPods {
-		deploymentNames := getDeploymentNames(ctx, k8sClient, pod)
-		for _, deploymentName := range deploymentNames {
-			authPolicyInfo.WithLabelValues(
-				authPolicy.Name,
-				authPolicy.Namespace,
-				string(authPolicy.Status.Phase),
-				namespace.Labels["team"],
-				idpAsParsedURL.Scheme+"://"+idpAsParsedURL.Hostname(),
-				strconv.FormatBool(authPolicy.Spec.Enabled),
-				strconv.FormatBool(autoLoginEnabled),
-				pod.Name,
-				deploymentName,
-			).Set(1)
-		}
+		authPolicyInfo.WithLabelValues(
+			authPolicy.Name,
+			authPolicy.Namespace,
+			string(authPolicy.Status.Phase),
+			namespace.Labels["team"],
+			idpAsParsedURL.Scheme+"://"+idpAsParsedURL.Hostname(),
+			strconv.FormatBool(authPolicy.Spec.Enabled),
+			strconv.FormatBool(autoLoginEnabled),
+			pod.Name,
+		).Set(1)
 	}
 
 	logger.Debug(
@@ -180,35 +173,4 @@ func getProtectedPods(ctx context.Context, k8sClient client.Client, authPolicy v
 		)
 	}
 	return &podList.Items, nil
-}
-
-func getDeploymentNames(ctx context.Context, k8sClient client.Client, pod v1.Pod) []string {
-	var replicaSetNames []string
-	for _, podOwnerRef := range pod.OwnerReferences {
-		if podOwnerRef.Kind == "ReplicaSet" {
-			replicaSetNames = append(replicaSetNames, podOwnerRef.Name)
-		}
-	}
-	var replicaSets []v2.ReplicaSet
-	for _, replicaSetName := range replicaSetNames {
-		var replicaSet v2.ReplicaSet
-		_ = k8sClient.Get(
-			ctx,
-			client.ObjectKey{
-				Namespace: pod.Namespace,
-				Name:      replicaSetName,
-			},
-			&replicaSet,
-		)
-		replicaSets = append(replicaSets, replicaSet)
-	}
-	var deploymentNames []string
-	for _, replicaSet := range replicaSets {
-		for _, replicaSetOwnerRef := range replicaSet.OwnerReferences {
-			if replicaSetOwnerRef.Kind == "Deployment" {
-				deploymentNames = append(deploymentNames, replicaSetOwnerRef.Name)
-			}
-		}
-	}
-	return deploymentNames
 }
