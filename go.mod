@@ -4,13 +4,14 @@ go 1.24.6
 
 require (
 	github.com/go-logr/logr v1.4.3
+	github.com/prometheus/client_golang v1.23.0
 	go.uber.org/zap v1.27.0
 	google.golang.org/protobuf v1.36.6
 	istio.io/api v1.27.0
 	istio.io/client-go v1.27.0
-	k8s.io/api v0.33.3
-	k8s.io/apimachinery v0.33.3
-	k8s.io/client-go v0.33.1
+	k8s.io/api v0.33.4
+	k8s.io/apimachinery v0.33.4
+	k8s.io/client-go v0.33.4
 	resty.dev/v3 v3.0.0-beta.3
 	sigs.k8s.io/controller-runtime v0.21.0
 	sigs.k8s.io/kustomize/kyaml v0.20.1
@@ -53,7 +54,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.23.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.65.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
