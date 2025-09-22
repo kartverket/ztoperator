@@ -8,8 +8,8 @@ spec:
     - audiences:
         - some-audience
       forwardOriginalToken: true
-      issuer: https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0
-      jwksUri: https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/discovery/v2.0/keys
+      issuer: https://test.idporten.no
+      jwksUri: https://test.idporten.no/jwks.json
   selector:
     matchLabels:
       app: application
@@ -58,7 +58,7 @@ spec:
       when:
         - key: request.auth.claims[iss]
           values:
-            - https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0
+            - https://test.idporten.no
         - key: request.auth.claims[aud]
           values:
             - some-audience
@@ -105,14 +105,14 @@ spec:
                   - endpoint:
                       address:
                         socket_address:
-                          address: login.microsoftonline.com
+                          address: test.idporten.no
                           port_value: 443
           name: oauth
           transport_socket:
             name: envoy.transport_sockets.tls
             typed_config:
               '@type': type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-              sni: login.microsoftonline.com
+              sni: test.idporten.no
           type: LOGICAL_DNS
     - applyTo: HTTP_FILTER
       match:
@@ -134,7 +134,7 @@ spec:
                 - openid
                 - offline_access
                 - User.Read
-              authorization_endpoint: https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/oauth2/v2.0/authorize
+              authorization_endpoint: https://login.test.idporten.no/authorize
               credentials:
                 client_id: entraid_server
                 hmac_secret:
@@ -155,7 +155,7 @@ spec:
                 - name: x-deny-redirect
                   string_match:
                     exact: "true"
-              end_session_endpoint: https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/oauth2/v2.0/logout
+              end_session_endpoint: https://login.test.idporten.no/logout
               forward_bearer_token: true
               pass_through_matcher:
                 - name: authorization
@@ -175,7 +175,7 @@ spec:
               token_endpoint:
                 cluster: oauth
                 timeout: 5s
-                uri: https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/oauth2/v2.0/token
+                uri: https://test.idporten.no/token
               use_refresh_token: true
   workloadSelector:
     labels:
