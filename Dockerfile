@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.24 AS builder
+FROM golang:1.24.6 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -29,6 +29,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o zt
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /workspace/ztoperator .
 USER 65532:65532
 
