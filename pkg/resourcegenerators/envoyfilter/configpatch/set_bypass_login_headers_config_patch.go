@@ -203,11 +203,15 @@ func envoyWildcardsToRE2Regex(path string) string {
 	const doubleStarPlaceholder = "<<DOUBLE_STAR>>"
 	path = strings.ReplaceAll(path, "**", doubleStarPlaceholder)
 	path = strings.ReplaceAll(path, "*", "[^/]+")
+	path = strings.ReplaceAll(path, ".", "%.")
 	return strings.ReplaceAll(path, doubleStarPlaceholder, ".*")
 }
 
 // escapeLuaString ensures any back‑slashes or quotes in the regex are safe for Lua source.
 func escapeLuaString(s string) string {
+	if s == "/" {
+		return "^/$"
+	}
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, `"`, `\"`)
 	return s
