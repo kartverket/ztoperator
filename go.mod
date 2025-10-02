@@ -6,7 +6,7 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/prometheus/client_golang v1.23.0
 	go.uber.org/zap v1.27.0
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.36.10
 	istio.io/api v1.27.1
 	istio.io/client-go v1.27.1
 	k8s.io/api v0.33.3
