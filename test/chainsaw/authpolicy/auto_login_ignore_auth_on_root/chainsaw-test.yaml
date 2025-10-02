@@ -1,0 +1,37 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: auto-login-ignore-auth-on-root
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: application.yaml
+        - create:
+            file: oauth2-credentials.yaml
+        - create:
+            file: authpolicy.yaml
+        - apply:
+            file: wildcard-ingress.yaml
+        - assert:
+            file: application-assert.yaml
+        - assert:
+            file: oauth2-credentials-assert.yaml
+        - assert:
+            file: authpolicy-assert.yaml
+        - script:
+            content: sleep 5
+        - script:
+            content: |
+              hurl --error-format long \
+              --insecure --test tests.hurl \
+              --variable token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client --token_name access_token)" \
+              --variable wrong_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer idporten --code idporten_code --token_name access_token)" \
+              --variable location_header="http://mock-oauth2.auth:8080/entraid/authorize?client_id=entraid_server&code_challenge="
