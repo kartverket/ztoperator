@@ -32,6 +32,7 @@ type AutoLoginConfig struct {
 	RedirectPath string
 	LogoutPath   string
 	Scopes       []string
+	LoginParams  []string
 }
 
 type OAuthCredentials struct {

@@ -799,6 +799,7 @@ func resolveAuthPolicy(
 		autoLoginConfig.RedirectPath = authPolicy.Spec.AutoLogin.RedirectPath
 		autoLoginConfig.LogoutPath = authPolicy.Spec.AutoLogin.LogoutPath
 		autoLoginConfig.Scopes = authPolicy.Spec.AutoLogin.Scopes
+		autoLoginConfig.LoginParams = authPolicy.Spec.AutoLogin.LoginParams
 	}
 
 	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name %s/%s", authPolicy.Namespace, authPolicy.Name))

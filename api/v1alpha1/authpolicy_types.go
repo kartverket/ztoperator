@@ -108,6 +108,11 @@ type AutoLogin struct {
 	//
 	// +kubebuilder:validation:Required
 	Scopes []string `json:"scopes"`
+
+	// LoginParams specifies a list of query parameters to be added in the authorize request made towards the configured identity provider.
+	//
+	// +kubebuilder:validation:Optional
+	LoginParams []string `json:"loginParams,omitempty"`
 }
 
 // OAuthCredentials specifies the kubernetes secret holding OAuth credentials used for authentication.
