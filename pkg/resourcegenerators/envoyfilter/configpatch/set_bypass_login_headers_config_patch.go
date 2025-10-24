@@ -171,7 +171,7 @@ func convertToRE2Regex(requestMatchers []v1alpha1.RequestMatcher) []v1alpha1.Req
 	for _, matcher := range requestMatchers {
 		var pathAsRE2Regex []string
 		for _, path := range matcher.Paths {
-			pathAsRE2Regex = append(pathAsRE2Regex, ConvertRequestMatcherPathToRegex(path))
+			pathAsRE2Regex = append(pathAsRE2Regex, "^"+ConvertRequestMatcherPathToRegex(path))
 		}
 		result = append(result, v1alpha1.RequestMatcher{
 			Paths:   pathAsRE2Regex,
@@ -186,7 +186,7 @@ func ConvertRequestMatcherPathToRegex(path string) string {
 		path = convertToEnvoyWildcards(path)
 		return envoyWildcardsToRE2Regex(path)
 	}
-	return path
+	return path + "$"
 }
 
 func convertToEnvoyWildcards(pathWithIstioWildcards string) string {
