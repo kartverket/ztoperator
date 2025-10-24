@@ -1,0 +1,330 @@
+# RequestAuthentication
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: auth-policy
+spec:
+  jwtRules:
+    - audiences:
+        - entraid_server
+      forwardOriginalToken: true
+      issuer: http://mock-oauth2.auth:8080/entraid
+      jwksUri: http://mock-oauth2.auth:8080/entraid/jwks
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (deny-auth-rules)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-deny-auth-rules
+spec:
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            methods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /*
+      when:
+        - key: request.auth.claims[iss]
+          notValues:
+            - http://mock-oauth2.auth:8080/entraid
+    - to:
+        - operation:
+            methods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /*
+      when:
+        - key: request.auth.claims[aud]
+          notValues:
+            - entraid_server
+    - to:
+        - operation:
+            methods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /*
+      when:
+        - key: request.auth.claims[role]
+          notValues:
+            - entra_user_role
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /
+              - /secure
+              - /secure1
+              - /secure2
+              - /other/path
+              - /other/path1
+      when:
+        - key: request.auth.claims[iss]
+          notValues:
+            - http://mock-oauth2.auth:8080/entraid
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /
+              - /secure
+              - /secure1
+              - /secure2
+              - /other/path
+              - /other/path1
+      when:
+        - key: request.auth.claims[aud]
+          notValues:
+            - entraid_server
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /
+              - /secure
+              - /secure1
+              - /secure2
+              - /other/path
+              - /other/path1
+      when:
+        - key: request.auth.claims[role]
+          notValues:
+            - entra_user_role
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (ignore-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-ignore-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /secure/specific/path1*
+              - /secure/specific/path2*
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (require-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-require-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            notMethods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /*
+        - operation:
+            notMethods:
+              - GET
+            paths:
+              - /
+              - /secure
+              - /secure1
+              - /secure2
+              - /other/path
+              - /other/path1
+        - operation:
+            notMethods:
+              - GET
+            paths:
+              - /secure/specific/path1*
+              - /secure/specific/path2*
+        - operation:
+            notPaths:
+              - /*
+              - /
+              - /secure
+              - /secure1
+              - /secure2
+              - /other/path
+              - /other/path1
+              - /secure/specific/path1*
+              - /secure/specific/path2*
+            paths:
+              - '*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - http://mock-oauth2.auth:8080/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+    - to:
+        - operation:
+            methods:
+              - POST
+              - PUT
+              - DELETE
+            paths:
+              - /*
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - http://mock-oauth2.auth:8080/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+        - key: request.auth.claims[role]
+          values:
+            - entra_user_role
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /
+              - /secure
+              - /secure1
+              - /secure2
+              - /other/path
+              - /other/path1
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - http://mock-oauth2.auth:8080/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+        - key: request.auth.claims[role]
+          values:
+            - entra_user_role
+  selector:
+    matchLabels:
+      app: application
+---
+# EnvoyFilter (auto-login)
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: auth-policy-login
+spec:
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.lua
+          typed_config:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+            default_source_code:
+              inline_string: "\nlocal ignore_rules = {{regex=\"^/secure/specific/path1.*\",methods={[\"GET\"]=true}},{regex=\"^/secure/specific/path2.*\",methods={[\"GET\"]=true}}}\nlocal require_rules = {{regex=\"^/.*\",methods={[\"POST\"]=true,[\"PUT\"]=true,[\"DELETE\"]=true}},{regex=\"^/$\",methods={[\"GET\"]=true}},{regex=\"^/secure$\",methods={[\"GET\"]=true}},{regex=\"^/secure1$\",methods={[\"GET\"]=true}},{regex=\"^/secure2$\",methods={[\"GET\"]=true}},{regex=\"^/other/path$\",methods={[\"GET\"]=true}},{regex=\"^/other/path1$\",methods={[\"GET\"]=true}},{regex=\"^/oauth2/callback$\",methods={}},{regex=\"^/logout$\",methods={}},{regex=\"^/login$\",methods={}}}\nlocal deny_redirect_rules = {}\n\n-- returns true when {p,m} matches any rule in the supplied table\nlocal function match(rules, p, m)\n  for _, rule in ipairs(rules) do\n    if string.match(p, rule.regex) then\n      -- empty \"methods\" table == all methods\n      if next(rule.methods) == nil or rule.methods[m] then\n        return true\n      end\n    end\n  end\n  return false\nend\n\n-- returns true if {p,m} is in ignore_rules *and* NOT in require_rules\nlocal function should_bypass(p, m)\n  local bypass = false\n  if p ~= \"\" and m ~= \"\" then\n    -- bypass only when it is in ignore_rules *and* NOT in require_rules\n    if match(ignore_rules, p, m) and not match(require_rules, p, m) then\n      bypass = true\n    end\n  end\n  return bypass\nend\n\n-- returns true if {p,m} is in deny_redirect_rules\nlocal function should_deny_redirect(p, m)\n  local deny_redirect = false\n  if p ~= \"\" and m ~= \"\" then\n    -- deny redirect only when it is in deny_redirect_rules\n    if match(deny_redirect_rules, p, m) then\n      deny_redirect = true\n    end\n  end\n  return deny_redirect\nend\n\nfunction envoy_on_request(request_handle)\n  local p = request_handle:headers():get(\":path\")   or \"\"\n  local m = request_handle:headers():get(\":method\") or \"\"\n  \n  local bypass = should_bypass(p, m)\n  request_handle:logCritical(\"Login bypassed?: \" .. tostring(bypass))\n  request_handle:headers():add(\"x-bypass-login\", tostring(bypass))\n  \n  local deny_redirect = should_deny_redirect(p, m)\n  request_handle:logCritical(\"Deny redirect?: \" .. tostring(deny_redirect))\t\n  request_handle:headers():add(\"x-deny-redirect\", tostring(deny_redirect))\nend\n"
+    - applyTo: CLUSTER
+      match:
+        cluster:
+          service: oauth
+      patch:
+        operation: ADD
+        value:
+          connect_timeout: 10s
+          dns_lookup_family: V4_ONLY
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: oauth
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: mock-oauth2.auth
+                          port_value: 8080
+          name: oauth
+          type: LOGICAL_DNS
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: envoy.filters.http.jwt_authn
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.oauth2
+          typed_config:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
+            config:
+              auth_scopes:
+                - openid
+              authorization_endpoint: http://mock-oauth2.auth:8080/entraid/authorize
+              credentials:
+                client_id: entraid_server
+                hmac_secret:
+                  name: hmac
+                  sds_config:
+                    path_config_source:
+                      path: /etc/istio/config/hmac-secret.yaml
+                      watched_directory:
+                        path: /etc/istio/config
+                token_secret:
+                  name: token
+                  sds_config:
+                    path_config_source:
+                      path: /etc/istio/config/token-secret.yaml
+                      watched_directory:
+                        path: /etc/istio/config
+              deny_redirect_matcher:
+                - name: x-deny-redirect
+                  string_match:
+                    exact: "true"
+              end_session_endpoint: http://mock-oauth2.auth:8080/entraid/endsession
+              forward_bearer_token: true
+              pass_through_matcher:
+                - name: authorization
+                  string_match:
+                    prefix: 'Bearer '
+                - name: x-bypass-login
+                  string_match:
+                    exact: "true"
+              redirect_path_matcher:
+                path:
+                  exact: /oauth2/callback
+              redirect_uri: https://%REQ(:authority)%/oauth2/callback
+              retry_policy: {}
+              signout_path:
+                path:
+                  exact: /logout
+              token_endpoint:
+                cluster: oauth
+                timeout: 5s
+                uri: http://mock-oauth2.auth:8080/entraid/token
+              use_refresh_token: true
+  workloadSelector:
+    labels:
+      app: application
+---
+
