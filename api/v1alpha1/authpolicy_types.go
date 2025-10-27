@@ -109,10 +109,10 @@ type AutoLogin struct {
 	// +kubebuilder:validation:Required
 	Scopes []string `json:"scopes"`
 
-	// LoginParams specifies a list of query parameters to be added in the authorize request made towards the configured identity provider.
+	// LoginParams specifies a map of query parameters and their values which will be added in the authorize request made towards the configured identity provider.
 	//
 	// +kubebuilder:validation:Optional
-	LoginParams []string `json:"loginParams,omitempty"`
+	LoginParams map[string]string `json:"loginParams,omitempty"`
 }
 
 // OAuthCredentials specifies the kubernetes secret holding OAuth credentials used for authentication.
@@ -353,4 +353,15 @@ func (ap *AuthPolicy) GetPaths() []string {
 		}
 	}
 	return paths
+}
+
+func (ap *AuthPolicy) HasDenyRedirects() bool {
+	if ap.Spec.AuthRules != nil {
+		for _, rule := range *ap.Spec.AuthRules {
+			if rule.DenyRedirect != nil && *rule.DenyRedirect {
+				return *rule.DenyRedirect
+			}
+		}
+	}
+	return false
 }

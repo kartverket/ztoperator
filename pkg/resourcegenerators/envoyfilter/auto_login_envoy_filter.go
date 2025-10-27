@@ -69,7 +69,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 
 	var configPatches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
 
-	if scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
+	if scope.AuthPolicy.HasDenyRedirects() || scope.AuthPolicy.Spec.IgnoreAuthRules != nil || len(scope.AutoLoginConfig.LoginParams) > 0 {
 		luaScriptConfigPatch, luaScriptConfigPatchErr := configpatch.GetLuaScriptConfigPatch(scope)
 		if luaScriptConfigPatchErr != nil {
 			panic(luaScriptConfigPatchErr.Error())

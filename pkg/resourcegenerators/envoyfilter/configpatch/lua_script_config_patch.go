@@ -2,6 +2,7 @@ package configpatch
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"google.golang.org/protobuf/types/known/structpb"
@@ -40,6 +41,8 @@ func GetLuaScriptConfigPatch(scope *state.Scope) (*v1alpha3.EnvoyFilter_EnvoyCon
 		scope.AutoLoginConfig.LoginPath,
 		scope.AutoLoginConfig.RedirectPath,
 		scope.AutoLoginConfig.LogoutPath,
+		scope.IdentityProviderUris.AuthorizationURI,
+		scope.AutoLoginConfig.LoginParams,
 	))
 	if structPbErr != nil {
 		return nil, fmt.Errorf(
@@ -77,6 +80,8 @@ func getLuaScript(
 	loginPath *string,
 	redirectPath,
 	logoutPath string,
+	authorizeEndpoint string,
+	loginParams map[string]string,
 ) map[string]interface{} {
 	requireAuthOAuthPaths := []string{
 		redirectPath, logoutPath,
@@ -98,11 +103,15 @@ func getLuaScript(
 	requireRulesLua := buildLuaRules(requireAuth)
 	denyRedirectRulesLua := buildLuaRules(denyRedirect)
 
+	loginParamsAsLua := buildLuaParams(encodeLoginParams(loginParams))
+
 	// Build the Lua script. We embed the two rule‑tables and a helper matcher.
 	luaScript := fmt.Sprintf(`
 local ignore_rules = %s
 local require_rules = %s
 local deny_redirect_rules = %s
+local authorize_endpoint = "%s"
+local login_params = %s
 
 -- returns true when {p,m} matches any rule in the supplied table
 local function match(rules, p, m)
@@ -141,6 +150,10 @@ local function should_deny_redirect(p, m)
   return deny_redirect
 end
 
+local function is_empty_table(t)
+  return type(t) ~= "table" or next(t) == nil
+end
+
 function envoy_on_request(request_handle)
   local p = request_handle:headers():get(":path")   or ""
   local m = request_handle:headers():get(":method") or ""
@@ -153,7 +166,36 @@ function envoy_on_request(request_handle)
   request_handle:logCritical("Deny redirect?: " .. tostring(deny_redirect))	
   request_handle:headers():add("%s", tostring(deny_redirect))
 end
-`, ignoreRulesLua, requireRulesLua, denyRedirectRulesLua, BypassOauthLoginHeaderName, DenyRedirectHeaderName)
+
+function envoy_on_response(response_handle)
+  local status = response_handle:headers():get(":status") or ""
+  if status == "302" and not is_empty_table(login_params) then
+    local loc = response_handle:headers():get("location") or ""
+    if loc ~= "" then
+      if string.sub(loc, 1, #authorize_endpoint) == authorize_endpoint then
+		local base, qs = loc:match("^([^?]+)%%??(.*)$")
+		local filtered = {}
+		if qs ~= "" then
+		    local params = {}
+			for key, val in string.gmatch(qs, "([^&=?]+)=([^&=?]+)") do
+			  params[key] = val
+			end
+			for k, v in pairs(login_params) do
+			  params[k] = v
+		  	end
+			for k, v in pairs(params) do
+			  table.insert(filtered, k .. "=" .. v)
+			end
+		end
+		
+		local new_qs = table.concat(filtered, "&")
+		local new_url = base .. (new_qs ~= "" and ("?" .. new_qs) or "")
+		response_handle:headers():replace("location", new_url)
+	  end	
+    end
+  end
+end
+`, ignoreRulesLua, requireRulesLua, denyRedirectRulesLua, authorizeEndpoint, loginParamsAsLua, BypassOauthLoginHeaderName, DenyRedirectHeaderName)
 
 	return map[string]interface{}{
 		"name": "envoy.filters.http.lua",
@@ -164,6 +206,32 @@ end
 			},
 		},
 	}
+}
+
+func encodeLoginParams(raw map[string]string) map[string]string {
+	encoded := make(map[string]string, len(raw))
+	for k, v := range raw {
+		encoded[k] = url.QueryEscape(v)
+	}
+	return encoded
+}
+
+func buildLuaParams(params map[string]string) string {
+	if params == nil || len(params) == 0 {
+		return "{}"
+	}
+	var sb strings.Builder
+	sb.WriteString("{")
+	first := true
+	for k, v := range params {
+		if !first {
+			sb.WriteString(",")
+		}
+		first = false
+		sb.WriteString(fmt.Sprintf(`["%s"]="%s"`, k, v))
+	}
+	sb.WriteString("}")
+	return sb.String()
 }
 
 func convertToRE2Regex(requestMatchers []v1alpha1.RequestMatcher) []v1alpha1.RequestMatcher {

@@ -1,0 +1,45 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: auto-login-with-login-params
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      name: chainsaw-login-params
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: application.yaml
+        - create:
+            file: oauth2-credentials.yaml
+        - create:
+            file: authpolicy-acr-values.yaml
+        - apply:
+            file: wildcard-ingress.yaml
+        - assert:
+            file: application-assert.yaml
+        - assert:
+            file: oauth2-credentials-assert.yaml
+        - assert:
+            file: authpolicy-acr-values-assert.yaml
+        - script:
+            content: sleep 5
+        - script:
+            content: |
+              hurl --error-format long --insecure --test test-acr-values.hurl
+        - apply:
+            file: authpolicy-auth-details.yaml
+        - assert:
+            file: authpolicy-auth-details-assert.yaml
+        - script:
+            content: |
+              kubectl rollout restart deploy application -n chainsaw-login-params
+              sleep 5
+        - script:
+            content: |
+              hurl --error-format long --insecure --test test-auth-details.hurl
