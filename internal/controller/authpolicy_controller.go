@@ -21,7 +21,7 @@ import (
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
 	"github.com/kartverket/ztoperator/pkg/rest"
-	"github.com/kartverket/ztoperator/pkg/utils"
+	"github.com/kartverket/ztoperator/pkg/utilities"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
 	v1 "k8s.io/api/core/v1"
@@ -147,7 +147,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return reconcile.Result{}, err
 	}
 
-	if pathValidationErr := utils.ValidatePaths(authPolicy.GetPaths()); pathValidationErr != nil {
+	if pathValidationErr := utilities.ValidatePaths(authPolicy.GetPaths()); pathValidationErr != nil {
 		rLog.Error(
 			pathValidationErr,
 			fmt.Sprintf(
@@ -181,8 +181,8 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*v1.Secret]{
 					ResourceKind: "Secret",
 					ResourceName: autoLoginSecretName,
-					DesiredResource: utils.Ptr(
-						secret.GetDesired(scope, utils.BuildObjectMeta(autoLoginSecretName, authPolicy.Namespace)),
+					DesiredResource: utilities.Ptr(
+						secret.GetDesired(scope, utilities.BuildObjectMeta(autoLoginSecretName, authPolicy.Namespace)),
 					),
 					Scope: scope,
 					ShouldUpdate: func(current, desired *v1.Secret) bool {
@@ -201,10 +201,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*v1alpha4.EnvoyFilter]{
 					ResourceKind: "EnvoyFilter",
 					ResourceName: autoLoginEnvoyFilter,
-					DesiredResource: utils.Ptr(
+					DesiredResource: utilities.Ptr(
 						envoyfilter.GetDesired(
 							scope,
-							utils.BuildObjectMeta(autoLoginEnvoyFilter, authPolicy.Namespace),
+							utilities.BuildObjectMeta(autoLoginEnvoyFilter, authPolicy.Namespace),
 						),
 					),
 					Scope: scope,
@@ -227,10 +227,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.RequestAuthentication]{
 					ResourceKind: "RequestAuthentication",
 					ResourceName: requestAuthenticationName,
-					DesiredResource: utils.Ptr(
+					DesiredResource: utilities.Ptr(
 						requestauthentication.GetDesired(
 							scope,
-							utils.BuildObjectMeta(requestAuthenticationName, authPolicy.Namespace),
+							utilities.BuildObjectMeta(requestAuthenticationName, authPolicy.Namespace),
 						),
 					),
 					Scope: scope,
@@ -250,10 +250,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
 					ResourceKind: "AuthorizationPolicy",
 					ResourceName: denyAuthorizationPolicyName,
-					DesiredResource: utils.Ptr(
+					DesiredResource: utilities.Ptr(
 						deny.GetDesired(
 							scope,
-							utils.BuildObjectMeta(denyAuthorizationPolicyName, authPolicy.Namespace),
+							utilities.BuildObjectMeta(denyAuthorizationPolicyName, authPolicy.Namespace),
 						),
 					),
 					Scope: scope,
@@ -273,10 +273,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
 					ResourceKind: "AuthorizationPolicy",
 					ResourceName: ignoreAuthAuthorizationPolicyName,
-					DesiredResource: utils.Ptr(
+					DesiredResource: utilities.Ptr(
 						ignore.GetDesired(
 							scope,
-							utils.BuildObjectMeta(ignoreAuthAuthorizationPolicyName, authPolicy.Namespace),
+							utilities.BuildObjectMeta(ignoreAuthAuthorizationPolicyName, authPolicy.Namespace),
 						),
 					),
 					Scope: scope,
@@ -296,10 +296,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
 					ResourceKind: "AuthorizationPolicy",
 					ResourceName: requireAuthAuthorizationPolicyName,
-					DesiredResource: utils.Ptr(
+					DesiredResource: utilities.Ptr(
 						require.GetDesired(
 							scope,
-							utils.BuildObjectMeta(requireAuthAuthorizationPolicyName, authPolicy.Namespace),
+							utilities.BuildObjectMeta(requireAuthAuthorizationPolicyName, authPolicy.Namespace),
 						),
 					),
 					Scope: scope,
@@ -350,7 +350,7 @@ func (r *AuthPolicyReconciler) doReconcile(
 		if len(errs) > 0 {
 			continue
 		}
-		result = utils.LowestNonZeroResult(result, reconcileResult)
+		result = utilities.LowestNonZeroResult(result, reconcileResult)
 	}
 
 	if len(errs) > 0 {
@@ -722,7 +722,7 @@ func resolveAuthPolicy(
 	if authPolicy.Spec.OAuthCredentials != nil &&
 		authPolicy.Spec.AutoLogin != nil &&
 		authPolicy.Spec.AutoLogin.Enabled {
-		oAuthSecret, err := utils.GetSecret(ctx, k8sClient, types.NamespacedName{
+		oAuthSecret, err := utilities.GetSecret(ctx, k8sClient, types.NamespacedName{
 			Namespace: authPolicy.Namespace,
 			Name:      authPolicy.Spec.OAuthCredentials.SecretRef,
 		})
@@ -799,6 +799,7 @@ func resolveAuthPolicy(
 		autoLoginConfig.RedirectPath = authPolicy.Spec.AutoLogin.RedirectPath
 		autoLoginConfig.LogoutPath = authPolicy.Spec.AutoLogin.LogoutPath
 		autoLoginConfig.Scopes = authPolicy.Spec.AutoLogin.Scopes
+		autoLoginConfig.LoginParams = authPolicy.Spec.AutoLogin.LoginParams
 	}
 
 	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name %s/%s", authPolicy.Namespace, authPolicy.Name))

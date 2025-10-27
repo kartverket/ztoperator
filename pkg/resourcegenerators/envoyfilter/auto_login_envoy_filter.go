@@ -10,7 +10,7 @@ import (
 
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
-	"github.com/kartverket/ztoperator/pkg/utils"
+	"github.com/kartverket/ztoperator/pkg/utilities"
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFilter {
@@ -19,7 +19,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 		return nil
 	}
 
-	idpAsParsedURL, err := utils.GetParsedURL(scope.IdentityProviderUris.TokenURI)
+	idpAsParsedURL, err := utilities.GetParsedURL(scope.IdentityProviderUris.TokenURI)
 	if err != nil {
 		panic(
 			"failed to get issuer hostname from issuer URI " + scope.IdentityProviderUris.IssuerURI + " due to the following error: " + err.Error(),
@@ -69,7 +69,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 
 	var configPatches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
 
-	if scope.AuthPolicy.Spec.IgnoreAuthRules != nil {
+	if scope.NeedsLuaScript() {
 		luaScriptConfigPatch, luaScriptConfigPatchErr := configpatch.GetLuaScriptConfigPatch(scope)
 		if luaScriptConfigPatchErr != nil {
 			panic(luaScriptConfigPatchErr.Error())

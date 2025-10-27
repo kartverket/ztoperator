@@ -108,6 +108,11 @@ type AutoLogin struct {
 	//
 	// +kubebuilder:validation:Required
 	Scopes []string `json:"scopes"`
+
+	// LoginParams specifies a map of query parameters and their values which will be added in the authorize request made towards the configured identity provider.
+	//
+	// +kubebuilder:validation:Optional
+	LoginParams map[string]string `json:"loginParams,omitempty"`
 }
 
 // OAuthCredentials specifies the kubernetes secret holding OAuth credentials used for authentication.
@@ -296,7 +301,7 @@ func (ap *AuthPolicy) InitializeStatus() {
 	if ap.Status.Conditions == nil {
 		ap.Status.Conditions = []metav1.Condition{}
 	}
-	ap.Status.ObservedGeneration = ap.GetGeneration()
+	ap.Status.ObservedGeneration = ap.ObjectMeta.GetGeneration()
 	ap.Status.Ready = false
 	ap.Status.Phase = PhasePending
 }
@@ -348,4 +353,15 @@ func (ap *AuthPolicy) GetPaths() []string {
 		}
 	}
 	return paths
+}
+
+func (ap *AuthPolicy) HasDenyRedirects() bool {
+	if ap.Spec.AuthRules != nil {
+		for _, rule := range *ap.Spec.AuthRules {
+			if rule.DenyRedirect != nil && *rule.DenyRedirect {
+				return *rule.DenyRedirect
+			}
+		}
+	}
+	return false
 }
