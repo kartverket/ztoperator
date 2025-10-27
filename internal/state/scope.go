@@ -92,3 +92,9 @@ func GetID(resourceKind, resourceName string) string {
 func (s *Scope) IsMisconfigured() bool {
 	return !s.AuthPolicy.Spec.Enabled || s.InvalidConfig
 }
+
+func (s *Scope) NeedsLuaScript() bool {
+	return s.AuthPolicy.HasDenyRedirects() ||
+		s.AuthPolicy.Spec.IgnoreAuthRules != nil ||
+		len(s.AutoLoginConfig.LoginParams) > 0
+}

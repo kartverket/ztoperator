@@ -301,7 +301,7 @@ func (ap *AuthPolicy) InitializeStatus() {
 	if ap.Status.Conditions == nil {
 		ap.Status.Conditions = []metav1.Condition{}
 	}
-	ap.Status.ObservedGeneration = ap.GetGeneration()
+	ap.Status.ObservedGeneration = ap.ObjectMeta.GetGeneration()
 	ap.Status.Ready = false
 	ap.Status.Phase = PhasePending
 }

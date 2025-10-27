@@ -217,7 +217,7 @@ func encodeLoginParams(raw map[string]string) map[string]string {
 }
 
 func buildLuaParams(params map[string]string) string {
-	if params == nil || len(params) == 0 {
+	if len(params) == 0 {
 		return "{}"
 	}
 	var sb strings.Builder
