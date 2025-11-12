@@ -93,3 +93,16 @@ func GetID(resourceKind, resourceName string) string {
 func (s *Scope) IsMisconfigured() bool {
 	return !s.AuthPolicy.Spec.Enabled || s.InvalidConfig
 }
+
+func (a *AutoLoginConfig) SetSaneDefaults(autoLogin ztoperatorv1alpha1.AutoLogin) {
+	if autoLogin.RedirectPath == nil || *autoLogin.RedirectPath == "" {
+		a.RedirectPath = "/oauth2/callback"
+	} else {
+		a.RedirectPath = *autoLogin.RedirectPath
+	}
+	if autoLogin.LogoutPath == nil || *autoLogin.LogoutPath == "" {
+		a.LogoutPath = "/logout"
+	} else {
+		a.LogoutPath = *autoLogin.LogoutPath
+	}
+}

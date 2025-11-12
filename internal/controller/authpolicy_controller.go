@@ -800,16 +800,7 @@ func resolveAuthPolicy(
 		autoLoginConfig.Scopes = authPolicy.Spec.AutoLogin.Scopes
 		autoLoginConfig.LoginParams = authPolicy.Spec.AutoLogin.LoginParams
 
-		if authPolicy.Spec.AutoLogin.RedirectPath == nil || *authPolicy.Spec.AutoLogin.RedirectPath == "" {
-			autoLoginConfig.RedirectPath = "/oauth2/callback"
-		} else {
-			autoLoginConfig.RedirectPath = *authPolicy.Spec.AutoLogin.RedirectPath
-		}
-		if authPolicy.Spec.AutoLogin.LogoutPath == nil || *authPolicy.Spec.AutoLogin.LogoutPath == "" {
-			autoLoginConfig.LogoutPath = "/logout"
-		} else {
-			autoLoginConfig.LogoutPath = *authPolicy.Spec.AutoLogin.LogoutPath
-		}
+		autoLoginConfig.SetSaneDefaults(*authPolicy.Spec.AutoLogin)
 	}
 
 	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name %s/%s", authPolicy.Namespace, authPolicy.Name))
