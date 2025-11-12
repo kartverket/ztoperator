@@ -106,24 +106,23 @@ for test_path in "$TEST_DIR"/*; do
       kubectl delete authpolicy "$RESOURCE_NAME" -n "$TARGET_NAMESPACE"
     done
 
-    # Delete secrets that were applied from oauth2-credentials.yaml (if any)
-    if [ -n "$OAUTH_SECRETS" ]; then
-      for S in $OAUTH_SECRETS; do
-        if kubectl get secret "$S" -n "$TARGET_NAMESPACE" > /dev/null 2>&1; then
-          echo "  🗑️ Deleting Secret $S"
-          kubectl delete secret "$S" -n "$TARGET_NAMESPACE"
-        else
-          echo "  ℹ️ No Secret $S found to delete"
-        fi
-      done
-    fi
-
-
     echo "  ⏳ Waiting 1s for reconciliation..."
     sleep 1
-
-    echo "-----------------------------"
   done
+  # Delete secrets that were applied from oauth2-credentials.yaml (if any)
+  if [ -n "$OAUTH_SECRETS" ]; then
+    for S in $OAUTH_SECRETS; do
+      if kubectl get secret "$S" -n "$TARGET_NAMESPACE" > /dev/null 2>&1; then
+        echo "  🗑️ Deleting Secret $S"
+        kubectl delete secret "$S" -n "$TARGET_NAMESPACE"
+      else
+        echo "  ℹ️ No Secret $S found to delete"
+      fi
+    done
+  fi
+
+  echo -e "\n\n"
+
 done
 
 echo "🏁 All test cases processed."
