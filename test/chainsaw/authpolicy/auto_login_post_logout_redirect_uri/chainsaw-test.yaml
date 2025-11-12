@@ -8,6 +8,7 @@ spec:
   skipDelete: false
   namespaceTemplate:
     metadata:
+      name: chainsaw-post-logout
       labels:
         istio-injection: enabled
   steps:
@@ -33,7 +34,10 @@ spec:
         - assert:
             file: authpolicy-without-post-logout-redirect-assert.yaml
         - script:
-            content: sleep 5
+            content: | 
+              sleep 2
+              kubectl rollout restart deploy application -n chainsaw-post-logout
+              sleep 5
         - script:
             content: |
               hurl --error-format long \
