@@ -1,60 +1,7 @@
-# RequestAuthentication
-apiVersion: security.istio.io/v1
-kind: RequestAuthentication
-metadata:
-  name: auth-policy
-spec:
-  jwtRules:
-    - audiences:
-        - entraid_server
-      forwardOriginalToken: true
-      issuer: http://mock-oauth2.auth:8080/entraid
-      jwksUri: http://mock-oauth2.auth:8080/entraid/jwks
-  selector:
-    matchLabels:
-      app: application
----
-# AuthorizationPolicy (require-auth)
-apiVersion: security.istio.io/v1
-kind: AuthorizationPolicy
-metadata:
-  name: auth-policy-require-auth
-spec:
-  rules:
-    - to:
-        - operation:
-            paths:
-              - '*'
-      when:
-        - key: request.auth.claims[iss]
-          values:
-            - http://mock-oauth2.auth:8080/entraid
-        - key: request.auth.claims[aud]
-          values:
-            - entraid_server
-  selector:
-    matchLabels:
-      app: application
----
-# EnvoyFilter (auto-login)
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
-  creationTimestamp: "2025-11-12T11:01:39Z"
-  generation: 4
-  labels:
-    type: ztoperator.kartverket.no
   name: auth-policy-login
-  namespace: default
-  ownerReferences:
-    - apiVersion: ztoperator.kartverket.no/v1alpha1
-      blockOwnerDeletion: true
-      controller: true
-      kind: AuthPolicy
-      name: auth-policy
-      uid: 72494338-b288-4d68-b8e7-443a8a31c9bb
-  resourceVersion: "12803"
-  uid: e4890275-e18e-4ce7-b5f3-665e94c8c42d
 spec:
   configPatches:
     - applyTo: HTTP_FILTER
@@ -71,10 +18,9 @@ spec:
           typed_config:
             '@type': type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
             default_source_code:
-              inline_string: "\nlocal ignore_rules = {}\nlocal require_rules = {{regex=\"^/oauth2/callback$\",methods={}},{regex=\"^/logout$\",methods={}},{regex=\"^/login$\",methods={}}}\nlocal
+              inline_string: "\nlocal ignore_rules = {}\nlocal require_rules = {{regex=\"^/oauth2/callback$\",methods={}},{regex=\"^/logout$\",methods={}}}\nlocal
               deny_redirect_rules = {}\nlocal authorize_endpoint = \"http://mock-oauth2.auth:8080/entraid/authorize\"\nlocal
-              login_params = {[\"acr_values\"]=\"entraid\",[\"authorization_details\"]=\"%5B+%7B+%22type%22%3A+%22ansattporten%3Aaltinn%3Aservice%22%2C+%22resource%22%3A+%22urn%3Aaltinn%3Aresource%3A2480%3A40%22+%7D%2C+%7B+%22type%22%3A+%22ansattporten%3Aaltinn%3Aservice%22%2C+%22resource%22%3A+%22urn%3Aaltinn%3Aresource%3A5900%3A1%22%2C+%22allow_multiple_organizations%22%3A+true+%7D+%5D\"}\nlocal
-              end_session_endpoint = \"http://mock-oauth2.auth:8080/entraid/endsession\"\nlocal
+              login_params = {}\nlocal end_session_endpoint = \"http://mock-oauth2.auth:8080/entraid/endsession\"\nlocal
               post_logout_redirect_uri = \"\"\n\n-- returns true when {p,m} matches
               any rule in the supplied table\nlocal function match(rules, p, m)\n
               \ for _, rule in ipairs(rules) do\n    if string.match(p, rule.regex)

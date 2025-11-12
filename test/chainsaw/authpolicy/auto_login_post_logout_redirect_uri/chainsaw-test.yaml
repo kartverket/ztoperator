@@ -1,0 +1,40 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: auto-login-post-logout-redirect-uri
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: application.yaml
+        - create:
+            file: oauth2-credentials.yaml
+        - create:
+            file: authpolicy-with-post-logout-redirect.yaml
+        - apply:
+            file: wildcard-ingress.yaml
+        - assert:
+            file: authpolicy-with-post-logout-redirect-assert.yaml
+        - script:
+            content: sleep 5
+        - script:
+            content: |
+              hurl --error-format long \
+              --insecure --test tests-with-post-logout-redirect.hurl
+        - update:
+            file: authpolicy-without-post-logout-redirect.yaml
+        - assert:
+            file: authpolicy-without-post-logout-redirect-assert.yaml
+        - script:
+            content: sleep 5
+        - script:
+            content: |
+              hurl --error-format long \
+              --insecure --test tests-without-post-logout-redirect.hurl

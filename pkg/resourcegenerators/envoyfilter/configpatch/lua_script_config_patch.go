@@ -43,6 +43,8 @@ func GetLuaScriptConfigPatch(scope *state.Scope) (*v1alpha3.EnvoyFilter_EnvoyCon
 		scope.AutoLoginConfig.LogoutPath,
 		scope.IdentityProviderUris.AuthorizationURI,
 		scope.AutoLoginConfig.LoginParams,
+		*scope.IdentityProviderUris.EndSessionURI,
+		scope.AutoLoginConfig.PostLogoutRedirectURI,
 	))
 	if structPbErr != nil {
 		return nil, fmt.Errorf(
@@ -82,6 +84,8 @@ func getLuaScript(
 	logoutPath string,
 	authorizeEndpoint string,
 	loginParams map[string]string,
+	endSessionEndpoint string,
+	postLogoutRedirectURI *string,
 ) map[string]interface{} {
 	requireAuthOAuthPaths := []string{
 		redirectPath, logoutPath,
@@ -105,6 +109,14 @@ func getLuaScript(
 
 	loginParamsAsLua := buildLuaParams(encodeLoginParams(loginParams))
 
+	var queryEscapedPostLogoutRedirectURI string
+	if postLogoutRedirectURI != nil {
+		queryEscapedPostLogoutRedirectURI = url.QueryEscape(*postLogoutRedirectURI)
+	} else {
+		// We handle postLogoutRedirectURI == nil as "" to make it easier when building the Lua script
+		queryEscapedPostLogoutRedirectURI = ""
+	}
+
 	// Build the Lua script. We embed the two rule‑tables and a helper matcher.
 	luaScript := fmt.Sprintf(`
 local ignore_rules = %s
@@ -112,6 +124,8 @@ local require_rules = %s
 local deny_redirect_rules = %s
 local authorize_endpoint = "%s"
 local login_params = %s
+local end_session_endpoint = "%s"
+local post_logout_redirect_uri = "%s"
 
 -- returns true when {p,m} matches any rule in the supplied table
 local function match(rules, p, m)
@@ -169,10 +183,10 @@ end
 
 function envoy_on_response(response_handle)
   local status = response_handle:headers():get(":status") or ""
-  if status == "302" and not is_empty_table(login_params) then
+  if status == "302" then
     local loc = response_handle:headers():get("location") or ""
     if loc ~= "" then
-      if string.sub(loc, 1, #authorize_endpoint) == authorize_endpoint then
+      if string.sub(loc, 1, #authorize_endpoint) == authorize_endpoint and not is_empty_table(login_params) then
 		local base, qs = loc:match("^([^?]+)%%??(.*)$")
 		local filtered = {}
 		if qs ~= "" then
@@ -191,11 +205,34 @@ function envoy_on_response(response_handle)
 		local new_qs = table.concat(filtered, "&")
 		local new_url = base .. (new_qs ~= "" and ("?" .. new_qs) or "")
 		response_handle:headers():replace("location", new_url)
-	  end	
+	  end
+	  
+	  if string.sub(loc, 1, #end_session_endpoint) == end_session_endpoint then
+		local base, qs = loc:match("^([^?]+)%%??(.*)$")
+		local filtered = {}	
+		if qs ~= "" then
+			local params = {}
+			for key, val in string.gmatch(qs, "([^&=?]+)=([^&=?]+)") do
+			  params[key] = val
+			end
+			if post_logout_redirect_uri == "" then
+			  params["post_logout_redirect_uri"] = nil
+			else
+			  params["post_logout_redirect_uri"] = post_logout_redirect_uri
+			end
+			for k, v in pairs(params) do
+			  table.insert(filtered, k .. "=" .. v)
+			end
+		end
+		
+		local new_qs = table.concat(filtered, "&")
+		local new_url = base .. (new_qs ~= "" and ("?" .. new_qs) or "")
+		response_handle:headers():replace("location", new_url)
+	  end
     end
   end
 end
-`, ignoreRulesLua, requireRulesLua, denyRedirectRulesLua, authorizeEndpoint, loginParamsAsLua, BypassOauthLoginHeaderName, DenyRedirectHeaderName)
+`, ignoreRulesLua, requireRulesLua, denyRedirectRulesLua, authorizeEndpoint, loginParamsAsLua, endSessionEndpoint, queryEscapedPostLogoutRedirectURI, BypassOauthLoginHeaderName, DenyRedirectHeaderName)
 
 	return map[string]interface{}{
 		"name": "envoy.filters.http.lua",

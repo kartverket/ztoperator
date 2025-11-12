@@ -69,13 +69,11 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 
 	var configPatches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
 
-	if scope.NeedsLuaScript() {
-		luaScriptConfigPatch, luaScriptConfigPatchErr := configpatch.GetLuaScriptConfigPatch(scope)
-		if luaScriptConfigPatchErr != nil {
-			panic(luaScriptConfigPatchErr.Error())
-		}
-		configPatches = append(configPatches, luaScriptConfigPatch)
+	luaScriptConfigPatch, luaScriptConfigPatchErr := configpatch.GetLuaScriptConfigPatch(scope)
+	if luaScriptConfigPatchErr != nil {
+		panic(luaScriptConfigPatchErr.Error())
 	}
+	configPatches = append(configPatches, luaScriptConfigPatch)
 
 	configPatches = append(configPatches, &v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: v1alpha3.EnvoyFilter_CLUSTER,

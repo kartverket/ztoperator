@@ -1,0 +1,20 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: auto-login-sane-defaults
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: oauth2-credentials.yaml
+        - create:
+            file: authpolicy.yaml
+        - assert:
+            file: authpolicy-assert.yaml
