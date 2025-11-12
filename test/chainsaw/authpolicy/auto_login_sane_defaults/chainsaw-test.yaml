@@ -15,6 +15,10 @@ spec:
         - create:
             file: oauth2-credentials.yaml
         - create:
-            file: authpolicy.yaml
+            file: authpolicy-with-specified-logout-redirect.yaml
         - assert:
-            file: authpolicy-assert.yaml
+            file: authpolicy-with-specified-logout-redirect-assert.yaml
+        - update:
+            file: authpolicy-with-specified-logout-redirect.yaml
+        - assert:
+            file: authpolicy-with-specified-logout-redirect-assert.yaml
