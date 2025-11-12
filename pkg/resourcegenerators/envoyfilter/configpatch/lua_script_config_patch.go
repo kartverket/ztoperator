@@ -169,8 +169,9 @@ local function is_empty_table(t)
 end
 
 function envoy_on_request(request_handle)
-  local p = request_handle:headers():get(":path")   or ""
+  local raw_p = request_handle:headers():get(":path") or ""
   local m = request_handle:headers():get(":method") or ""
+  local p = string.match(raw_p, "^[^?]*")
   
   local bypass = should_bypass(p, m)
   request_handle:logCritical("Login bypassed?: " .. tostring(bypass))
