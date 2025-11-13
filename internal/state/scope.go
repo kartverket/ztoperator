@@ -8,8 +8,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+type ClientAuthMethod int
+
+const (
+	ClientSecretPost ClientAuthMethod = iota
+	PrivateKeyJWT
+)
+
 type Scope struct {
 	AuthPolicy             ztoperatorv1alpha1.AuthPolicy
+	AppLabel               *string
 	AutoLoginConfig        AutoLoginConfig
 	OAuthCredentials       OAuthCredentials
 	IdentityProviderUris   IdentityProviderUris
@@ -37,8 +45,9 @@ type AutoLoginConfig struct {
 }
 
 type OAuthCredentials struct {
-	ClientID     *string
-	ClientSecret *string
+	ClientID         *string
+	ClientSecret     *string
+	ClientAuthMethod ClientAuthMethod
 }
 
 type Descendant[T client.Object] struct {

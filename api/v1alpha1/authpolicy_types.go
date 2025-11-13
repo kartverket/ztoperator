@@ -133,15 +133,20 @@ type OAuthCredentials struct {
 	// +kubebuilder:validation:Required
 	SecretRef string `json:"secretRef"`
 
-	// ClientSecretKey specifies the data key to access the client secret.
-	//
-	// +kubebuilder:validation:Required
-	ClientSecretKey string `json:"clientSecretKey"`
-
 	// ClientIDKey specifies the data key to access the client ID.
 	//
 	// +kubebuilder:validation:Required
 	ClientIDKey string `json:"clientIDKey"`
+
+	// ClientSecretKey specifies the data key to access the client secret.
+	//
+	// +kubebuilder:validation:Optional
+	ClientSecretKey string `json:"clientSecretKey,omitempty"`
+
+	// PrivateJWKKey specifies the data key to access the private JSON Web Key.
+	//
+	// +kubebuilder:validation:Optional
+	PrivateJWKKey string `json:"privateJWKKey,omitempty"`
 }
 
 type WorkloadSelector struct {

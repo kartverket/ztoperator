@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/kartverket/skiperator/api/v1alpha1"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/log"
@@ -98,6 +99,7 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies;requestauthentications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=skiperator.kartverket.no,resources=applications,verbs=get;list;watch;create;update;patch;delete
 
 func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	rLog := log.GetLogger(ctx)
@@ -176,6 +178,28 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	requireAuthAuthorizationPolicyName := authPolicy.Name + "-require-auth"
 
 	reconcileFuncs := []reconciliation.ReconcileAction{
+		AuthPolicyAdapter[*v1alpha1.Application]{
+			reconciliation.ReconcileFuncAdapter[*v1alpha1.Application]{
+				Func: reconciliation.ReconcileFunc[*v1alpha1.Application]{
+					ResourceKind: "Application",
+					ResourceName: tokenProxyName,
+					DesiredResource: utilities.Ptr(
+						secret.GetDesired(scope, utilities.BuildObjectMeta(tokenProxyName, authPolicy.Namespace)),
+					),
+					Scope: scope,
+					ShouldUpdate: func(current, desired *v1alpha1.Application) bool {
+						return !reflect.DeepEqual(current.Spec, desired.Spec)
+
+						desiredTokenSecret, hasDesired := desired.Data[configpatch.TokenSecretFileName]
+						currentTokenSecret, hasCurrent := current.Data[configpatch.TokenSecretFileName]
+						return !hasDesired || !hasCurrent || !bytes.Equal(currentTokenSecret, desiredTokenSecret)
+					},
+					UpdateFields: func(current, desired *v1alpha1.Application) {
+						current.Data = desired.Data
+					},
+				},
+			},
+		},
 		AuthPolicyAdapter[*v1.Secret]{
 			reconciliation.ReconcileFuncAdapter[*v1.Secret]{
 				Func: reconciliation.ReconcileFunc[*v1.Secret]{
@@ -718,6 +742,7 @@ func resolveAuthPolicy(
 	rLog.Info(fmt.Sprintf("Trying to resolve auth policy %s/%s", authPolicy.Namespace, authPolicy.Name))
 
 	var oAuthCredentials state.OAuthCredentials
+	var appLabel *string
 
 	if authPolicy.Spec.OAuthCredentials != nil &&
 		authPolicy.Spec.AutoLogin != nil &&
@@ -735,6 +760,8 @@ func resolveAuthPolicy(
 		clientSecret := string(oAuthSecret.Data[authPolicy.Spec.OAuthCredentials.ClientSecretKey])
 		oAuthCredentials.ClientSecret = &clientSecret
 
+		privateJWK := string(oAuthSecret.Data[authPolicy.Spec.OAuthCredentials.PrivateJWKKey])
+
 		if oAuthCredentials.ClientID == nil || *oAuthCredentials.ClientID == "" {
 			return nil, fmt.Errorf(
 				"client id with key: %s was nil or empty when retrieving it from Secret with name %s/%s",
@@ -744,13 +771,27 @@ func resolveAuthPolicy(
 			)
 		}
 
-		if oAuthCredentials.ClientSecret == nil || *oAuthCredentials.ClientSecret == "" {
-			return nil, fmt.Errorf(
-				"client secret with key: %s was nil or empty when retrieving it from Secret with name %s/%s",
-				authPolicy.Spec.OAuthCredentials.ClientSecretKey,
-				authPolicy.Namespace,
-				authPolicy.Spec.OAuthCredentials.SecretRef,
-			)
+		if privateJWK == "" {
+			if oAuthCredentials.ClientSecret == nil || *oAuthCredentials.ClientSecret == "" {
+				return nil, fmt.Errorf(
+					"both client secret with key: %s and private JWK with key: %s was nil or empty when retrieving it from Secret with name %s/%s",
+					authPolicy.Spec.OAuthCredentials.ClientSecretKey,
+					authPolicy.Spec.OAuthCredentials.PrivateJWKKey,
+					authPolicy.Namespace,
+					authPolicy.Spec.OAuthCredentials.SecretRef,
+				)
+			}
+			oAuthCredentials.ClientAuthMethod = state.ClientSecretPost
+		} else {
+			oAuthCredentials.ClientAuthMethod = state.PrivateKeyJWT
+			if appLabelValue, exists := authPolicy.Spec.Selector.MatchLabels["app"]; exists {
+				appLabel = &appLabelValue
+			} else {
+				return nil, fmt.Errorf(
+					"client auth method of %s requires the app label to be set as selector.matchLabels",
+					oAuthCredentials.ClientAuthMethod,
+				)
+			}
 		}
 	}
 
@@ -810,5 +851,6 @@ func resolveAuthPolicy(
 		AutoLoginConfig:      autoLoginConfig,
 		OAuthCredentials:     oAuthCredentials,
 		IdentityProviderUris: identityProviderUris,
+		AppLabel:             appLabel,
 	}, nil
 }
