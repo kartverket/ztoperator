@@ -190,6 +190,21 @@ func (in *AutoLogin) DeepCopyInto(out *AutoLogin) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.RedirectPath != nil {
+		in, out := &in.RedirectPath, &out.RedirectPath
+		*out = new(string)
+		**out = **in
+	}
+	if in.LogoutPath != nil {
+		in, out := &in.LogoutPath, &out.LogoutPath
+		*out = new(string)
+		**out = **in
+	}
+	if in.PostLogoutRedirectURI != nil {
+		in, out := &in.PostLogoutRedirectURI, &out.PostLogoutRedirectURI
+		*out = new(string)
+		**out = **in
+	}
 	if in.Scopes != nil {
 		in, out := &in.Scopes, &out.Scopes
 		*out = make([]string, len(*in))

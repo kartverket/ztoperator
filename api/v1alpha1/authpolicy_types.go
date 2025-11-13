@@ -93,16 +93,25 @@ type AutoLogin struct {
 	LoginPath *string `json:"loginPath,omitempty"`
 
 	// RedirectPath specifies which path to redirect the user to after completing the OIDC flow.
+	// If omitted, a default path of /oauth2/callback is used.
 	//
-	// +kubebuilder:validation:Required
-	RedirectPath string `json:"redirectPath"`
+	// +kubebuilder:validation:Optional
+	RedirectPath *string `json:"redirectPath,omitempty"`
 
 	// LogoutPath specifies which URI to redirect the user to when signing out.
-	// This will end the session for the application, but not end the session towards the configured identity provider.
-	// This feature will hopefully soon be available in later releases of Istio, ref. [envoy/envoyproxy](https://github.com/envoyproxy/envoy/commit/c12fefc11f7adc9cd404287eb674ba838c2c8bd0).
+	// This will end the session for the application and also redirect the user
+	// to log out towards the configured identity provider (RP-initiated logout).
+	// If omitted, a default path of /logout is used.
 	//
-	// +kubebuilder:validation:Required
-	LogoutPath string `json:"logoutPath"`
+	// +kubebuilder:validation:Optional
+	LogoutPath *string `json:"logoutPath,omitempty"`
+
+	// PostLogoutRedirectURI specifies which URI to redirect the user to after
+	// successfully signed out towards the configured identity provider (RP-initiated logout).
+	// If omitted, no post_logout_redirect_uri will be used.
+	//
+	// +kubebuilder:validation:Optional
+	PostLogoutRedirectURI *string `json:"postLogoutRedirectUri,omitempty"`
 
 	// Scopes specifies the OAuth2 scopes used during authorization code flow.
 	//
@@ -353,15 +362,4 @@ func (ap *AuthPolicy) GetPaths() []string {
 		}
 	}
 	return paths
-}
-
-func (ap *AuthPolicy) HasDenyRedirects() bool {
-	if ap.Spec.AuthRules != nil {
-		for _, rule := range *ap.Spec.AuthRules {
-			if rule.DenyRedirect != nil && *rule.DenyRedirect {
-				return *rule.DenyRedirect
-			}
-		}
-	}
-	return false
 }

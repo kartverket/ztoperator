@@ -27,12 +27,13 @@ type IdentityProviderUris struct {
 }
 
 type AutoLoginConfig struct {
-	Enabled      bool
-	LoginPath    *string
-	RedirectPath string
-	LogoutPath   string
-	Scopes       []string
-	LoginParams  map[string]string
+	Enabled               bool
+	LoginPath             *string
+	RedirectPath          string
+	LogoutPath            string
+	PostLogoutRedirectURI *string
+	Scopes                []string
+	LoginParams           map[string]string
 }
 
 type OAuthCredentials struct {
@@ -93,8 +94,15 @@ func (s *Scope) IsMisconfigured() bool {
 	return !s.AuthPolicy.Spec.Enabled || s.InvalidConfig
 }
 
-func (s *Scope) NeedsLuaScript() bool {
-	return s.AuthPolicy.HasDenyRedirects() ||
-		s.AuthPolicy.Spec.IgnoreAuthRules != nil ||
-		len(s.AutoLoginConfig.LoginParams) > 0
+func (a *AutoLoginConfig) SetSaneDefaults(autoLogin ztoperatorv1alpha1.AutoLogin) {
+	if autoLogin.RedirectPath == nil || *autoLogin.RedirectPath == "" {
+		a.RedirectPath = "/oauth2/callback"
+	} else {
+		a.RedirectPath = *autoLogin.RedirectPath
+	}
+	if autoLogin.LogoutPath == nil || *autoLogin.LogoutPath == "" {
+		a.LogoutPath = "/logout"
+	} else {
+		a.LogoutPath = *autoLogin.LogoutPath
+	}
 }
