@@ -19,13 +19,16 @@ import (
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/require"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/networkpolicy"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/skiperatorapplication"
 	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/kartverket/ztoperator/pkg/utilities"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
 	v1 "k8s.io/api/core/v1"
+	v2 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -100,6 +103,7 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=skiperator.kartverket.no,resources=applications,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.k8s.io/v1,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 
 func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	rLog := log.GetLogger(ctx)
@@ -170,6 +174,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		scope.InvalidConfig = false
 	}
 
+	tokenProxyNetworkPolicyName := scope.AutoLoginConfig.TokenProxyServiceName + "-egress"
 	autoLoginSecretName := authPolicy.Name + "-envoy-secret"
 	autoLoginEnvoyFilter := authPolicy.Name + "-login"
 	requestAuthenticationName := authPolicy.Name
@@ -178,24 +183,50 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	requireAuthAuthorizationPolicyName := authPolicy.Name + "-require-auth"
 
 	reconcileFuncs := []reconciliation.ReconcileAction{
+		AuthPolicyAdapter[*v2.NetworkPolicy]{
+			reconciliation.ReconcileFuncAdapter[*v2.NetworkPolicy]{
+				Func: reconciliation.ReconcileFunc[*v2.NetworkPolicy]{
+					ResourceKind: "NetworkPolicy",
+					ResourceName: tokenProxyNetworkPolicyName,
+					DesiredResource: utilities.Ptr(
+						networkpolicy.GetDesired(
+							scope,
+							utilities.BuildObjectMeta(
+								tokenProxyNetworkPolicyName,
+								authPolicy.Namespace,
+							),
+						),
+					),
+					Scope: scope,
+					ShouldUpdate: func(current, desired *v2.NetworkPolicy) bool {
+						return !reflect.DeepEqual(current.Spec, desired.Spec)
+					},
+					UpdateFields: func(current, desired *v2.NetworkPolicy) {
+						current.Spec = desired.Spec
+					},
+				},
+			},
+		},
 		AuthPolicyAdapter[*v1alpha1.Application]{
 			reconciliation.ReconcileFuncAdapter[*v1alpha1.Application]{
 				Func: reconciliation.ReconcileFunc[*v1alpha1.Application]{
 					ResourceKind: "Application",
-					ResourceName: tokenProxyName,
+					ResourceName: scope.AutoLoginConfig.TokenProxyServiceName,
 					DesiredResource: utilities.Ptr(
-						secret.GetDesired(scope, utilities.BuildObjectMeta(tokenProxyName, authPolicy.Namespace)),
+						skiperatorapplication.GetDesired(
+							scope,
+							utilities.BuildObjectMeta(
+								scope.AutoLoginConfig.TokenProxyServiceName,
+								authPolicy.Namespace,
+							),
+						),
 					),
 					Scope: scope,
 					ShouldUpdate: func(current, desired *v1alpha1.Application) bool {
 						return !reflect.DeepEqual(current.Spec, desired.Spec)
-
-						desiredTokenSecret, hasDesired := desired.Data[configpatch.TokenSecretFileName]
-						currentTokenSecret, hasCurrent := current.Data[configpatch.TokenSecretFileName]
-						return !hasDesired || !hasCurrent || !bytes.Equal(currentTokenSecret, desiredTokenSecret)
 					},
 					UpdateFields: func(current, desired *v1alpha1.Application) {
-						current.Data = desired.Data
+						current.Spec = desired.Spec
 					},
 				},
 			},
@@ -788,8 +819,7 @@ func resolveAuthPolicy(
 				appLabel = &appLabelValue
 			} else {
 				return nil, fmt.Errorf(
-					"client auth method of %s requires the app label to be set as selector.matchLabels",
-					oAuthCredentials.ClientAuthMethod,
+					"client auth method private_key_jwt requires the app label to be set as selector.matchLabels",
 				)
 			}
 		}
@@ -826,12 +856,24 @@ func resolveAuthPolicy(
 	}
 	identityProviderUris.IssuerURI = *discoveryDocument.Issuer
 	identityProviderUris.JwksURI = *discoveryDocument.JwksURI
-	identityProviderUris.TokenURI = *discoveryDocument.TokenEndpoint
 	identityProviderUris.AuthorizationURI = *discoveryDocument.AuthorizationEndpoint
 	identityProviderUris.EndSessionURI = discoveryDocument.EndSessionEndpoint
 
 	autoLoginConfig := state.AutoLoginConfig{
-		Enabled: false,
+		Enabled:               false,
+		TokenProxyServiceName: strings.ToLower("token-proxy-" + utilities.Base64EncodedSHA256(authPolicy.Name)),
+	}
+
+	if oAuthCredentials.ClientAuthMethod == state.PrivateKeyJWT {
+		identityProviderUris.TokenProxyConfiguredEndpoint = discoveryDocument.TokenEndpoint
+		identityProviderUris.TokenURI = fmt.Sprintf(
+			"http://%s.%s:%d/token",
+			autoLoginConfig.TokenProxyServiceName,
+			authPolicy.Namespace,
+			networkpolicy.TokenServicePort,
+		)
+	} else {
+		identityProviderUris.TokenURI = *discoveryDocument.TokenEndpoint
 	}
 
 	if authPolicy.Spec.AutoLogin != nil && authPolicy.Spec.AutoLogin.Enabled {

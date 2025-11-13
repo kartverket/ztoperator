@@ -30,6 +30,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	skiperatorv1alpha1 "github.com/kartverket/skiperator/api/v1alpha1"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/controller"
 	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
@@ -56,6 +57,7 @@ func init() {
 	utilruntime.Must(istionetworkingv1.AddToScheme(scheme))
 	utilruntime.Must(securityv1.AddToScheme(scheme))
 	utilruntime.Must(v1alpha3.AddToScheme(scheme))
+	utilruntime.Must(skiperatorv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(ztoperatorv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }

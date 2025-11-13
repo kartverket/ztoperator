@@ -3,6 +3,7 @@ package utilities
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"net/url"
@@ -144,4 +145,13 @@ func GenerateHMACSecret(size int) (*string, error) {
 	}
 	base64EncodedSecret := base64.StdEncoding.EncodeToString(secret)
 	return &base64EncodedSecret, nil
+}
+
+func Base64EncodedSHA256(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	encoded := base64.StdEncoding.EncodeToString(sum[:])
+	if len(encoded) < 6 {
+		return encoded
+	}
+	return encoded[:6]
 }

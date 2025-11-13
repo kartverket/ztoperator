@@ -14,7 +14,7 @@ const (
 	TokenProxyIssuerEnvVarName        = "ZTOPERATOR_TOKEN_PROXY_ISSUER"
 	TokenProxyPrivateJWKEnvVarName    = "ZTOPERATOR_TOKEN_PROXY_PRIVATE_JWK"
 	TokenProxyServerModeEnvVarName    = "GIN_MODE"
-	TokenProxyServerModeEnvVarValue   = "RELEASE"
+	TokenProxyServerModeEnvVarValue   = "release"
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha1.Application {
@@ -24,10 +24,11 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha1.Applicat
 		return nil
 	}
 
-	idpAsParsedURL, err := utilities.GetParsedURL(scope.IdentityProviderUris.TokenURI)
+	idpAsParsedURL, err := utilities.GetParsedURL(*scope.IdentityProviderUris.TokenProxyConfiguredEndpoint)
 	if err != nil {
+		errMsg := "failed to get issuer hostname from token URI " + scope.IdentityProviderUris.TokenURI + " due to the following error: "
 		panic(
-			"failed to get issuer hostname from token URI " + scope.IdentityProviderUris.TokenURI + " due to the following error: " + err.Error(),
+			errMsg + err.Error(),
 		)
 	}
 
@@ -64,7 +65,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha1.Applicat
 				},
 				{
 					Name:  TokenProxyTokenEndpointEnvVarName,
-					Value: scope.IdentityProviderUris.TokenURI,
+					Value: *scope.IdentityProviderUris.TokenProxyConfiguredEndpoint,
 				},
 				{
 					Name:  TokenProxyIssuerEnvVarName,
@@ -74,9 +75,11 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha1.Applicat
 					Name: TokenProxyPrivateJWKEnvVarName,
 					ValueFrom: &v3.EnvVarSource{
 						SecretKeyRef: &v3.SecretKeySelector{
-							LocalObjectReference: v3.LocalObjectReference{},
-							Key:                  scope.AuthPolicy.Spec.OAuthCredentials.PrivateJWKKey,
-							Optional:             utilities.Ptr(false),
+							LocalObjectReference: v3.LocalObjectReference{
+								Name: scope.AuthPolicy.Spec.OAuthCredentials.SecretRef,
+							},
+							Key:      scope.AuthPolicy.Spec.OAuthCredentials.PrivateJWKKey,
+							Optional: utilities.Ptr(false),
 						},
 					},
 				},

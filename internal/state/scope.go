@@ -27,11 +27,12 @@ type Scope struct {
 }
 
 type IdentityProviderUris struct {
-	IssuerURI        string
-	JwksURI          string
-	TokenURI         string
-	AuthorizationURI string
-	EndSessionURI    *string
+	IssuerURI                    string
+	JwksURI                      string
+	TokenURI                     string
+	TokenProxyConfiguredEndpoint *string
+	AuthorizationURI             string
+	EndSessionURI                *string
 }
 
 type AutoLoginConfig struct {
@@ -42,6 +43,7 @@ type AutoLoginConfig struct {
 	PostLogoutRedirectURI *string
 	Scopes                []string
 	LoginParams           map[string]string
+	TokenProxyServiceName string
 }
 
 type OAuthCredentials struct {

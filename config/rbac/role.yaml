@@ -45,10 +45,34 @@ rules:
   - update
   - watch
 - apiGroups:
+  - networking.k8s.io/v1
+  resources:
+  - networkpolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - security.istio.io
   resources:
   - authorizationpolicies
   - requestauthentications
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - skiperator.kartverket.no
+  resources:
+  - applications
   verbs:
   - create
   - delete
