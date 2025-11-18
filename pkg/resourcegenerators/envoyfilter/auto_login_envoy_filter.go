@@ -40,6 +40,13 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 		oAuthClusterConfigPatchValue = configpatch.GetExternalOAuthClusterPatchValue(idpAsParsedURL.Host)
 	}
 
+	luaScriptConfigPatchValue, err := structpb.NewStruct(configpatch.GetLuaScriptConfigPatch(*scope))
+	if err != nil {
+		panic(
+			"failed to serialize Lua script config patch value due to the following error: " + err.Error(),
+		)
+	}
+
 	oAuthClusterConfigPatchValueAsPbStruct, err := structpb.NewStruct(
 		oAuthClusterConfigPatchValue,
 	)
@@ -50,16 +57,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 	}
 
 	oAuthSidecarConfigPatchValueAsPbStruct, err := structpb.NewStruct(
-		configpatch.GetOAuthSidecarConfigPatchValue(
-			scope.IdentityProviderUris.TokenURI,
-			scope.IdentityProviderUris.AuthorizationURI,
-			scope.AutoLoginConfig.RedirectPath,
-			scope.AutoLoginConfig.LogoutPath,
-			scope.IdentityProviderUris.EndSessionURI,
-			*scope.OAuthCredentials.ClientID,
-			scope.AutoLoginConfig.Scopes,
-			scope.AuthPolicy.Spec.AcceptedResources,
-		),
+		configpatch.GetOAuthSidecarConfigPatchValue(*scope),
 	)
 	if err != nil {
 		panic(
@@ -69,11 +67,25 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 
 	var configPatches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
 
-	luaScriptConfigPatch, luaScriptConfigPatchErr := configpatch.GetLuaScriptConfigPatch(scope)
-	if luaScriptConfigPatchErr != nil {
-		panic(luaScriptConfigPatchErr.Error())
-	}
-	configPatches = append(configPatches, luaScriptConfigPatch)
+	configPatches = append(configPatches, &v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
+		ApplyTo: v1alpha3.EnvoyFilter_HTTP_FILTER,
+		Match: &v1alpha3.EnvoyFilter_EnvoyConfigObjectMatch{
+			Context: v1alpha3.EnvoyFilter_SIDECAR_INBOUND,
+			ObjectTypes: &v1alpha3.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
+				Listener: &v1alpha3.EnvoyFilter_ListenerMatch{
+					FilterChain: &v1alpha3.EnvoyFilter_ListenerMatch_FilterChainMatch{
+						Filter: &v1alpha3.EnvoyFilter_ListenerMatch_FilterMatch{
+							Name: "envoy.filters.network.http_connection_manager",
+						},
+					},
+				},
+			},
+		},
+		Patch: &v1alpha3.EnvoyFilter_Patch{
+			Operation: v1alpha3.EnvoyFilter_Patch_INSERT_BEFORE,
+			Value:     luaScriptConfigPatchValue,
+		},
+	})
 
 	configPatches = append(configPatches, &v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: v1alpha3.EnvoyFilter_CLUSTER,
