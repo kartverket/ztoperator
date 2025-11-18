@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kartverket/ztoperator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -154,4 +155,23 @@ func Base64EncodedSHA256(s string) string {
 		return encoded
 	}
 	return encoded[:6]
+}
+
+func GetProtectedPods(ctx context.Context, k8sClient client.Client, authPolicy v1alpha1.AuthPolicy) (*[]v1.Pod, error) {
+	var podList v1.PodList
+	if listErr := k8sClient.List(
+		ctx,
+		&podList,
+		client.InNamespace(authPolicy.Namespace),
+		client.MatchingLabels(authPolicy.Spec.Selector.MatchLabels),
+	); listErr != nil {
+		return nil, fmt.Errorf(
+			"failed to get list of pods with the label: %s from authpolicy {%s, %s} due to the following error: %w",
+			authPolicy.Spec.Selector.MatchLabels,
+			authPolicy.Namespace,
+			authPolicy.Name,
+			listErr,
+		)
+	}
+	return &podList.Items, nil
 }

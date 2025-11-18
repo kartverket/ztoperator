@@ -5,6 +5,18 @@ metadata:
   name: ztoperator
 rules:
 - apiGroups:
+  - apps/v1
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - ""
   resources:
   - events
@@ -24,6 +36,8 @@ rules:
   - ""
   resources:
   - secrets
+  - serviceaccounts
+  - services
   verbs:
   - create
   - delete
@@ -36,6 +50,7 @@ rules:
   - networking.istio.io
   resources:
   - envoyfilters
+  - serviceentries
   verbs:
   - create
   - delete
@@ -61,18 +76,6 @@ rules:
   resources:
   - authorizationpolicies
   - requestauthentications
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - skiperator.kartverket.no
-  resources:
-  - applications
   verbs:
   - create
   - delete

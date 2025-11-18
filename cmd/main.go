@@ -23,14 +23,15 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/metrics"
 	"go.uber.org/zap/zapcore"
+	v1 "k8s.io/api/apps/v1"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	skiperatorv1alpha1 "github.com/kartverket/skiperator/api/v1alpha1"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/controller"
 	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
@@ -57,7 +58,7 @@ func init() {
 	utilruntime.Must(istionetworkingv1.AddToScheme(scheme))
 	utilruntime.Must(securityv1.AddToScheme(scheme))
 	utilruntime.Must(v1alpha3.AddToScheme(scheme))
-	utilruntime.Must(skiperatorv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 	utilruntime.Must(ztoperatorv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
@@ -134,7 +135,9 @@ func main() {
 
 	kubeconfig := ctrl.GetConfigOrDie()
 
-	if !*isDeployment && !strings.Contains(kubeconfig.Host, "https://127.0.0.1") {
+	config.IsLocal = *isDeployment || strings.Contains(kubeconfig.Host, "https://127.0.0.1")
+
+	if !config.IsLocal {
 		setupLog.Info("Tried to start ztoperator with non-local kubecontext. Exiting to prevent havoc.")
 		os.Exit(1)
 	}

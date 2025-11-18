@@ -1,13 +1,9 @@
 package configpatch
 
-import "slices"
+import (
+	"slices"
 
-const (
-	TokenSecretFileName       = "token-secret.yaml"
-	HmacSecretFileName        = "hmac-secret.yaml"
-	IstioTokenSecretSource    = "/etc/istio/config/" + TokenSecretFileName
-	IstioHmacSecretSource     = "/etc/istio/config/" + HmacSecretFileName
-	IstioCredentialsDirectory = "/etc/istio/config"
+	"github.com/kartverket/ztoperator/pkg/utilities"
 )
 
 func GetOAuthSidecarConfigPatchValue(
@@ -85,9 +81,9 @@ func GetOAuthSidecarConfigPatchValue(
 				"name": "token",
 				"sds_config": map[string]interface{}{
 					"path_config_source": map[string]interface{}{
-						"path": IstioTokenSecretSource,
+						"path": utilities.IstioTokenSecretVolumePath,
 						"watched_directory": map[string]interface{}{
-							"path": IstioCredentialsDirectory,
+							"path": utilities.IstioCredentialsVolumePath,
 						},
 					},
 				},
@@ -96,9 +92,9 @@ func GetOAuthSidecarConfigPatchValue(
 				"name": "hmac",
 				"sds_config": map[string]interface{}{
 					"path_config_source": map[string]interface{}{
-						"path": IstioHmacSecretSource,
+						"path": utilities.IstioHmacSecretVolumePath,
 						"watched_directory": map[string]interface{}{
-							"path": IstioCredentialsDirectory,
+							"path": utilities.IstioCredentialsVolumePath,
 						},
 					},
 				},

@@ -1,4 +1,4 @@
-package networkpolicy
+package token_proxy_outbound
 
 import (
 	"github.com/kartverket/ztoperator/internal/state"
@@ -9,15 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-const (
-	TokenServicePort = 8080
-	IstioSidecarPort = 15020
-)
-
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v2.NetworkPolicy {
-	if scope.IsMisconfigured() ||
-		scope.OAuthCredentials.ClientAuthMethod != state.PrivateKeyJWT ||
-		scope.AppLabel == nil {
+	if !scope.ShouldHaveTokenProxy() {
 		return nil
 	}
 
@@ -26,25 +19,25 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v2.NetworkPolicy 
 		Spec: v2.NetworkPolicySpec{
 			PodSelector: v1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": *scope.AppLabel,
+					"app": scope.AutoLoginConfig.TokenProxy.Name,
 				},
 			},
 			PolicyTypes: []v2.PolicyType{
-				v2.PolicyTypeEgress,
+				v2.PolicyTypeIngress,
 			},
-			Egress: []v2.NetworkPolicyEgressRule{
+			Ingress: []v2.NetworkPolicyIngressRule{
 				{
 					Ports: []v2.NetworkPolicyPort{
 						{
-							Port:     &intstr.IntOrString{IntVal: TokenServicePort},
+							Port:     &intstr.IntOrString{IntVal: utilities.TokenProxyPort},
 							Protocol: utilities.Ptr(v3.ProtocolTCP),
 						},
 						{
-							Port:     &intstr.IntOrString{IntVal: IstioSidecarPort},
+							Port:     &intstr.IntOrString{IntVal: utilities.IstioProxyPort},
 							Protocol: utilities.Ptr(v3.ProtocolTCP),
 						},
 					},
-					To: []v2.NetworkPolicyPeer{
+					From: []v2.NetworkPolicyPeer{
 						{
 							NamespaceSelector: &v1.LabelSelector{
 								MatchLabels: map[string]string{
@@ -52,9 +45,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v2.NetworkPolicy 
 								},
 							},
 							PodSelector: &v1.LabelSelector{
-								MatchLabels: map[string]string{
-									"app": scope.AutoLoginConfig.TokenProxyServiceName,
-								},
+								MatchLabels: scope.AuthPolicy.Spec.Selector.MatchLabels,
 							},
 						},
 					},

@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"net/url"
 	"reflect"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
@@ -17,7 +18,6 @@ const (
 
 type Scope struct {
 	AuthPolicy             ztoperatorv1alpha1.AuthPolicy
-	AppLabel               *string
 	AutoLoginConfig        AutoLoginConfig
 	OAuthCredentials       OAuthCredentials
 	IdentityProviderUris   IdentityProviderUris
@@ -43,7 +43,13 @@ type AutoLoginConfig struct {
 	PostLogoutRedirectURI *string
 	Scopes                []string
 	LoginParams           map[string]string
-	TokenProxyServiceName string
+	TokenProxy            TokenProxyConfig
+}
+
+type TokenProxyConfig struct {
+	Name                         string
+	TokenEndpointParsedAsUrl     url.URL
+	ProtectedPodsServiceAccounts []string
 }
 
 type OAuthCredentials struct {
@@ -116,4 +122,9 @@ func (a *AutoLoginConfig) SetSaneDefaults(autoLogin ztoperatorv1alpha1.AutoLogin
 	} else {
 		a.LogoutPath = *autoLogin.LogoutPath
 	}
+}
+
+func (s *Scope) ShouldHaveTokenProxy() bool {
+	return !s.IsMisconfigured() &&
+		s.OAuthCredentials.ClientAuthMethod == PrivateKeyJWT
 }
