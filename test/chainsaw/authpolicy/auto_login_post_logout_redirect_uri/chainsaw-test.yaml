@@ -14,13 +14,13 @@ spec:
   steps:
     - try:
         - create:
-            file: application.yaml
+            file: ../../../resources/skiperator/application-with-istio-mounts.yaml
+        - apply:
+            file: ../../../resources/ingress/wildcard-ingress.yaml
         - create:
-            file: oauth2-credentials.yaml
+            file: ../../../resources/secret/oauth-secret.yaml
         - create:
             file: authpolicy-with-post-logout-redirect.yaml
-        - apply:
-            file: wildcard-ingress.yaml
         - assert:
             file: authpolicy-with-post-logout-redirect-assert.yaml
         - script:

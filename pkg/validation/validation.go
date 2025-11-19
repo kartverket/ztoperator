@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/utilities"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,28 +29,30 @@ var (
 	// Valid pchar from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
 	// pchar = unreserved / pct-encoded / sub-delims / ":" / "@".
 	validLiteral = regexp.MustCompile("^[a-zA-Z0-9-._~%!$&'()+,;:@=]+$")
-)
 
-var AuthPolicyValidators = []AuthPolicyValidator{
-	{
-		Type: pathsValidation,
-		Validate: func(ctx context.Context, k8sClient client.Client, scope state.Scope) error {
-			return validatePaths(scope.AuthPolicy.GetPaths())
+	AuthPolicyValidators = []AuthPolicyValidator{
+		{
+			Type: pathsValidation,
+			Validate: func(ctx context.Context, k8sClient client.Client, scope *state.Scope) error {
+				return validatePaths(scope.AuthPolicy.GetPaths())
+			},
 		},
-	},
-	{
-		Type: podAnnotationsValidation,
-		Validate: func(ctx context.Context, k8sClient client.Client, scope state.Scope) error {
-			return validatePodAnnotations(ctx, k8sClient, scope)
+		{
+			Type: podAnnotationsValidation,
+			Validate: func(ctx context.Context, k8sClient client.Client, scope *state.Scope) error {
+				return validatePodAnnotations(ctx, k8sClient, scope)
+			},
 		},
-	},
-}
+	}
+
+	errorMessageSuffix = fmt.Sprintf("see https://github.com/kartverket/ztoperator/%s/README.md on how to do it correctly", config.ZtoperatorConfig.GitRef)
+)
 
 type authPolicyValidatorType int
 
 type AuthPolicyValidator struct {
 	Type     authPolicyValidatorType
-	Validate func(ctx context.Context, k8sClient client.Client, scope state.Scope) error
+	Validate func(ctx context.Context, k8sClient client.Client, scope *state.Scope) error
 }
 
 type istioUserVolume struct {
@@ -70,6 +73,84 @@ type istioUserVolumeMount struct {
 	Name      string `json:"name"`
 	MountPath string `json:"mountPath"`
 	ReadOnly  bool   `json:"readonly"`
+}
+
+type volumeSourceKind int
+
+const (
+	volumeSourceSecret volumeSourceKind = iota
+	volumeSourceConfigMap
+)
+
+func (s *volumeSourceKind) String() string {
+	if *s == volumeSourceSecret {
+		return "secret"
+	}
+	return "configMap"
+}
+
+func collectIstioVolumesAndMountsFromPod(podAnnotations map[string]string) ([]istioUserVolume, []istioUserVolumeMount, error) {
+	var volumes []istioUserVolume
+	if err := json.Unmarshal([]byte(podAnnotations[istioUserVolumeAnnotation]), &volumes); err != nil {
+		return nil, nil, fmt.Errorf("protected pods are missing or has incorrect pod annotation '%s', %s", istioUserVolumeAnnotation, errorMessageSuffix)
+	}
+
+	var volumeMounts []istioUserVolumeMount
+	if err := json.Unmarshal([]byte(podAnnotations[istioUserVolumeMountAnnotation]), &volumeMounts); err != nil {
+		return nil, nil, fmt.Errorf("protected pods are missing or has incorrect pod annotation '%s', %s", istioUserVolumeMountAnnotation, errorMessageSuffix)
+	}
+
+	return volumes, volumeMounts, nil
+}
+
+func validateMountedVolumes(
+	mounts []istioUserVolumeMount,
+	userVolumes []istioUserVolume,
+	expectedName string,
+	sourceKind volumeSourceKind,
+) (bool, error) {
+	if len(mounts) == 0 {
+		return false, nil
+	}
+
+	hasMountedCorrect := false
+
+	for _, mount := range mounts {
+		if !mount.ReadOnly {
+			return false, fmt.Errorf("volume mount with name %s mounting %s cannot have readonly=%t, %s", mount.Name, sourceKind.String(), mount.ReadOnly, errorMessageSuffix)
+		}
+
+		for _, volume := range userVolumes {
+			if volume.Name != mount.Name {
+				continue
+			}
+
+			if volume.Secret != nil && volume.ConfigMap != nil {
+				return false, fmt.Errorf("volume with name %s cannot create a volume from both a secret AND a configmap, %s", volume.Name, errorMessageSuffix)
+			}
+
+			switch sourceKind {
+			case volumeSourceSecret:
+				if volume.Secret != nil {
+					if volume.Secret.SecretName == expectedName {
+						hasMountedCorrect = true
+					}
+				} else {
+					return false, fmt.Errorf("volume with name %s must create a volume from a secret, %s", mount.Name, errorMessageSuffix)
+				}
+			case volumeSourceConfigMap:
+				if volume.ConfigMap != nil {
+					if volume.ConfigMap.Name == expectedName {
+						hasMountedCorrect = true
+					}
+				} else {
+					return false, fmt.Errorf("volume with name %s must create a volume from a configMap, %s", mount.Name, errorMessageSuffix)
+				}
+			}
+		}
+	}
+
+	return hasMountedCorrect, nil
 }
 
 func (t authPolicyValidatorType) String() string {
@@ -141,100 +222,71 @@ func validateNewPathSyntax(paths []string) error {
 	return nil
 }
 
-func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope state.Scope) error {
-	pods, err := utilities.GetProtectedPods(ctx, k8sClient, scope.AuthPolicy)
-	if err != nil {
-		return fmt.Errorf("error when getting pods matching the configured labelSelector %s: %w", scope.AuthPolicy.Spec.Selector.MatchLabels, err)
+func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope *state.Scope) error {
+	if !scope.AutoLoginConfig.Enabled {
+		return nil
+	}
+
+	pods, getPodsErr := utilities.GetProtectedPods(ctx, k8sClient, scope.AuthPolicy)
+	if getPodsErr != nil {
+		return fmt.Errorf("error when getting pods matching the configured labelSelector %s: %w", scope.AuthPolicy.Spec.Selector.MatchLabels, getPodsErr)
 	}
 	if len(*pods) == 0 {
-		return fmt.Errorf("no pods found having the labels %s", scope.AuthPolicy.Spec.Selector.MatchLabels)
+		return fmt.Errorf("no pods found having the labels %s, %s", scope.AuthPolicy.Spec.Selector.MatchLabels, errorMessageSuffix)
 	}
 
 	var envoySecretVolumeMounts []istioUserVolumeMount
 	var configMapVolumeMounts []istioUserVolumeMount
 	var userVolumes []istioUserVolume
 
-	if scope.AutoLoginConfig.Enabled {
-		for _, pod := range *pods {
-			var volumes []istioUserVolume
-			userVolumeParseErr := json.Unmarshal([]byte(pod.Annotations[istioUserVolumeAnnotation]), &volumes)
-			if userVolumeParseErr != nil {
-				return fmt.Errorf("protected pods are missing or has incorrect pod annotation '%s'", istioUserVolumeAnnotation)
-			}
-
-			var volumeMounts []istioUserVolumeMount
-			userVolumeMountParseErr := json.Unmarshal([]byte(pod.Annotations[istioUserVolumeMountAnnotation]), &volumeMounts)
-			if userVolumeMountParseErr != nil {
-				return fmt.Errorf("protected pods are missing or has incorrect pod annotation '%s'", istioUserVolumeMountAnnotation)
-			}
-
-			// iterer over volumemounts og hent ut de som mounter til /etc/istio/config og de som mounter til /etc/envoy/lua
-			// av de som mounter til /etc/istio/config så må de finnes en userVolume med samme name og må referere til riktig secret
-			// av de som mounter til /etc/envoy/lua så må de finnes en userVolume med samme name og må referere til riktig configMap
-
-			for _, volumeMount := range volumeMounts {
-				if volumeMount.MountPath == configpatch.IstioCredentialsDirectory {
-					envoySecretVolumeMounts = append(envoySecretVolumeMounts, volumeMount)
-				} else if volumeMount.MountPath == configpatch.LuaScriptDirectory {
-					configMapVolumeMounts = append(configMapVolumeMounts, volumeMount)
-				}
-			}
-			for _, volume := range volumes {
-				userVolumes = append(userVolumes, volume)
-			}
+	for _, pod := range *pods {
+		volumes, volumeMounts, collectIstioMountsErr := collectIstioVolumesAndMountsFromPod(pod.Annotations)
+		if collectIstioMountsErr != nil {
+			return collectIstioMountsErr
 		}
-	}
-	hasMountedCorrectSecret := false
-	for _, secretMount := range envoySecretVolumeMounts {
-		if !secretMount.ReadOnly {
-			return fmt.Errorf("volume mount with name %s mounting secret used by envoy filter cannot have readonly=%t", secretMount.Name, secretMount.ReadOnly)
-		}
-		for _, userVolume := range userVolumes {
-			if userVolume.Name == secretMount.Name {
-				if userVolume.Secret != nil && userVolume.ConfigMap != nil {
-					return fmt.Errorf("volume with name %s cannot create a volume from both a secret AND a configmap", userVolume.Name)
-				}
-				if userVolume.Secret != nil {
-					if userVolume.Secret.SecretName == scope.AutoLoginConfig.EnvoySecretName {
-						hasMountedCorrectSecret = true
-					}
-				} else {
-					return fmt.Errorf("volume with name %s must create a volume from a secret", secretMount.Name)
-				}
-			}
-		}
-	}
-	hasMountedCorrectConfigMap := false
-	for _, configMapMount := range configMapVolumeMounts {
-		if !configMapMount.ReadOnly {
-			return fmt.Errorf("volume mount with name %s mounting configMap used by envoy filter cannot have readonly=%t", configMapMount.Name, configMapMount.ReadOnly)
-		}
-		for _, userVolume := range userVolumes {
-			if userVolume.Name == configMapMount.Name {
-				if userVolume.Secret != nil && userVolume.ConfigMap != nil {
-					return fmt.Errorf("volume with name %s cannot create a volume from both a secret AND a configmap", userVolume.Name)
-				}
-				if userVolume.ConfigMap != nil {
-					if userVolume.ConfigMap.Name == scope.AutoLoginConfig.LuaScriptConfig.LuaScriptConfigMapName {
-						hasMountedCorrectConfigMap = true
-					}
-				} else {
-					return fmt.Errorf("volume with name %s must create a volume from a configMap", configMapMount.Name)
-				}
+		userVolumes = append(userVolumes, volumes...)
+		for _, volumeMount := range volumeMounts {
+			switch volumeMount.MountPath {
+			case configpatch.IstioCredentialsDirectory:
+				envoySecretVolumeMounts = append(envoySecretVolumeMounts, volumeMount)
+			case configpatch.LuaScriptDirectory:
+				configMapVolumeMounts = append(configMapVolumeMounts, volumeMount)
 			}
 		}
 	}
 
-	if len(envoySecretVolumeMounts) == 0 || !hasMountedCorrectSecret {
-		return fmt.Errorf("secret used by envoyfilter is either not mounted in istio-proxy or is mounted incorrectly")
+	hasMountedCorrectSecret, err := validateMountedVolumes(
+		envoySecretVolumeMounts,
+		userVolumes,
+		scope.AutoLoginConfig.EnvoySecretName,
+		volumeSourceSecret,
+	)
+	if err != nil {
+		return err
 	}
 
-	if len(configMapVolumeMounts) == 0 {
+	if envoySecretVolumeMounts == nil || len(envoySecretVolumeMounts) == 0 || !hasMountedCorrectSecret {
+		return fmt.Errorf("secret used by envoyfilter is either not mounted in istio-proxy or is mounted incorrectly, %s", errorMessageSuffix)
+	}
+
+	if configMapVolumeMounts == nil || len(configMapVolumeMounts) == 0 {
+		// If no configMap mounts are present, fall back to injecting the Lua script inline.
 		scope.AutoLoginConfig.LuaScriptConfig.InjectLuaScriptAsInlineCode = true
-	} else {
-		if !hasMountedCorrectConfigMap {
-			return fmt.Errorf("configmap with lua script not correctly mounted in istio-proxy")
-		}
+		return nil
 	}
+	hasMountedCorrectConfigMap, err := validateMountedVolumes(
+		configMapVolumeMounts,
+		userVolumes,
+		scope.AutoLoginConfig.LuaScriptConfig.LuaScriptConfigMapName,
+		volumeSourceConfigMap,
+	)
+	if err != nil {
+		return err
+	}
+
+	if !hasMountedCorrectConfigMap {
+		return fmt.Errorf("configmap with lua script not correctly mounted in istio-proxy, %s", errorMessageSuffix)
+	}
+
 	return nil
 }

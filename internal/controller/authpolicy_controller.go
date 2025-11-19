@@ -93,6 +93,8 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&v1.Secret{}).
 		Owns(&v1.ConfigMap{}).
 		Watches(&v1.Pod{}, pod.EventHandler(r.Client)).
+		//TODO: Bør watche deployments og hvis autoLogin er konfigurert bør den ztoperator trigge restart hvis den er i en failed state?
+		//TODO: Bør watche secrets og reconcile authpolicies på nytt for å laste inn nye secrets (ved f.eks. rotasjon)
 		Complete(r)
 }
 
@@ -162,7 +164,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	ignoreAuthAuthorizationPolicyName := authPolicy.Name + "-ignore-auth"
 	requireAuthAuthorizationPolicyName := authPolicy.Name + "-require-auth"
 
-	scope = validateAuthPolicy(ctx, r.Client, *scope)
+	scope = validateAuthPolicy(ctx, r.Client, scope)
 
 	reconcileFuncs := []reconciliation.ReconcileAction{
 		AuthPolicyAdapter[*v1.ConfigMap]{
@@ -826,7 +828,7 @@ func resolveAuthPolicy(
 	}, nil
 }
 
-func validateAuthPolicy(ctx context.Context, k8sClient client.Client, scope state.Scope) *state.Scope {
+func validateAuthPolicy(ctx context.Context, k8sClient client.Client, scope *state.Scope) *state.Scope {
 	rLog := log.GetLogger(ctx)
 	for _, validator := range validation.AuthPolicyValidators {
 		if validationErr := validator.Validate(ctx, k8sClient, scope); validationErr != nil {
@@ -850,10 +852,10 @@ func validateAuthPolicy(ctx context.Context, k8sClient client.Client, scope stat
 			scope.InvalidConfig = true
 			validationErrorMessage := validationErr.Error()
 			scope.ValidationErrorMessage = &validationErrorMessage
-			return &scope
+			return scope
 		}
 	}
 
 	scope.InvalidConfig = false
-	return &scope
+	return scope
 }

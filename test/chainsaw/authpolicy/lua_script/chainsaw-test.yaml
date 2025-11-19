@@ -1,0 +1,59 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: lua-script
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      name: chainsaw-lua-script
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - apply:
+            file: ../../../resources/ingress/wildcard-ingress.yaml
+        - create:
+            file: ../../../resources/secret/oauth-secret.yaml
+        - create:
+            file: ../../../resources/skiperator/application.yaml
+        - create:
+            file: authpolicy.yaml
+        - assert:
+            file: authpolicy-with-incorrect-istio-mounts-assert.yaml
+        - script:
+            content: |
+              sleep 5
+              kubectl rollout restart deploy application -n chainsaw-lua-script
+              hurl --error-format long \
+              --insecure --test test-denied.hurl \
+              --variable token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client --token_name access_token)"            
+
+        - apply:
+            file: application-without-lua-script-mount.yaml
+        - assert:
+            file: authpolicy-without-lua-script-mount-assert.yaml
+        - script:
+            content: |
+              sleep 5
+              kubectl rollout restart deploy application -n chainsaw-lua-script
+              hurl --error-format long \
+              --insecure --test test-working.hurl \
+              --variable token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client --token_name access_token)" \
+              --variable location_header="http://mock-oauth2.auth:8080/entraid/authorize?client_id=entraid_server&code_challenge="
+        
+
+        - apply:
+            file: ../../../resources/skiperator/application-with-istio-mounts.yaml
+        - assert:
+            file: authpolicy-with-lua-script-mount-assert.yaml
+        - script:
+            content: |
+              sleep 5
+              kubectl rollout restart deploy application -n chainsaw-lua-script
+              hurl --error-format long \
+              --insecure --test test-working.hurl \
+              --variable token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client --token_name access_token)" \
+              --variable location_header="http://mock-oauth2.auth:8080/entraid/authorize?client_id=entraid_server&code_challenge="
