@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.15.0
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: authpolicies.ztoperator.kartverket.no
 spec:
   group: ztoperator.kartverket.no
@@ -48,7 +48,6 @@ spec:
                   AcceptedResources is used as a validation field following [RFC8707](https://datatracker.ietf.org/doc/html/rfc8707).
                   It defines accepted audience resource indicators in the JWT token.
 
-
                   Each resource indicator must be a valid URI, and the indicator must be present as the `aud` claim in the JWT token.
                 items:
                   type: string
@@ -66,7 +65,6 @@ spec:
                   AuthRules defines rules for allowing HTTP requests based on conditions
                   that must be met based on JWT claims.
 
-
                   API endpoints not covered by AuthRules and/or IgnoreAuthRules requires an authenticated JWT by default.
                 items:
                   description: RequestAuthRule defines a rule for controlling access
@@ -81,7 +79,6 @@ spec:
                       description: |-
                         Methods specifies HTTP methods that applies for the defined paths.
                         If omitted, all methods are permitted.
-
 
                         Allowed methods:
                         - GET
@@ -109,16 +106,13 @@ spec:
                       description: |-
                         When defines additional conditions based on JWT claims that must be met.
 
-
                         The request is permitted if at least one of the specified conditions is satisfied.
                       items:
                         description: |-
                           Condition represents a rule that evaluates JWT claims to determine access control.
 
-
                           This type allows defining conditions that check whether a specific claim in
                           the JWT token contains one of the expected values.
-
 
                           If multiple conditions are specified, all must be met (AND logic) for the request to be allowed.
                         properties:
@@ -206,7 +200,6 @@ spec:
                 description: |-
                   IgnoreAuthRules defines request matchers for HTTP requests that do not require JWT authentication.
 
-
                   API endpoints not covered by AuthRules or IgnoreAuthRules require an authenticated JWT by default.
                 items:
                   description: RequestMatcher defines paths and methods to match incoming
@@ -216,7 +209,6 @@ spec:
                       description: |-
                         Methods specifies HTTP methods that applies for the defined paths.
                         If omitted, all methods are permitted.
-
 
                         Allowed methods:
                         - GET
@@ -310,6 +302,8 @@ spec:
                       rule: self.all(key, !key.contains('*'))
                     - message: key must not be empty
                       rule: self.all(key, key.size() != 0)
+                required:
+                - matchLabels
                 type: object
               wellKnownURI:
                 description: WellKnownURI specifies the URi to the identity provider's
@@ -317,6 +311,7 @@ spec:
                 type: string
             required:
             - enabled
+            - oAuthCredentials
             - selector
             - wellKnownURI
             type: object
@@ -325,16 +320,8 @@ spec:
             properties:
               conditions:
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -375,12 +362,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
