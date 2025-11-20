@@ -18,14 +18,14 @@ spec:
           typed_config:
             '@type': type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
             default_source_code:
-              inline_code: |-
-                local ignore_rules = %s
-                local require_rules = %s
-                local deny_redirect_rules = %s
-                local authorize_endpoint = "%s"
-                local login_params = %s
-                local end_session_endpoint = "%s"
-                local post_logout_redirect_uri = "%s"
+              inline_string: |-
+                local ignore_rules = {{regex="^/public$",methods={}}}
+                local require_rules = {{regex="^/oauth2/callback$",methods={}},{regex="^/logout$",methods={}}}
+                local deny_redirect_rules = {}
+                local authorize_endpoint = "http://mock-oauth2.auth:8080/entraid/authorize"
+                local login_params = {}
+                local end_session_endpoint = "http://mock-oauth2.auth:8080/entraid/endsession"
+                local post_logout_redirect_uri = ""
                 
                 -- returns true when {p,m} matches any rule in the supplied table
                 local function match(rules, p, m)
@@ -75,11 +75,11 @@ spec:
                 
                     local bypass = should_bypass(p, m)
                     request_handle:logCritical("Login bypassed?: " .. tostring(bypass))
-                    request_handle:headers():add("%s", tostring(bypass))
+                    request_handle:headers():add("x-bypass-login", tostring(bypass))
                 
                     local deny_redirect = should_deny_redirect(p, m)
                     request_handle:logCritical("Deny redirect?: " .. tostring(deny_redirect))
-                    request_handle:headers():add("%s", tostring(deny_redirect))
+                    request_handle:headers():add("x-deny-redirect", tostring(deny_redirect))
                 end
                 
                 function envoy_on_response(response_handle)
@@ -88,7 +88,7 @@ spec:
                         local loc = response_handle:headers():get("location") or ""
                         if loc ~= "" then
                             if string.sub(loc, 1, #authorize_endpoint) == authorize_endpoint and not is_empty_table(login_params) then
-                                local base, qs = loc:match("^([^?]+)%%??(.*)$")
+                                local base, qs = loc:match("^([^?]+)%??(.*)$")
                                 local filtered = {}
                                 if qs ~= "" then
                                     local params = {}
@@ -109,7 +109,7 @@ spec:
                             end
                 
                             if string.sub(loc, 1, #end_session_endpoint) == end_session_endpoint then
-                                local base, qs = loc:match("^([^?]+)%%??(.*)$")
+                                local base, qs = loc:match("^([^?]+)%??(.*)$")
                                 local filtered = {}
                                 if qs ~= "" then
                                     local params = {}
@@ -190,7 +190,7 @@ spec:
                       watched_directory:
                         path: /etc/istio/config
               deny_redirect_matcher:
-                - name: x-bypass-login
+                - name: x-deny-redirect
                   string_match:
                     exact: "true"
               end_session_endpoint: http://mock-oauth2.auth:8080/entraid/endsession

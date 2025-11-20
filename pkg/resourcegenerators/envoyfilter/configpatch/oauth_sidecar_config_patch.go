@@ -4,7 +4,7 @@ import (
 	"slices"
 
 	"github.com/kartverket/ztoperator/internal/state"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/configmap"
+	"github.com/kartverket/ztoperator/pkg/luascript"
 )
 
 const (
@@ -63,7 +63,7 @@ func GetOAuthSidecarConfigPatchValue(
 				},
 			},
 			map[string]interface{}{
-				"name": configmap.BypassOauthLoginHeaderName,
+				"name": luascript.BypassOauthLoginHeaderName,
 				"string_match": map[string]interface{}{
 					"exact": "true",
 				},
@@ -71,7 +71,7 @@ func GetOAuthSidecarConfigPatchValue(
 		},
 		"deny_redirect_matcher": []interface{}{
 			map[string]interface{}{
-				"name": configmap.BypassOauthLoginHeaderName,
+				"name": luascript.DenyRedirectHeaderName,
 				"string_match": map[string]interface{}{
 					"exact": "true",
 				},

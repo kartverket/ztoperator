@@ -28,7 +28,7 @@ func GetLuaScriptConfigPatch(scope state.Scope) map[string]interface{} {
 func getLuaScriptSourceCode(injectAsInlineCode bool, luaScript string) map[string]interface{} {
 	if injectAsInlineCode {
 		return map[string]interface{}{
-			"inline_code": luaScript,
+			"inline_string": luaScript,
 		}
 	}
 	return map[string]interface{}{

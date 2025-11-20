@@ -21,24 +21,20 @@ spec:
         - script:
             content: |
               sleep 5
-        - script:
-            content: |
               hurl --error-format long --test test-1.hurl
         - create:
             file: ../../../resources/secret/oauth-secret.yaml
+        - apply:
+            file: application-with-both-authpolicy-istio-mounts.yaml
         - create:
             file: other-authpolicy.yaml
         - script:
             content: |
               sleep 5
-        - script:
-            content: |
               hurl --error-format long --test test-2.hurl
         - delete:
             file: authpolicy.yaml
         - script:
             content: |
               sleep 5
-        - script:
-            content: |
               hurl --error-format long --test test-3.hurl

@@ -11,6 +11,8 @@ import (
 	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/utilities"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -45,7 +47,7 @@ var (
 		},
 	}
 
-	errorMessageSuffix = fmt.Sprintf("see https://github.com/kartverket/ztoperator/%s/README.md on how to do it correctly", config.ZtoperatorConfig.GitRef)
+	errorMessageSuffix = fmt.Sprintf("see https://github.com/kartverket/ztoperator/blob/%s/README.md on how to do it correctly", config.ZtoperatorConfig.GitRef)
 )
 
 type authPolicyValidatorType int
@@ -239,19 +241,29 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 	var configMapVolumeMounts []istioUserVolumeMount
 	var userVolumes []istioUserVolume
 
+	youngestPod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			CreationTimestamp: metav1.Time{},
+		},
+	}
+
 	for _, pod := range *pods {
-		volumes, volumeMounts, collectIstioMountsErr := collectIstioVolumesAndMountsFromPod(pod.Annotations)
-		if collectIstioMountsErr != nil {
-			return collectIstioMountsErr
+		if pod.CreationTimestamp.After(youngestPod.CreationTimestamp.Time) {
+			youngestPod = pod
 		}
-		userVolumes = append(userVolumes, volumes...)
-		for _, volumeMount := range volumeMounts {
-			switch volumeMount.MountPath {
-			case configpatch.IstioCredentialsDirectory:
-				envoySecretVolumeMounts = append(envoySecretVolumeMounts, volumeMount)
-			case configpatch.LuaScriptDirectory:
-				configMapVolumeMounts = append(configMapVolumeMounts, volumeMount)
-			}
+	}
+
+	volumes, volumeMounts, collectIstioMountsErr := collectIstioVolumesAndMountsFromPod(youngestPod.Annotations)
+	if collectIstioMountsErr != nil {
+		return collectIstioMountsErr
+	}
+	userVolumes = append(userVolumes, volumes...)
+	for _, volumeMount := range volumeMounts {
+		switch volumeMount.MountPath {
+		case configpatch.IstioCredentialsDirectory:
+			envoySecretVolumeMounts = append(envoySecretVolumeMounts, volumeMount)
+		case configpatch.LuaScriptDirectory:
+			configMapVolumeMounts = append(configMapVolumeMounts, volumeMount)
 		}
 	}
 

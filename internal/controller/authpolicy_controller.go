@@ -802,10 +802,6 @@ func resolveAuthPolicy(
 
 	autoLoginConfig := state.AutoLoginConfig{
 		Enabled: false,
-		LuaScriptConfig: state.LuaScriptConfig{
-			InjectLuaScriptAsInlineCode: false,
-			LuaScript:                   luascript.GetLuaScript(),
-		},
 	}
 
 	if authPolicy.Spec.AutoLogin != nil && authPolicy.Spec.AutoLogin.Enabled {
@@ -816,6 +812,15 @@ func resolveAuthPolicy(
 		autoLoginConfig.LoginParams = authPolicy.Spec.AutoLogin.LoginParams
 
 		autoLoginConfig.SetSaneDefaults(*authPolicy.Spec.AutoLogin)
+
+		autoLoginConfig.LuaScriptConfig = state.LuaScriptConfig{
+			InjectLuaScriptAsInlineCode: false,
+			LuaScript: luascript.GetLuaScript(
+				authPolicy,
+				autoLoginConfig,
+				identityProviderUris,
+			),
+		}
 	}
 
 	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name %s/%s", authPolicy.Namespace, authPolicy.Name))

@@ -1,0 +1,22 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: envoy-secret
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: ../../../resources/secret/oauth-secret.yaml
+        - create:
+            file: ../../../resources/skiperator/application-with-istio-mounts.yaml
+        - create:
+            file: authpolicy.yaml
+        - assert:
+            file: authpolicy-assert.yaml

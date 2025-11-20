@@ -13,7 +13,7 @@ data:
     local function match(rules, p, m)
         for _, rule in ipairs(rules) do
             if string.match(p, rule.regex) then
-                -- empty "methods" table == all methods
+            -- empty "methods" table == all methods
                 if next(rule.methods) == nil or rule.methods[m] then
                     return true
                 end
@@ -197,7 +197,7 @@ spec:
                       watched_directory:
                         path: /etc/istio/config
               deny_redirect_matcher:
-                - name: x-bypass-login
+                - name: x-deny-redirect
                   string_match:
                     exact: "true"
               end_session_endpoint: http://mock-oauth2.auth:8080/entraid/endsession

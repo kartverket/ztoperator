@@ -13,7 +13,7 @@ data:
     local function match(rules, p, m)
         for _, rule in ipairs(rules) do
             if string.match(p, rule.regex) then
-                -- empty "methods" table == all methods
+            -- empty "methods" table == all methods
                 if next(rule.methods) == nil or rule.methods[m] then
                     return true
                 end
