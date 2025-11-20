@@ -13,7 +13,7 @@ spec:
   steps:
     - try:
         - create:
-            file: ../../../resources/skiperator/application.yaml
+            file: echo-application.yaml
         - apply:
             file: ../../../resources/ingress/wildcard-ingress.yaml
         - create:
@@ -21,9 +21,8 @@ spec:
         - assert:
             file: authpolicy-assert.yaml
         - script:
-            content: sleep 5
-        - script:
             content: |
+              sleep 5
               hurl --error-format long \
               --insecure --test tests.hurl \
               --variable token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer maskinporten --code maskinporten_code --token_name access_token)"
