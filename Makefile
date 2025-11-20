@@ -19,7 +19,7 @@ CONTAINER_TOOL             ?= docker
 IMG                        ?= ztoperator:latest
 KIND_CLUSTER_NAME          ?= ztoperator
 KUBECONTEXT                ?= kind-$(KIND_CLUSTER_NAME)
-KUBERNETES_VERSION          = 1.31.4
+KUBERNETES_VERSION          = 1.32.5
 ENVTEST_K8S_VERSION         = $(KUBERNETES_VERSION)
 KIND_IMAGE                 ?= kindest/node:v$(KUBERNETES_VERSION)
 CHAINSAW_VERSION           := 0.2.12
@@ -43,8 +43,8 @@ GOLANGCI_LINT   = $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.2
-CONTROLLER_TOOLS_VERSION ?= v0.15.0
-GOLANGCI_LINT_VERSION ?= v1.59.1
+CONTROLLER_TOOLS_VERSION ?= v0.19.0
+GOLANGCI_LINT_VERSION ?= v2.5.0
 
 
 .PHONY: all
