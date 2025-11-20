@@ -12,7 +12,6 @@ const (
 )
 
 func GetLuaScriptConfigPatch(scope state.Scope) map[string]interface{} {
-
 	return map[string]interface{}{
 		"name": "envoy.filters.http.lua",
 		"typed_config": map[string]interface{}{
@@ -34,5 +33,4 @@ func getLuaScriptSourceCode(injectAsInlineCode bool, luaScript string) map[strin
 	return map[string]interface{}{
 		"filename": fmt.Sprintf("%s/%s", LuaScriptDirectory, configmap.LuaScriptFileName),
 	}
-
 }

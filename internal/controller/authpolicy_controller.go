@@ -173,7 +173,13 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					ResourceKind: "ConfigMap",
 					ResourceName: scope.AutoLoginConfig.LuaScriptConfig.LuaScriptConfigMapName,
 					DesiredResource: utilities.Ptr(
-						configmap.GetDesired(scope, utilities.BuildObjectMeta(scope.AutoLoginConfig.LuaScriptConfig.LuaScriptConfigMapName, authPolicy.Namespace)),
+						configmap.GetDesired(
+							scope,
+							utilities.BuildObjectMeta(
+								scope.AutoLoginConfig.LuaScriptConfig.LuaScriptConfigMapName,
+								authPolicy.Namespace,
+							),
+						),
 					),
 					Scope: scope,
 					ShouldUpdate: func(current, desired *v1.ConfigMap) bool {
@@ -191,7 +197,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					ResourceKind: "Secret",
 					ResourceName: scope.AutoLoginConfig.EnvoySecretName,
 					DesiredResource: utilities.Ptr(
-						secret.GetDesired(scope, utilities.BuildObjectMeta(scope.AutoLoginConfig.EnvoySecretName, authPolicy.Namespace)),
+						secret.GetDesired(
+							scope,
+							utilities.BuildObjectMeta(scope.AutoLoginConfig.EnvoySecretName, authPolicy.Namespace),
+						),
 					),
 					Scope: scope,
 					ShouldUpdate: func(current, desired *v1.Secret) bool {
@@ -835,7 +844,7 @@ func resolveAuthPolicy(
 
 func validateAuthPolicy(ctx context.Context, k8sClient client.Client, scope *state.Scope) *state.Scope {
 	rLog := log.GetLogger(ctx)
-	for _, validator := range validation.AuthPolicyValidators {
+	for _, validator := range validation.GetValidators() {
 		if validationErr := validator.Validate(ctx, k8sClient, scope); validationErr != nil {
 			rLog.Error(
 				validationErr,

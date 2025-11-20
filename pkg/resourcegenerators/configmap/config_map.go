@@ -1,8 +1,6 @@
 package configmap
 
 import (
-	_ "embed"
-
 	"github.com/kartverket/ztoperator/internal/state"
 	v2 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

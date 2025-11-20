@@ -31,23 +31,6 @@ var (
 	// Valid pchar from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
 	// pchar = unreserved / pct-encoded / sub-delims / ":" / "@".
 	validLiteral = regexp.MustCompile("^[a-zA-Z0-9-._~%!$&'()+,;:@=]+$")
-
-	AuthPolicyValidators = []AuthPolicyValidator{
-		{
-			Type: pathsValidation,
-			Validate: func(ctx context.Context, k8sClient client.Client, scope *state.Scope) error {
-				return validatePaths(scope.AuthPolicy.GetPaths())
-			},
-		},
-		{
-			Type: podAnnotationsValidation,
-			Validate: func(ctx context.Context, k8sClient client.Client, scope *state.Scope) error {
-				return validatePodAnnotations(ctx, k8sClient, scope)
-			},
-		},
-	}
-
-	errorMessageSuffix = fmt.Sprintf("see https://github.com/kartverket/ztoperator/blob/%s/README.md on how to do it correctly", config.ZtoperatorConfig.GitRef)
 )
 
 type authPolicyValidatorType int
@@ -91,15 +74,47 @@ func (s *volumeSourceKind) String() string {
 	return "configMap"
 }
 
-func collectIstioVolumesAndMountsFromPod(podAnnotations map[string]string) ([]istioUserVolume, []istioUserVolumeMount, error) {
+func GetValidators() []AuthPolicyValidator {
+	return []AuthPolicyValidator{
+		{
+			Type: pathsValidation,
+			Validate: func(_ context.Context, _ client.Client, scope *state.Scope) error {
+				return validatePaths(scope.AuthPolicy.GetPaths())
+			},
+		},
+		{
+			Type:     podAnnotationsValidation,
+			Validate: validatePodAnnotations,
+		},
+	}
+}
+
+func errorMessageSuffix() string {
+	return fmt.Sprintf(
+		"see https://github.com/kartverket/ztoperator/blob/%s/README.md on how to do it correctly",
+		config.Get().GitRef,
+	)
+}
+
+func collectIstioVolumesAndMountsFromPod(
+	podAnnotations map[string]string,
+) ([]istioUserVolume, []istioUserVolumeMount, error) {
 	var volumes []istioUserVolume
 	if err := json.Unmarshal([]byte(podAnnotations[istioUserVolumeAnnotation]), &volumes); err != nil {
-		return nil, nil, fmt.Errorf("protected pods are missing or has incorrect pod annotation '%s', %s", istioUserVolumeAnnotation, errorMessageSuffix)
+		return nil, nil, fmt.Errorf(
+			"protected pods are missing or has incorrect pod annotation '%s', %s",
+			istioUserVolumeAnnotation,
+			errorMessageSuffix(),
+		)
 	}
 
 	var volumeMounts []istioUserVolumeMount
 	if err := json.Unmarshal([]byte(podAnnotations[istioUserVolumeMountAnnotation]), &volumeMounts); err != nil {
-		return nil, nil, fmt.Errorf("protected pods are missing or has incorrect pod annotation '%s', %s", istioUserVolumeMountAnnotation, errorMessageSuffix)
+		return nil, nil, fmt.Errorf(
+			"protected pods are missing or has incorrect pod annotation '%s', %s",
+			istioUserVolumeMountAnnotation,
+			errorMessageSuffix(),
+		)
 	}
 
 	return volumes, volumeMounts, nil
@@ -119,7 +134,13 @@ func validateMountedVolumes(
 
 	for _, mount := range mounts {
 		if !mount.ReadOnly {
-			return false, fmt.Errorf("volume mount with name %s mounting %s cannot have readonly=%t, %s", mount.Name, sourceKind.String(), mount.ReadOnly, errorMessageSuffix)
+			return false, fmt.Errorf(
+				"volume mount with name %s mounting %s cannot have readonly=%t, %s",
+				mount.Name,
+				sourceKind.String(),
+				mount.ReadOnly,
+				errorMessageSuffix(),
+			)
 		}
 
 		for _, volume := range userVolumes {
@@ -128,31 +149,48 @@ func validateMountedVolumes(
 			}
 
 			if volume.Secret != nil && volume.ConfigMap != nil {
-				return false, fmt.Errorf("volume with name %s cannot create a volume from both a secret AND a configmap, %s", volume.Name, errorMessageSuffix)
+				return false, fmt.Errorf(
+					"volume with name %s cannot create a volume from both a secret AND a configmap, %s",
+					volume.Name,
+					errorMessageSuffix(),
+				)
 			}
-
-			switch sourceKind {
-			case volumeSourceSecret:
-				if volume.Secret != nil {
-					if volume.Secret.SecretName == expectedName {
-						hasMountedCorrect = true
-					}
-				} else {
-					return false, fmt.Errorf("volume with name %s must create a volume from a secret, %s", mount.Name, errorMessageSuffix)
-				}
-			case volumeSourceConfigMap:
-				if volume.ConfigMap != nil {
-					if volume.ConfigMap.Name == expectedName {
-						hasMountedCorrect = true
-					}
-				} else {
-					return false, fmt.Errorf("volume with name %s must create a volume from a configMap, %s", mount.Name, errorMessageSuffix)
-				}
+			correct, err := hasMountedCorrectVolume(sourceKind, volume, expectedName, mount)
+			if err != nil {
+				return false, err
 			}
+			hasMountedCorrect = *correct
 		}
 	}
 
 	return hasMountedCorrect, nil
+}
+
+func hasMountedCorrectVolume(
+	sourceKind volumeSourceKind,
+	volume istioUserVolume,
+	expectedName string,
+	volumeMount istioUserVolumeMount,
+) (*bool, error) {
+	switch sourceKind {
+	case volumeSourceSecret:
+		if volume.Secret != nil {
+			if volume.Secret.SecretName == expectedName {
+				return utilities.Ptr(true), nil
+			}
+		} else {
+			return nil, fmt.Errorf("volume with name %s must create a volume from a secret, %s", volumeMount.Name, errorMessageSuffix())
+		}
+	case volumeSourceConfigMap:
+		if volume.ConfigMap != nil {
+			if volume.ConfigMap.Name == expectedName {
+				return utilities.Ptr(true), nil
+			}
+		} else {
+			return nil, fmt.Errorf("volume with name %s must create a volume from a configMap, %s", volumeMount.Name, errorMessageSuffix())
+		}
+	}
+	return nil, fmt.Errorf("encountered unknown volumeSourceKind: %s for volume %s", sourceKind.String(), volume.Name)
 }
 
 func (t authPolicyValidatorType) String() string {
@@ -231,10 +269,18 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 
 	pods, getPodsErr := utilities.GetProtectedPods(ctx, k8sClient, scope.AuthPolicy)
 	if getPodsErr != nil {
-		return fmt.Errorf("error when getting pods matching the configured labelSelector %s: %w", scope.AuthPolicy.Spec.Selector.MatchLabels, getPodsErr)
+		return fmt.Errorf(
+			"error when getting pods matching the configured labelSelector %s: %w",
+			scope.AuthPolicy.Spec.Selector.MatchLabels,
+			getPodsErr,
+		)
 	}
 	if len(*pods) == 0 {
-		return fmt.Errorf("no pods found having the labels %s, %s", scope.AuthPolicy.Spec.Selector.MatchLabels, errorMessageSuffix)
+		return fmt.Errorf(
+			"no pods found having the labels %s, %s",
+			scope.AuthPolicy.Spec.Selector.MatchLabels,
+			errorMessageSuffix(),
+		)
 	}
 
 	var envoySecretVolumeMounts []istioUserVolumeMount
@@ -277,11 +323,14 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 		return err
 	}
 
-	if envoySecretVolumeMounts == nil || len(envoySecretVolumeMounts) == 0 || !hasMountedCorrectSecret {
-		return fmt.Errorf("secret used by envoyfilter is either not mounted in istio-proxy or is mounted incorrectly, %s", errorMessageSuffix)
+	if len(envoySecretVolumeMounts) == 0 || !hasMountedCorrectSecret {
+		return fmt.Errorf(
+			"secret used by envoyfilter is either not mounted in istio-proxy or is mounted incorrectly, %s",
+			errorMessageSuffix(),
+		)
 	}
 
-	if configMapVolumeMounts == nil || len(configMapVolumeMounts) == 0 {
+	if len(configMapVolumeMounts) == 0 {
 		// If no configMap mounts are present, fall back to injecting the Lua script inline.
 		scope.AutoLoginConfig.LuaScriptConfig.InjectLuaScriptAsInlineCode = true
 		return nil
@@ -297,7 +346,7 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 	}
 
 	if !hasMountedCorrectConfigMap {
-		return fmt.Errorf("configmap with lua script not correctly mounted in istio-proxy, %s", errorMessageSuffix)
+		return fmt.Errorf("configmap with lua script not correctly mounted in istio-proxy, %s", errorMessageSuffix())
 	}
 
 	return nil
