@@ -5,7 +5,7 @@ import (
 )
 
 type Config struct {
-	GitRef string `required:"true" split_words:"true"`
+	GitRef string `split_words:"true" default:"main"`
 }
 
 var cfg Config
