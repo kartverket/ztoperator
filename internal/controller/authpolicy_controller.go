@@ -93,8 +93,6 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&v1.Secret{}).
 		Owns(&v1.ConfigMap{}).
 		Watches(&v1.Pod{}, pod.EventHandler(r.Client)).
-		//TODO: Bør watche deployments og hvis autoLogin er konfigurert bør den ztoperator trigge restart hvis den er i en failed state?
-		//TODO: Bør watche secrets og reconcile authpolicies på nytt for å laste inn nye secrets (ved f.eks. rotasjon)
 		Complete(r)
 }
 
