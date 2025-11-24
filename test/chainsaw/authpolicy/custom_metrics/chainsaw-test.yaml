@@ -20,15 +20,17 @@ spec:
             file: authpolicy.yaml
         - script:
             content: |
-              sleep 5
+              sleep 7
               hurl --error-format long --test test-1.hurl
         - create:
             file: ../../../resources/secret/oauth-secret.yaml
         - create:
+            file: other-application.yaml
+        - create:
             file: other-authpolicy.yaml
         - script:
             content: |
-              sleep 5
+              sleep 7
               hurl --error-format long --test test-2.hurl
         - delete:
             file: authpolicy.yaml
