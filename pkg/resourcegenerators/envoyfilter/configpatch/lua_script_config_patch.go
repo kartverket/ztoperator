@@ -4,10 +4,6 @@ import (
 	"github.com/kartverket/ztoperator/internal/state"
 )
 
-const (
-	LuaScriptDirectory = "/etc/envoy/lua"
-)
-
 func GetLuaScriptConfigPatch(scope state.Scope) map[string]interface{} {
 	return map[string]interface{}{
 		"name": "envoy.filters.http.lua",
