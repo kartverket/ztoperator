@@ -217,7 +217,6 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 	}
 
 	var envoySecretVolumeMounts []istioUserVolumeMount
-	var configMapVolumeMounts []istioUserVolumeMount
 	var userVolumes []istioUserVolume
 
 	youngestPod := corev1.Pod{
@@ -238,11 +237,8 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 	}
 	userVolumes = append(userVolumes, volumes...)
 	for _, volumeMount := range volumeMounts {
-		switch volumeMount.MountPath {
-		case configpatch.IstioCredentialsDirectory:
+		if volumeMount.MountPath == configpatch.IstioCredentialsDirectory {
 			envoySecretVolumeMounts = append(envoySecretVolumeMounts, volumeMount)
-		case configpatch.LuaScriptDirectory:
-			configMapVolumeMounts = append(configMapVolumeMounts, volumeMount)
 		}
 	}
 
