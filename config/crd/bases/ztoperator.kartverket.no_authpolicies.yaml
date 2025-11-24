@@ -311,7 +311,6 @@ spec:
                 type: string
             required:
             - enabled
-            - oAuthCredentials
             - selector
             - wellKnownURI
             type: object

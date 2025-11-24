@@ -19,7 +19,7 @@ type AuthPolicySpec struct {
 
 	// OAuthCredentials specifies a reference to a kubernetes secret in the same namespace holding OAuth credentials used for authentication.
 	//
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
 	OAuthCredentials *OAuthCredentials `json:"oAuthCredentials,omitempty"`
 
 	// WellKnownURI specifies the URi to the identity provider's discovery document (also known as well-known endpoint).
