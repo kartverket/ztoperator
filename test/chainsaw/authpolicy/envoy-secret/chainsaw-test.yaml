@@ -15,7 +15,7 @@ spec:
         - create:
             file: ../../../resources/secret/oauth-secret.yaml
         - create:
-            file: ../../../resources/skiperator/application-with-istio-mounts.yaml
+            file: ../../../resources/skiperator/application-with-istio-mount.yaml
         - create:
             file: authpolicy.yaml
         - assert:

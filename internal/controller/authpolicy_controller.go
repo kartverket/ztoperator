@@ -18,7 +18,6 @@ import (
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/deny"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/require"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/configmap"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
@@ -91,7 +90,6 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&istioclientsecurityv1.AuthorizationPolicy{}).
 		Owns(&v1alpha4.EnvoyFilter{}).
 		Owns(&v1.Secret{}).
-		Owns(&v1.ConfigMap{}).
 		Watches(&v1.Pod{}, pod.EventHandler(r.Client)).
 		Complete(r)
 }
@@ -103,7 +101,7 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=core,resources=namespaces;pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies;requestauthentications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	rLog := log.GetLogger(ctx)
@@ -153,7 +151,6 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return reconcile.Result{}, err
 	}
 
-	scope.AutoLoginConfig.LuaScriptConfig.LuaScriptConfigMapName = authPolicy.Name + "-lua-script"
 	scope.AutoLoginConfig.EnvoySecretName = authPolicy.Name + "-envoy-secret"
 
 	autoLoginEnvoyFilter := authPolicy.Name + "-login"
@@ -165,30 +162,6 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	scope = validateAuthPolicy(ctx, r.Client, scope)
 
 	reconcileFuncs := []reconciliation.ReconcileAction{
-		AuthPolicyAdapter[*v1.ConfigMap]{
-			reconciliation.ReconcileFuncAdapter[*v1.ConfigMap]{
-				Func: reconciliation.ReconcileFunc[*v1.ConfigMap]{
-					ResourceKind: "ConfigMap",
-					ResourceName: scope.AutoLoginConfig.LuaScriptConfig.LuaScriptConfigMapName,
-					DesiredResource: utilities.Ptr(
-						configmap.GetDesired(
-							scope,
-							utilities.BuildObjectMeta(
-								scope.AutoLoginConfig.LuaScriptConfig.LuaScriptConfigMapName,
-								authPolicy.Namespace,
-							),
-						),
-					),
-					Scope: scope,
-					ShouldUpdate: func(current, desired *v1.ConfigMap) bool {
-						return !reflect.DeepEqual(current.Data, desired.Data)
-					},
-					UpdateFields: func(current, desired *v1.ConfigMap) {
-						current.Data = desired.Data
-					},
-				},
-			},
-		},
 		AuthPolicyAdapter[*v1.Secret]{
 			reconciliation.ReconcileFuncAdapter[*v1.Secret]{
 				Func: reconciliation.ReconcileFunc[*v1.Secret]{
@@ -821,7 +794,6 @@ func resolveAuthPolicy(
 		autoLoginConfig.SetSaneDefaults(*authPolicy.Spec.AutoLogin)
 
 		autoLoginConfig.LuaScriptConfig = state.LuaScriptConfig{
-			InjectLuaScriptAsInlineCode: false,
 			LuaScript: luascript.GetLuaScript(
 				authPolicy,
 				autoLoginConfig,

@@ -14,15 +14,13 @@ spec:
   steps:
     - try:
         - create:
-            file: ../../../resources/skiperator/application-with-istio-mounts.yaml
+            file: ../../../resources/skiperator/application-with-istio-mount.yaml
         - apply:
             file: ../../../resources/ingress/wildcard-ingress.yaml
         - create:
             file: ../../../resources/secret/oauth-secret.yaml
         - create:
             file: authpolicy-with-post-logout-redirect.yaml
-        - assert:
-            file: authpolicy-with-post-logout-redirect-assert.yaml
         - script:
             content: sleep 5
         - script:
@@ -31,8 +29,6 @@ spec:
               --insecure --test tests-with-post-logout-redirect.hurl
         - update:
             file: authpolicy-without-post-logout-redirect.yaml
-        - assert:
-            file: authpolicy-without-post-logout-redirect-assert.yaml
         - script:
             content: | 
               sleep 2

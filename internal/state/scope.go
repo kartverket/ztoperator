@@ -39,9 +39,7 @@ type AutoLoginConfig struct {
 }
 
 type LuaScriptConfig struct {
-	LuaScriptConfigMapName      string
-	InjectLuaScriptAsInlineCode bool
-	LuaScript                   string
+	LuaScript string
 }
 
 type OAuthCredentials struct {

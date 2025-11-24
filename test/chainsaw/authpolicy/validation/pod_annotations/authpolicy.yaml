@@ -4,9 +4,6 @@ metadata:
   name: auth-policy
 spec:
   enabled: true
-  ignoreAuthRules:
-    - paths:
-        - /public
   oAuthCredentials:
     clientIDKey: CLIENT_ID
     clientSecretKey: CLIENT_SECRET

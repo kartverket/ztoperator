@@ -14,15 +14,13 @@ spec:
   steps:
     - try:
         - create:
-            file: ../../../resources/skiperator/application-with-istio-mounts.yaml
+            file: ../../../resources/skiperator/application-with-istio-mount.yaml
         - apply:
             file: ../../../resources/ingress/wildcard-ingress.yaml
         - create:
             file: ../../../resources/secret/oauth-secret.yaml
         - create:
             file: authpolicy-acr-values.yaml
-        - assert:
-            file: authpolicy-acr-values-assert.yaml
         - script:
             content: sleep 5
         - script:
@@ -30,8 +28,6 @@ spec:
               hurl --error-format long --insecure --test test-acr-values.hurl
         - apply:
             file: authpolicy-auth-details.yaml
-        - assert:
-            file: authpolicy-auth-details-assert.yaml
         - script:
             content: |
               kubectl rollout restart deploy application -n chainsaw-login-params

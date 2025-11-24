@@ -15,7 +15,7 @@ spec:
   steps:
     - try:
         - create:
-            file: ../../../resources/skiperator/application-with-istio-mounts.yaml
+            file: ../../../resources/skiperator/application-with-istio-mount.yaml
         - create:
             file: authpolicy.yaml
         - script:
@@ -24,8 +24,6 @@ spec:
               hurl --error-format long --test test-1.hurl
         - create:
             file: ../../../resources/secret/oauth-secret.yaml
-        - apply:
-            file: application-with-both-authpolicy-istio-mounts.yaml
         - create:
             file: other-authpolicy.yaml
         - script:

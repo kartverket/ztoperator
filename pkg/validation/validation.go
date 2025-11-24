@@ -41,37 +41,18 @@ type AuthPolicyValidator struct {
 }
 
 type istioUserVolume struct {
-	Name      string                    `json:"name"`
-	Secret    *istioUserVolumeSecret    `json:"secret,omitempty"`
-	ConfigMap *istioUserVolumeConfigMap `json:"configMap,omitempty"`
+	Name   string                 `json:"name"`
+	Secret *istioUserVolumeSecret `json:"secret,omitempty"`
 }
 
 type istioUserVolumeSecret struct {
 	SecretName string `json:"secretName"`
 }
 
-type istioUserVolumeConfigMap struct {
-	Name string `json:"name"`
-}
-
 type istioUserVolumeMount struct {
 	Name      string `json:"name"`
 	MountPath string `json:"mountPath"`
 	ReadOnly  bool   `json:"readonly"`
-}
-
-type volumeSourceKind int
-
-const (
-	volumeSourceSecret volumeSourceKind = iota
-	volumeSourceConfigMap
-)
-
-func (s *volumeSourceKind) String() string {
-	if *s == volumeSourceSecret {
-		return "secret"
-	}
-	return "configMap"
 }
 
 func GetValidators() []AuthPolicyValidator {
@@ -89,6 +70,17 @@ func GetValidators() []AuthPolicyValidator {
 	}
 }
 
+func (t authPolicyValidatorType) String() string {
+	switch t {
+	case pathsValidation:
+		return "Path validation"
+	case podAnnotationsValidation:
+		return "Pod annotation"
+	default:
+		panic(fmt.Sprintf("unknown authPolicyValidatorType %d", t))
+	}
+}
+
 func errorMessageSuffix() string {
 	return fmt.Sprintf(
 		"see https://github.com/kartverket/ztoperator/blob/%s/README.md on how to do it correctly",
@@ -102,7 +94,7 @@ func collectIstioVolumesAndMountsFromPod(
 	var volumes []istioUserVolume
 	if err := json.Unmarshal([]byte(podAnnotations[istioUserVolumeAnnotation]), &volumes); err != nil {
 		return nil, nil, fmt.Errorf(
-			"protected pods are missing or has incorrect pod annotation '%s', %s",
+			"the required annotation '%s' is either missing or its content is not properly formatted, %s",
 			istioUserVolumeAnnotation,
 			errorMessageSuffix(),
 		)
@@ -111,7 +103,7 @@ func collectIstioVolumesAndMountsFromPod(
 	var volumeMounts []istioUserVolumeMount
 	if err := json.Unmarshal([]byte(podAnnotations[istioUserVolumeMountAnnotation]), &volumeMounts); err != nil {
 		return nil, nil, fmt.Errorf(
-			"protected pods are missing or has incorrect pod annotation '%s', %s",
+			"the required annotation '%s' is either missing or its content is not properly formatted, %s",
 			istioUserVolumeMountAnnotation,
 			errorMessageSuffix(),
 		)
@@ -120,11 +112,10 @@ func collectIstioVolumesAndMountsFromPod(
 	return volumes, volumeMounts, nil
 }
 
-func validateMountedVolumes(
+func validateSecretVolumeMount(
 	mounts []istioUserVolumeMount,
 	userVolumes []istioUserVolume,
-	expectedName string,
-	sourceKind volumeSourceKind,
+	expectedSecretName string,
 ) (bool, error) {
 	if len(mounts) == 0 {
 		return false, nil
@@ -133,75 +124,17 @@ func validateMountedVolumes(
 	hasMountedCorrect := false
 
 	for _, mount := range mounts {
-		if !mount.ReadOnly {
-			return false, fmt.Errorf(
-				"volume mount with name %s mounting %s cannot have readonly=%t, %s",
-				mount.Name,
-				sourceKind.String(),
-				mount.ReadOnly,
-				errorMessageSuffix(),
-			)
-		}
-
 		for _, volume := range userVolumes {
 			if volume.Name != mount.Name {
 				continue
 			}
-
-			if volume.Secret != nil && volume.ConfigMap != nil {
-				return false, fmt.Errorf(
-					"volume with name %s cannot create a volume from both a secret AND a configmap, %s",
-					volume.Name,
-					errorMessageSuffix(),
-				)
+			if volume.Secret != nil && volume.Secret.SecretName == expectedSecretName {
+				hasMountedCorrect = true
 			}
-			correct, err := hasMountedCorrectVolume(sourceKind, volume, expectedName, mount)
-			if err != nil {
-				return false, err
-			}
-			hasMountedCorrect = *correct
 		}
 	}
 
 	return hasMountedCorrect, nil
-}
-
-func hasMountedCorrectVolume(
-	sourceKind volumeSourceKind,
-	volume istioUserVolume,
-	expectedName string,
-	volumeMount istioUserVolumeMount,
-) (*bool, error) {
-	switch sourceKind {
-	case volumeSourceSecret:
-		if volume.Secret != nil {
-			if volume.Secret.SecretName == expectedName {
-				return utilities.Ptr(true), nil
-			}
-		} else {
-			return nil, fmt.Errorf("volume with name %s must create a volume from a secret, %s", volumeMount.Name, errorMessageSuffix())
-		}
-	case volumeSourceConfigMap:
-		if volume.ConfigMap != nil {
-			if volume.ConfigMap.Name == expectedName {
-				return utilities.Ptr(true), nil
-			}
-		} else {
-			return nil, fmt.Errorf("volume with name %s must create a volume from a configMap, %s", volumeMount.Name, errorMessageSuffix())
-		}
-	}
-	return nil, fmt.Errorf("encountered unknown volumeSourceKind: %s for volume %s", sourceKind.String(), volume.Name)
-}
-
-func (t authPolicyValidatorType) String() string {
-	switch t {
-	case pathsValidation:
-		return "Path validation"
-	case podAnnotationsValidation:
-		return "Pod annotation"
-	default:
-		panic(fmt.Sprintf("unknown authPolicyValidatorType %d", t))
-	}
 }
 
 func validatePaths(paths []string) error {
@@ -313,11 +246,10 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 		}
 	}
 
-	hasMountedCorrectSecret, err := validateMountedVolumes(
+	hasMountedCorrectSecret, err := validateSecretVolumeMount(
 		envoySecretVolumeMounts,
 		userVolumes,
 		scope.AutoLoginConfig.EnvoySecretName,
-		volumeSourceSecret,
 	)
 	if err != nil {
 		return err
@@ -325,28 +257,10 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 
 	if len(envoySecretVolumeMounts) == 0 || !hasMountedCorrectSecret {
 		return fmt.Errorf(
-			"secret used by envoyfilter is either not mounted in istio-proxy or is mounted incorrectly, %s",
+			"secret with name '%s' used by OAuth-EnvoyFilter is not mounted in istio-proxy, %s",
+			scope.AutoLoginConfig.EnvoySecretName,
 			errorMessageSuffix(),
 		)
-	}
-
-	if len(configMapVolumeMounts) == 0 {
-		// If no configMap mounts are present, fall back to injecting the Lua script inline.
-		scope.AutoLoginConfig.LuaScriptConfig.InjectLuaScriptAsInlineCode = true
-		return nil
-	}
-	hasMountedCorrectConfigMap, err := validateMountedVolumes(
-		configMapVolumeMounts,
-		userVolumes,
-		scope.AutoLoginConfig.LuaScriptConfig.LuaScriptConfigMapName,
-		volumeSourceConfigMap,
-	)
-	if err != nil {
-		return err
-	}
-
-	if !hasMountedCorrectConfigMap {
-		return fmt.Errorf("configmap with lua script not correctly mounted in istio-proxy, %s", errorMessageSuffix())
 	}
 
 	return nil

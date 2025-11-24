@@ -13,7 +13,7 @@ spec:
   steps:
     - try:
         - create:
-            file: ../../../resources/skiperator/application-with-istio-mounts.yaml
+            file: ../../../resources/skiperator/application-with-istio-mount.yaml
         - apply:
             file: ../../../resources/ingress/wildcard-ingress.yaml
         - create:

@@ -1,7 +1,7 @@
 apiVersion: skiperator.kartverket.no/v1alpha1
 kind: Application
 metadata:
-  name: other-application
+  name: application
 spec:
   podSettings:
     annotations:
@@ -10,13 +10,7 @@ spec:
         {
           "name": "secret",
           "secret": {
-            "secretName": "other-auth-policy-envoy-secret"
-          }
-        },
-        {
-          "name": "lua",
-          "configMap": {
-            "name": "other-auth-policy-lua-script"
+            "secretName": "envoy-secret"
           }
         }        
       ]'
@@ -24,11 +18,6 @@ spec:
         {
           "name": "secret",
           "mountPath": "/etc/istio/config",
-          "readonly": true
-        },
-        {
-          "name": "lua",
-          "mountPath": "/etc/envoy/lua",
           "readonly": true
         }        
       ]'

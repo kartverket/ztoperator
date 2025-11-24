@@ -12,3 +12,12 @@ spec:
   selector:
     matchLabels:
       app: application
+---
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+status:
+  phase: Invalid
+  ready: false
+

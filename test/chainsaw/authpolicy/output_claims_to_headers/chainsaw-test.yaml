@@ -18,8 +18,6 @@ spec:
             file: ../../../resources/ingress/wildcard-ingress.yaml
         - create:
             file: authpolicy.yaml
-        - assert:
-            file: authpolicy-assert.yaml
         - script:
             content: |
               sleep 5
