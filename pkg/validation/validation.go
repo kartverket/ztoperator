@@ -116,9 +116,9 @@ func validateSecretVolumeMount(
 	mounts []istioUserVolumeMount,
 	userVolumes []istioUserVolume,
 	expectedSecretName string,
-) (bool, error) {
+) bool {
 	if len(mounts) == 0 {
-		return false, nil
+		return false
 	}
 
 	hasMountedCorrect := false
@@ -134,7 +134,7 @@ func validateSecretVolumeMount(
 		}
 	}
 
-	return hasMountedCorrect, nil
+	return hasMountedCorrect
 }
 
 func validatePaths(paths []string) error {
@@ -242,16 +242,11 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 		}
 	}
 
-	hasMountedCorrectSecret, err := validateSecretVolumeMount(
+	if len(envoySecretVolumeMounts) == 0 || !validateSecretVolumeMount(
 		envoySecretVolumeMounts,
 		userVolumes,
 		scope.AutoLoginConfig.EnvoySecretName,
-	)
-	if err != nil {
-		return err
-	}
-
-	if len(envoySecretVolumeMounts) == 0 || !hasMountedCorrectSecret {
+	) {
 		return fmt.Errorf(
 			"secret with name '%s' used by OAuth-EnvoyFilter is not mounted in istio-proxy, %s",
 			scope.AutoLoginConfig.EnvoySecretName,
