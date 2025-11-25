@@ -22,7 +22,7 @@ spec:
         - create:
             file: authpolicy-acr-values.yaml
         - script:
-            content: sleep 5
+            content: sleep 7
         - script:
             content: |
               hurl --error-format long --insecure --test test-acr-values.hurl
@@ -31,7 +31,7 @@ spec:
         - script:
             content: |
               kubectl rollout restart deploy application -n chainsaw-login-params
-              sleep 5
+              sleep 7
         - script:
             content: |
               hurl --error-format long --insecure --test test-auth-details.hurl

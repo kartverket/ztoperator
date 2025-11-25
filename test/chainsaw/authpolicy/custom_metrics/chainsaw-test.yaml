@@ -36,5 +36,5 @@ spec:
             file: authpolicy.yaml
         - script:
             content: |
-              sleep 5
+              sleep 7
               hurl --error-format long --test test-3.hurl

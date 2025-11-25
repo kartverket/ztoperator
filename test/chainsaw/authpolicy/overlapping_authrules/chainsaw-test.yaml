@@ -19,7 +19,7 @@ spec:
         - create:
             file: authpolicy.yaml
         - script:
-            content: sleep 5
+            content: sleep 7
         - script:
             content: |
               hurl --error-format long \
