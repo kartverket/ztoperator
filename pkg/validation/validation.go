@@ -81,9 +81,9 @@ func (t authPolicyValidatorType) String() string {
 	}
 }
 
-func errorMessageSuffix() string {
+func podAnnotationErrorMessageSuffix() string {
 	return fmt.Sprintf(
-		"see https://github.com/kartverket/ztoperator/blob/%s/README.md on how to do it correctly",
+		"see https://github.com/kartverket/ztoperator/blob/%s/README.md#-mounting-oauth-credentials-in-the-istio-sidecar on how to do it correctly",
 		config.Get().GitRef,
 	)
 }
@@ -96,7 +96,7 @@ func collectIstioVolumesAndMountsFromPod(
 		return nil, nil, fmt.Errorf(
 			"the required annotation '%s' is either missing or its content is not properly formatted, %s",
 			istioUserVolumeAnnotation,
-			errorMessageSuffix(),
+			podAnnotationErrorMessageSuffix(),
 		)
 	}
 
@@ -105,7 +105,7 @@ func collectIstioVolumesAndMountsFromPod(
 		return nil, nil, fmt.Errorf(
 			"the required annotation '%s' is either missing or its content is not properly formatted, %s",
 			istioUserVolumeMountAnnotation,
-			errorMessageSuffix(),
+			podAnnotationErrorMessageSuffix(),
 		)
 	}
 
@@ -212,7 +212,7 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 		return fmt.Errorf(
 			"no pods found having the labels %s, %s",
 			scope.AuthPolicy.Spec.Selector.MatchLabels,
-			errorMessageSuffix(),
+			podAnnotationErrorMessageSuffix(),
 		)
 	}
 
@@ -250,7 +250,7 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 		return fmt.Errorf(
 			"secret with name '%s' used by OAuth-EnvoyFilter is not mounted in istio-proxy, %s",
 			scope.AutoLoginConfig.EnvoySecretName,
-			errorMessageSuffix(),
+			podAnnotationErrorMessageSuffix(),
 		)
 	}
 
