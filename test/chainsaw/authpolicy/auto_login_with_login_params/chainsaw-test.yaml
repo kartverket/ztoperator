@@ -22,12 +22,26 @@ spec:
         - create:
             file: authpolicy-acr-values.yaml
         - script:
+            content: |
+              cat authpolicy-acr-values.yaml | ../../../../venv/bin/python ./../../../../scripts/create-envoyfilter.py > generated-envoyfilter-assert.yaml
+        - assert:
+            file: generated-envoyfilter-assert.yaml
+        - script:
+            content: rm -f generated-envoyfilter-assert.yaml
+        - script:
             content: sleep 7
         - script:
             content: |
               hurl --error-format long --insecure --test test-acr-values.hurl
         - apply:
             file: authpolicy-auth-details.yaml
+        - script:
+            content: |
+              cat authpolicy-auth-details.yaml | ../../../../venv/bin/python ./../../../../scripts/create-envoyfilter.py > generated-envoyfilter-assert.yaml
+        - assert:
+            file: generated-envoyfilter-assert.yaml
+        - script:
+            content: rm -f generated-envoyfilter-assert.yaml
         - script:
             content: |
               kubectl rollout restart deploy application -n chainsaw-login-params

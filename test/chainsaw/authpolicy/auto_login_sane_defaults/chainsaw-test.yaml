@@ -18,9 +18,19 @@ spec:
             file: ../../../resources/secret/oauth-secret.yaml
         - create:
             file: authpolicy-with-specified-logout-redirect.yaml
+        - script:
+            content: |
+              cat authpolicy-with-specified-logout-redirect.yaml | ../../../../venv/bin/python ./../../../../scripts/create-envoyfilter.py > generated-envoyfilter-assert.yaml
         - assert:
-            file: authpolicy-with-specified-logout-redirect-assert.yaml
+            file: generated-envoyfilter-assert.yaml
+        - script:
+            content: rm -f generated-envoyfilter-assert.yaml
         - update:
-            file: authpolicy-with-specified-logout-redirect.yaml
+            file: authpolicy-without-specified-logout-redirect.yaml
+        - script:
+            content: |
+              cat authpolicy-without-specified-logout-redirect.yaml | ../../../../venv/bin/python ./../../../../scripts/create-envoyfilter.py > generated-envoyfilter-assert.yaml
         - assert:
-            file: authpolicy-with-specified-logout-redirect-assert.yaml
+            file: generated-envoyfilter-assert.yaml
+        - script:
+            content: rm -f generated-envoyfilter-assert.yaml

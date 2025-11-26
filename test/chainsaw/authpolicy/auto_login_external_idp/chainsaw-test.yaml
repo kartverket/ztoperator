@@ -18,5 +18,10 @@ spec:
             file: ../../../resources/secret/oauth-secret.yaml
         - create:
             file: authpolicy.yaml
+        - script:
+            content: |
+              cat authpolicy.yaml | ../../../../venv/bin/python ./../../../../scripts/create-envoyfilter.py > generated-envoyfilter-assert.yaml
         - assert:
-            file: authpolicy-assert.yaml
+            file: generated-envoyfilter-assert.yaml
+        - script:
+            content: rm -f generated-envoyfilter-assert.yaml
