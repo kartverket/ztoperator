@@ -18,13 +18,19 @@ spec:
             file: ../../../resources/skiperator/application.yaml
         - create:
             file: authpolicy.yaml
+        - script:
+            content: sleep 5
         - assert:
             file: application-without-pod-annotations-assert.yaml
         - apply:
             file: application-with-wrong-pod-annotations.yaml
+        - script:
+            content: sleep 5
         - assert:
             file: application-with-wrong-pod-annotations-assert.yaml
         - apply:
             file: ../../../resources/skiperator/application-with-istio-mount.yaml
+        - script:
+            content: sleep 5
         - assert:
             file: application-with-correct-pod-annotations-assert.yaml
