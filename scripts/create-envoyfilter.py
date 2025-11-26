@@ -57,7 +57,7 @@ def lua_table_from_map(mapping):
     if not mapping:
         return "{}"
     parts = []
-    for k, v in mapping.items():
+    for k, v in sorted(mapping.items()):
         parts.append(f'["{k}"]="{v}"')
     return "{" + ",".join(parts) + "}"
 
@@ -139,13 +139,16 @@ use_tls = oauth_scheme == "https"
 if oauth_port is None:
     oauth_port = 443 if use_tls else 80
 
-login_params = auto.get("loginParams") or {}
+from urllib.parse import quote_plus
 
-from urllib.parse import quote
-# URL‑encode each login param value
-login_params = {k: quote(str(v), safe="") for k, v in login_params.items()}
+login_params_raw = auto.get("loginParams") or {}
+# URL-encode each login param value using + for spaces
+login_params_encoded = {k: quote_plus(str(v), safe="") for k, v in login_params_raw.items()}
+# Sort login params alphabetically on key for deterministic Lua output
+login_params = {k: login_params_encoded[k] for k in sorted(login_params_encoded.keys())}
+
 raw_post_logout = auto.get("postLogoutRedirectUri", "")
-post_logout = quote(raw_post_logout, safe="")
+post_logout = quote_plus(raw_post_logout, safe="")
 
 login_params_lua = lua_table_from_map(login_params)
 

@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
@@ -109,10 +110,17 @@ func buildLuaParams(params map[string]string) string {
 	if len(params) == 0 {
 		return "{}"
 	}
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	var sb strings.Builder
 	sb.WriteString("{")
 	first := true
-	for k, v := range params {
+	for _, k := range keys {
+		v := params[k]
 		if !first {
 			sb.WriteString(",")
 		}
