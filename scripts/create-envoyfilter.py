@@ -1,11 +1,12 @@
 import json
-import os
 import re
 import sys
 import urllib.request
-from urllib.parse import urlparse
+from pathlib import Path
+from urllib.parse import quote_plus, urlparse
 
 import yaml
+from jinja2 import Environment, FileSystemLoader
 
 ap = yaml.safe_load(sys.stdin)
 
@@ -13,6 +14,7 @@ metadata = ap.get("metadata") or {}
 spec = ap.get("spec") or {}
 
 ap_name = metadata.get("name", "auth-policy")
+script_dir = Path(__file__).resolve().parent
 
 # Helpers ----------------------------------------------------------
 
@@ -139,8 +141,6 @@ use_tls = oauth_scheme == "https"
 if oauth_port is None:
     oauth_port = 443 if use_tls else 80
 
-from urllib.parse import quote_plus
-
 login_params_raw = auto.get("loginParams") or {}
 # URL-encode each login param value using + for spaces
 login_params_encoded = {k: quote_plus(str(v), safe="") for k, v in login_params_raw.items()}
@@ -156,20 +156,10 @@ scopes = auto.get("scopes") or ["openid", "offline_access", "User.Read"]
 match_labels = (spec.get("selector") or {}).get("matchLabels") or {}
 
 # Load external Lua file template with %s placeholders
-lua_file_path = os.path.join(os.path.dirname(__file__), "..", "pkg", "luascript", "ztoperator.lua")
-with open(lua_file_path, "r") as f:
+lua_file_path = script_dir.parent / "pkg" / "luascript" / "ztoperator.lua"
+with lua_file_path.open("r") as f:
     lua_template = f.read()
 
-# Fill in the %s placeholders in this order:
-#   1) ignore_rules
-#   2) require_rules
-#   3) deny_redirect_rules
-#   4) authorize_endpoint
-#   5) login_params
-#   6) end_session_endpoint
-#   7) post_logout_redirect_uri
-#   8) bypass-header-name
-#   9) deny-redirect-header-name
 lua_filled = lua_template % (
     ignore_lua,
     require_lua,
@@ -182,127 +172,35 @@ lua_filled = lua_template % (
     "x-deny-redirect",
 )
 
-
 def indent(text: str, prefix: str) -> str:
     return "\n".join(prefix + line if line else prefix for line in text.splitlines())
-
 
 lua_indented = indent(lua_filled, "                ")
 
 # Emit EnvoyFilter YAML -------------------------------------------
 
-print("apiVersion: networking.istio.io/v1alpha3")
-print("kind: EnvoyFilter")
-print("metadata:")
-print(f"  name: {ap_name}-login")
-print("spec:")
-print("  configPatches:")
-print("    - applyTo: HTTP_FILTER")
-print("      match:")
-print("        context: SIDECAR_INBOUND")
-print("        listener:")
-print("          filterChain:")
-print("            filter:")
-print("              name: envoy.filters.network.http_connection_manager")
-print("      patch:")
-print("        operation: INSERT_BEFORE")
-print("        value:")
-print("          name: envoy.filters.http.lua")
-print("          typed_config:")
-print("            '@type': type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua")
-print("            default_source_code:")
-print("              inline_string: |-")
-print(lua_indented)
-print("    - applyTo: CLUSTER")
-print("      match:")
-print("        cluster:")
-print("          service: oauth")
-print("      patch:")
-print("        operation: ADD")
-print("        value:")
-print("          connect_timeout: 10s")
-print("          dns_lookup_family: V4_ONLY")
-print("          lb_policy: ROUND_ROBIN")
-print("          load_assignment:")
-print("            cluster_name: oauth")
-print("            endpoints:")
-print("              - lb_endpoints:")
-print("                  - endpoint:")
-print("                      address:")
-print("                        socket_address:")
-print(f"                          address: {oauth_host}")
-print(f"                          port_value: {oauth_port}")
-print("          name: oauth")
-if use_tls:
-    print("          transport_socket:")
-    print("            name: envoy.transport_sockets.tls")
-    print("            typed_config:")
-    print("              '@type': type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext")
-    print(f"              sni: {oauth_host}")
-print("          type: LOGICAL_DNS")
-print("    - applyTo: HTTP_FILTER")
-print("      match:")
-print("        context: SIDECAR_INBOUND")
-print("        listener:")
-print("          filterChain:")
-print("            filter:")
-print("              name: envoy.filters.network.http_connection_manager")
-print("              subFilter:")
-print("                name: envoy.filters.http.jwt_authn")
-print("      patch:")
-print("        operation: INSERT_BEFORE")
-print("        value:")
-print("          name: envoy.filters.http.oauth2")
-print("          typed_config:")
-print("            '@type': type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2")
-print("            config:")
-print("              auth_scopes:")
-for scope in scopes:
-    print(f"                - {scope}")
-print(f"              authorization_endpoint: {authorize_endpoint}")
-print("              credentials:")
-print("                client_id: entraid_server")
-print("                hmac_secret:")
-print("                  name: hmac")
-print("                  sds_config:")
-print("                    path_config_source:")
-print("                      path: /etc/istio/config/hmac-secret.yaml")
-print("                      watched_directory:")
-print("                        path: /etc/istio/config")
-print("                token_secret:")
-print("                  name: token")
-print("                  sds_config:")
-print("                    path_config_source:")
-print("                      path: /etc/istio/config/token-secret.yaml")
-print("                      watched_directory:")
-print("                        path: /etc/istio/config")
-print("              deny_redirect_matcher:")
-print("                - name: x-deny-redirect")
-print("                  string_match:")
-print('                    exact: "true"')
-print(f"              end_session_endpoint: {end_session_endpoint or ''}")
-print("              forward_bearer_token: true")
-print("              pass_through_matcher:")
-print("                - name: authorization")
-print("                  string_match:")
-print("                    prefix: 'Bearer '")
-print("                - name: x-bypass-login")
-print("                  string_match:")
-print('                    exact: "true"')
-print("              redirect_path_matcher:")
-print("                path:")
-print(f"                  exact: {redirect_path}")
-print(f"              redirect_uri: https://%REQ(:authority)%{redirect_path}")
-print("              retry_policy: {}")
-print("              signout_path:")
-print("                path:")
-print(f"                  exact: {logout_path}")
-print("              token_endpoint:")
-print("                cluster: oauth")
-print("                timeout: 5s")
-print(f"                uri: {token_endpoint}")
-print("              use_refresh_token: true")
-print("  workloadSelector:")
-print("    labels:")
-for k, v in match_labels.items():
-    print(f"      {k}: {v}")
+template_dir = script_dir / "templates"
+env = Environment(
+    loader=FileSystemLoader(str(template_dir)),
+    autoescape=False,
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
+template = env.get_template("envoyfilter.yaml.j2")
+
+rendered = template.render(
+    ap_name=ap_name,
+    lua_indented=lua_indented,
+    oauth_host=oauth_host,
+    oauth_port=oauth_port,
+    use_tls=use_tls,
+    scopes=scopes,
+    authorize_endpoint=authorize_endpoint,
+    end_session_endpoint=end_session_endpoint or "",
+    redirect_path=redirect_path,
+    logout_path=logout_path,
+    token_endpoint=token_endpoint,
+    match_labels=match_labels,
+)
+
+print(rendered, end="")
