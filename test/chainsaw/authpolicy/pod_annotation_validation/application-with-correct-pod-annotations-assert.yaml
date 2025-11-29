@@ -1,0 +1,7 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+status:
+  phase: Ready
+  ready: true

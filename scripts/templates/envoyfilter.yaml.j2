@@ -1,0 +1,118 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: {{ ap_name }}-login
+spec:
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.lua
+          typed_config:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+            default_source_code:
+              inline_string: |-
+{{ lua_indented }}
+    - applyTo: CLUSTER
+      match:
+        cluster:
+          service: oauth
+      patch:
+        operation: ADD
+        value:
+          connect_timeout: 10s
+          dns_lookup_family: V4_ONLY
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: oauth
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ oauth_host }}
+                          port_value: {{ oauth_port }}
+          name: oauth
+{% if use_tls %}
+          transport_socket:
+            name: envoy.transport_sockets.tls
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+              sni: {{ oauth_host }}
+{% endif %}
+          type: LOGICAL_DNS
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: envoy.filters.http.jwt_authn
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.oauth2
+          typed_config:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
+            config:
+              auth_scopes:
+{% for scope in scopes %}
+                - {{ scope }}
+{% endfor %}
+              authorization_endpoint: {{ authorize_endpoint }}
+              credentials:
+                client_id: entraid_server
+                hmac_secret:
+                  name: hmac
+                  sds_config:
+                    path_config_source:
+                      path: /etc/istio/config/hmac-secret.yaml
+                      watched_directory:
+                        path: /etc/istio/config
+                token_secret:
+                  name: token
+                  sds_config:
+                    path_config_source:
+                      path: /etc/istio/config/token-secret.yaml
+                      watched_directory:
+                        path: /etc/istio/config
+              deny_redirect_matcher:
+                - name: x-deny-redirect
+                  string_match:
+                    exact: "true"
+              end_session_endpoint: {{ end_session_endpoint }}
+              forward_bearer_token: true
+              pass_through_matcher:
+                - name: authorization
+                  string_match:
+                    prefix: 'Bearer '
+                - name: x-bypass-login
+                  string_match:
+                    exact: "true"
+              redirect_path_matcher:
+                path:
+                  exact: {{ redirect_path }}
+              redirect_uri: https://%REQ(:authority)%{{ redirect_path }}
+              retry_policy: {}
+              signout_path:
+                path:
+                  exact: {{ logout_path }}
+              token_endpoint:
+                cluster: oauth
+                timeout: 5s
+                uri: {{ token_endpoint }}
+              use_refresh_token: true
+  workloadSelector:
+    labels:
+{% for k, v in match_labels.items() %}
+      {{ k }}: {{ v }}
+{% endfor %}

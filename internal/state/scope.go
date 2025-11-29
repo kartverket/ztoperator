@@ -34,6 +34,12 @@ type AutoLoginConfig struct {
 	PostLogoutRedirectURI *string
 	Scopes                []string
 	LoginParams           map[string]string
+	LuaScriptConfig       LuaScriptConfig
+	EnvoySecretName       string
+}
+
+type LuaScriptConfig struct {
+	LuaScript string
 }
 
 type OAuthCredentials struct {

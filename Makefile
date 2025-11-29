@@ -19,7 +19,7 @@ CONTAINER_TOOL             ?= docker
 IMG                        ?= ztoperator:latest
 KIND_CLUSTER_NAME          ?= ztoperator
 KUBECONTEXT                ?= kind-$(KIND_CLUSTER_NAME)
-KUBERNETES_VERSION          = 1.31.4
+KUBERNETES_VERSION          = 1.32.5
 ENVTEST_K8S_VERSION         = $(KUBERNETES_VERSION)
 KIND_IMAGE                 ?= kindest/node:v$(KUBERNETES_VERSION)
 CHAINSAW_VERSION           := 0.2.12
@@ -43,8 +43,8 @@ GOLANGCI_LINT   = $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.2
-CONTROLLER_TOOLS_VERSION ?= v0.15.0
-GOLANGCI_LINT_VERSION ?= v1.59.1
+CONTROLLER_TOOLS_VERSION ?= v0.19.0
+GOLANGCI_LINT_VERSION ?= v2.5.0
 
 
 .PHONY: all
@@ -267,7 +267,7 @@ test-single: chainsaw install
 .PHONY: test
 test:
 	@echo "Checking if ztoperator is running..."
-	@lsof -i :8081 | grep -E '___Ztoper|___[0-9]+Ztope' > /dev/null || (echo "ztoperator is not running. Please start it first." && exit 1)
+	@lsof -i :8081 | grep -E '___Ztoper|___[0-9]+Ztope|___[10-99]+Ztop|___[100-999]+Zto|___[1000-9999]+Zt|___[10000-99999]+Z|___[100000-999999]' > /dev/null || (echo "ztoperator is not running. Please start it first." && exit 1)
 	@echo "ztoperator is running. Proceeding with tests..."
 	@bash -ec ' \
 		for dir in test/chainsaw/authpolicy/*/ ; do \

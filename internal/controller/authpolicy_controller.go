@@ -9,8 +9,10 @@ import (
 	"strings"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/eventhandler/pod"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/log"
+	"github.com/kartverket/ztoperator/pkg/luascript"
 	"github.com/kartverket/ztoperator/pkg/metrics"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/deny"
@@ -22,6 +24,7 @@ import (
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
 	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/kartverket/ztoperator/pkg/utilities"
+	"github.com/kartverket/ztoperator/pkg/validation"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
 	v1 "k8s.io/api/core/v1"
@@ -87,6 +90,7 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&istioclientsecurityv1.AuthorizationPolicy{}).
 		Owns(&v1alpha4.EnvoyFilter{}).
 		Owns(&v1.Secret{}).
+		Watches(&v1.Pod{}, pod.EventHandler(r.Client)).
 		Complete(r)
 }
 
@@ -147,42 +151,27 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return reconcile.Result{}, err
 	}
 
-	if pathValidationErr := utilities.ValidatePaths(authPolicy.GetPaths()); pathValidationErr != nil {
-		rLog.Error(
-			pathValidationErr,
-			fmt.Sprintf(
-				"Path validation failed for AuthPolicy with name %s",
-				req.NamespacedName.String(),
-			),
-		)
-		rLog.Debug(
-			fmt.Sprintf(
-				"Path validation failed for AuthPolicy with name %s. Defaulting to default deny on all paths.",
-				req.NamespacedName.String(),
-			),
-		)
-		scope.InvalidConfig = true
-		pathValidationError := pathValidationErr.Error()
-		scope.ValidationErrorMessage = &pathValidationError
-	} else {
-		scope.InvalidConfig = false
-	}
+	scope.AutoLoginConfig.EnvoySecretName = authPolicy.Name + "-envoy-secret"
 
-	autoLoginSecretName := authPolicy.Name + "-envoy-secret"
 	autoLoginEnvoyFilter := authPolicy.Name + "-login"
 	requestAuthenticationName := authPolicy.Name
 	denyAuthorizationPolicyName := authPolicy.Name + "-deny-auth-rules"
 	ignoreAuthAuthorizationPolicyName := authPolicy.Name + "-ignore-auth"
 	requireAuthAuthorizationPolicyName := authPolicy.Name + "-require-auth"
 
+	scope = validateAuthPolicy(ctx, r.Client, scope)
+
 	reconcileFuncs := []reconciliation.ReconcileAction{
 		AuthPolicyAdapter[*v1.Secret]{
 			reconciliation.ReconcileFuncAdapter[*v1.Secret]{
 				Func: reconciliation.ReconcileFunc[*v1.Secret]{
 					ResourceKind: "Secret",
-					ResourceName: autoLoginSecretName,
+					ResourceName: scope.AutoLoginConfig.EnvoySecretName,
 					DesiredResource: utilities.Ptr(
-						secret.GetDesired(scope, utilities.BuildObjectMeta(autoLoginSecretName, authPolicy.Namespace)),
+						secret.GetDesired(
+							scope,
+							utilities.BuildObjectMeta(scope.AutoLoginConfig.EnvoySecretName, authPolicy.Namespace),
+						),
 					),
 					Scope: scope,
 					ShouldUpdate: func(current, desired *v1.Secret) bool {
@@ -212,8 +201,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 						return !reflect.DeepEqual(
 							current.Spec.GetWorkloadSelector(),
 							desired.Spec.GetWorkloadSelector(),
-						) ||
-							!reflect.DeepEqual(current.Spec.GetConfigPatches(), desired.Spec.GetConfigPatches())
+						) || !reflect.DeepEqual(
+							current.Spec.GetConfigPatches(),
+							desired.Spec.GetConfigPatches(),
+						)
 					},
 					UpdateFields: func(current, desired *v1alpha4.EnvoyFilter) {
 						current.Spec.WorkloadSelector = desired.Spec.GetWorkloadSelector()
@@ -801,6 +792,14 @@ func resolveAuthPolicy(
 		autoLoginConfig.LoginParams = authPolicy.Spec.AutoLogin.LoginParams
 
 		autoLoginConfig.SetSaneDefaults(*authPolicy.Spec.AutoLogin)
+
+		autoLoginConfig.LuaScriptConfig = state.LuaScriptConfig{
+			LuaScript: luascript.GetLuaScript(
+				authPolicy,
+				autoLoginConfig,
+				identityProviderUris,
+			),
+		}
 	}
 
 	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name %s/%s", authPolicy.Namespace, authPolicy.Name))
@@ -811,4 +810,36 @@ func resolveAuthPolicy(
 		OAuthCredentials:     oAuthCredentials,
 		IdentityProviderUris: identityProviderUris,
 	}, nil
+}
+
+func validateAuthPolicy(ctx context.Context, k8sClient client.Client, scope *state.Scope) *state.Scope {
+	rLog := log.GetLogger(ctx)
+	for _, validator := range validation.GetValidators() {
+		if validationErr := validator.Validate(ctx, k8sClient, scope); validationErr != nil {
+			rLog.Error(
+				validationErr,
+				fmt.Sprintf(
+					"%s failed for AuthPolicy with name %s/%s",
+					validator.Type.String(),
+					scope.AuthPolicy.Namespace,
+					scope.AuthPolicy.Name,
+				),
+			)
+			rLog.Debug(
+				fmt.Sprintf(
+					"%s failed for AuthPolicy with name %s/%s. Defaulting to default deny on all paths.",
+					validator.Type.String(),
+					scope.AuthPolicy.Namespace,
+					scope.AuthPolicy.Name,
+				),
+			)
+			scope.InvalidConfig = true
+			validationErrorMessage := validationErr.Error()
+			scope.ValidationErrorMessage = &validationErrorMessage
+			return scope
+		}
+	}
+
+	scope.InvalidConfig = false
+	return scope
 }

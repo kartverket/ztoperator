@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/metrics"
 	"go.uber.org/zap/zapcore"
 
@@ -159,6 +160,11 @@ func main() {
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	if configLoadErr := config.Load(); configLoadErr != nil {
+		setupLog.Error(configLoadErr, "unable to load config")
 		os.Exit(1)
 	}
 

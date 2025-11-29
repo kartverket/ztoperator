@@ -16,6 +16,7 @@ COPY "cmd/main.go" "cmd/main.go"
 COPY api/ api/
 COPY pkg/ pkg/
 COPY internal/controller/ internal/controller/
+COPY internal/eventhandler/ internal/eventhandler/
 COPY internal/state/ internal/state/
 
 # Build

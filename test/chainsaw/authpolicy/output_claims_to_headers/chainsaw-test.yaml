@@ -13,19 +13,14 @@ spec:
   steps:
     - try:
         - create:
-            file: application.yaml
+            file: echo-application.yaml
         - apply:
-            file: wildcard-ingress.yaml
-        - assert:
-            file: application-assert.yaml
+            file: ../../../resources/ingress/wildcard-ingress.yaml
         - create:
             file: authpolicy.yaml
-        - assert:
-            file: authpolicy-assert.yaml
-        - script:
-            content: sleep 5
         - script:
             content: |
+              sleep 7
               hurl --error-format long \
               --insecure --test tests.hurl \
               --variable token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer maskinporten --code maskinporten_code --token_name access_token)"

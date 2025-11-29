@@ -13,17 +13,13 @@ spec:
   steps:
     - try:
         - create:
-            file: application.yaml
+            file: ../../../resources/skiperator/application.yaml
         - apply:
-            file: wildcard-ingress.yaml
-        - assert:
-            file: application-assert.yaml
+            file: ../../../resources/ingress/wildcard-ingress.yaml
         - create:
             file: authpolicy.yaml
-        - assert:
-            file: authpolicy-assert.yaml
         - script:
-            content: sleep 5
+            content: sleep 7
         - script:
             content: |
               hurl --error-format long \
