@@ -35,3 +35,9 @@ dist/
 
 # Python virtualenv
 venv/
+
+# VS Code settings
+.vscode/
+
+# macOS system files
+.DS_Store

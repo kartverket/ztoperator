@@ -1,6 +1,11 @@
 package configpatch
 
-import "slices"
+import (
+	"slices"
+
+	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/luascript"
+)
 
 const (
 	TokenSecretFileName       = "token-secret.yaml"
@@ -11,48 +16,41 @@ const (
 )
 
 func GetOAuthSidecarConfigPatchValue(
-	tokenEndpoint string,
-	authorizationEndpoint string,
-	redirectPath string,
-	signoutPath string,
-	endSessionEndpoint *string,
-	clientID string,
-	authScopes []string,
-	resources *[]string,
+	scope state.Scope,
 ) map[string]interface{} {
 	var resourcesInterface []interface{}
-	if resources != nil {
-		for _, resource := range *resources {
+	if scope.AuthPolicy.Spec.AcceptedResources != nil {
+		for _, resource := range *scope.AuthPolicy.Spec.AcceptedResources {
 			resourcesInterface = append(resourcesInterface, resource)
 		}
 	}
 
-	if !slices.Contains(authScopes, "openid") {
-		authScopes = append(authScopes, "openid")
+	if !slices.Contains(scope.AutoLoginConfig.Scopes, "openid") {
+		scope.AutoLoginConfig.Scopes = append(scope.AutoLoginConfig.Scopes, "openid")
 	}
 
-	authScopesInterface := make([]interface{}, len(authScopes))
-	for i, authScope := range authScopes {
+	authScopesInterface := make([]interface{}, len(scope.AutoLoginConfig.Scopes))
+	for i, authScope := range scope.AutoLoginConfig.Scopes {
 		authScopesInterface[i] = authScope
 	}
 
 	oauthSidecarConfigPatchValue := map[string]interface{}{
 		"token_endpoint": map[string]interface{}{
 			"cluster": "oauth",
-			"uri":     tokenEndpoint,
+			"uri":     scope.IdentityProviderUris.TokenURI,
 			"timeout": "5s",
 		},
 		"retry_policy":           map[string]interface{}{},
-		"authorization_endpoint": authorizationEndpoint,
-		"redirect_uri":           "https://%REQ(:authority)%" + redirectPath,
+		"authorization_endpoint": scope.IdentityProviderUris.AuthorizationURI,
+		"redirect_uri":           "https://%REQ(:authority)%" + scope.AutoLoginConfig.RedirectPath,
 		"redirect_path_matcher": map[string]interface{}{
 			"path": map[string]interface{}{
-				"exact": redirectPath,
+				"exact": scope.AutoLoginConfig.RedirectPath,
 			},
 		},
 		"signout_path": map[string]interface{}{
 			"path": map[string]interface{}{
-				"exact": signoutPath,
+				"exact": scope.AutoLoginConfig.LogoutPath,
 			},
 		},
 		"forward_bearer_token": true,
@@ -65,7 +63,7 @@ func GetOAuthSidecarConfigPatchValue(
 				},
 			},
 			map[string]interface{}{
-				"name": BypassOauthLoginHeaderName,
+				"name": luascript.BypassOauthLoginHeaderName,
 				"string_match": map[string]interface{}{
 					"exact": "true",
 				},
@@ -73,14 +71,14 @@ func GetOAuthSidecarConfigPatchValue(
 		},
 		"deny_redirect_matcher": []interface{}{
 			map[string]interface{}{
-				"name": DenyRedirectHeaderName,
+				"name": luascript.DenyRedirectHeaderName,
 				"string_match": map[string]interface{}{
 					"exact": "true",
 				},
 			},
 		},
 		"credentials": map[string]interface{}{
-			"client_id": clientID,
+			"client_id": *scope.OAuthCredentials.ClientID,
 			"token_secret": map[string]interface{}{
 				"name": "token",
 				"sds_config": map[string]interface{}{
@@ -107,12 +105,12 @@ func GetOAuthSidecarConfigPatchValue(
 		"auth_scopes": authScopesInterface,
 	}
 
-	if resources != nil && len(*resources) > 0 {
+	if scope.AuthPolicy.Spec.AcceptedResources != nil && len(*scope.AuthPolicy.Spec.AcceptedResources) > 0 {
 		oauthSidecarConfigPatchValue["resources"] = resourcesInterface
 	}
 
-	if endSessionEndpoint != nil {
-		oauthSidecarConfigPatchValue["end_session_endpoint"] = *endSessionEndpoint
+	if scope.IdentityProviderUris.EndSessionURI != nil {
+		oauthSidecarConfigPatchValue["end_session_endpoint"] = *scope.IdentityProviderUris.EndSessionURI
 	}
 
 	return map[string]interface{}{

@@ -448,6 +448,12 @@ linters:
       - path: "pkg/resourcegenerators/envoyfilter/configpatch/oauth_sidecar_config_patch.go"
         linters:
           - gosec
+      - path: "pkg/luascript/lua_script.go"
+        linters:
+          - gosec
+      - path: "pkg/config/config.go"
+        linters:
+          - gochecknoglobals
       - path: "pkg/resourcegenerators/envoyfilter/configpatch/lua_script_config_patch.go"
         linters:
           - gosec

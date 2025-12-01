@@ -1,0 +1,36 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: pod-annotation-validation
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: ../../../resources/secret/oauth-secret.yaml
+        - create:
+            file: ../../../resources/skiperator/application.yaml
+        - create:
+            file: authpolicy.yaml
+        - script:
+            content: sleep 5
+        - assert:
+            file: application-without-pod-annotations-assert.yaml
+        - apply:
+            file: application-with-wrong-pod-annotations.yaml
+        - script:
+            content: sleep 5
+        - assert:
+            file: application-with-wrong-pod-annotations-assert.yaml
+        - apply:
+            file: ../../../resources/skiperator/application-with-istio-mount.yaml
+        - script:
+            content: sleep 5
+        - assert:
+            file: application-with-correct-pod-annotations-assert.yaml
