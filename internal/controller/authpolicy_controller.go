@@ -170,7 +170,8 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	tokenProxyNetworkPolicyName := scope.AutoLoginConfig.TokenProxy.Name + "-ingress"
 	protectedAppNetworkPolicyName := scope.AuthPolicy.Name + "-egress-token-proxy"
 	tokenProxyAuthorizationPolicyName := scope.AutoLoginConfig.TokenProxy.Name + "-deny"
-	autoLoginSecretName := authPolicy.Name + "-envoy-secret"
+	scope.AutoLoginConfig.EnvoySecretName = authPolicy.Name + "-envoy-secret"
+
 	autoLoginEnvoyFilter := authPolicy.Name + "-login"
 	requestAuthenticationName := authPolicy.Name
 	denyAuthorizationPolicyName := authPolicy.Name + "-deny-auth-rules"
@@ -276,9 +277,9 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			reconciliation.ReconcileFuncAdapter[*v4.ServiceEntry]{
 				Func: reconciliation.ReconcileFunc[*v4.ServiceEntry]{
 					ResourceKind: "Secret",
-					ResourceName: autoLoginSecretName,
+					ResourceName: scope.AutoLoginConfig.EnvoySecretName,
 					DesiredResource: utilities.Ptr(
-						serviceentryprivatekeyjwt.GetDesired(scope, utilities.BuildObjectMeta(autoLoginSecretName, authPolicy.Namespace)),
+						serviceentryprivatekeyjwt.GetDesired(scope, utilities.BuildObjectMeta(scope.AutoLoginConfig.EnvoySecretName, authPolicy.Namespace)),
 					),
 					Scope: scope,
 					ShouldUpdate: func(current, desired *v4.ServiceEntry) bool {
@@ -863,7 +864,7 @@ func resolveAuthPolicy(
 	if authPolicy == nil {
 		return nil, errors.New("encountered AuthPolicy as null when resolving")
 	}
-	rLog.Info(fmt.Sprintf("Trying to resolve auth policy %s/%s", authPolicy.Namespace, authPolicy.Name))
+	rLog.Info(fmt.Sprintf("Trying to resolve auth policy '%s/%s'", authPolicy.Namespace, authPolicy.Name))
 
 	var oAuthCredentials state.OAuthCredentials
 
@@ -887,7 +888,7 @@ func resolveAuthPolicy(
 
 		if oAuthCredentials.ClientID == nil || *oAuthCredentials.ClientID == "" {
 			return nil, fmt.Errorf(
-				"client id with key: %s was nil or empty when retrieving it from Secret with name %s/%s",
+				"client id with key: '%s' was nil or empty when retrieving it from Secret with name '%s/%s'",
 				authPolicy.Spec.OAuthCredentials.ClientIDKey,
 				authPolicy.Namespace,
 				authPolicy.Spec.OAuthCredentials.SecretRef,
@@ -897,7 +898,7 @@ func resolveAuthPolicy(
 		if privateJWK == "" {
 			if oAuthCredentials.ClientSecret == nil || *oAuthCredentials.ClientSecret == "" {
 				return nil, fmt.Errorf(
-					"both client secret with key: %s and private JWK with key: %s was nil or empty when retrieving it from Secret with name %s/%s",
+					"both client secret with key: '%s' and private JWK with key: '%s' was nil or empty when retrieving it from Secret with name '%s/%s'",
 					authPolicy.Spec.OAuthCredentials.ClientSecretKey,
 					authPolicy.Spec.OAuthCredentials.PrivateJWKKey,
 					authPolicy.Namespace,
@@ -913,7 +914,7 @@ func resolveAuthPolicy(
 	var identityProviderUris state.IdentityProviderUris
 	rLog.Info(
 		fmt.Sprintf(
-			"Trying to resolve discovery document from well-known uri: %s for AuthPolicy with name %s/%s",
+			"Trying to resolve discovery document from well-known uri: '%s' for AuthPolicy with name '%s/%s'",
 			authPolicy.Spec.WellKnownURI,
 			authPolicy.Namespace,
 			authPolicy.Name,
@@ -922,18 +923,17 @@ func resolveAuthPolicy(
 	discoveryDocument, err := rest.GetOAuthDiscoveryDocument(authPolicy.Spec.WellKnownURI, rLog)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to resolve discovery document from well-known uri: %s for AuthPolicy with name %s/%s: %w",
+			"failed to resolve discovery document from well-known uri: '%s' for AuthPolicy with name '%s/%s'",
 			authPolicy.Spec.WellKnownURI,
 			authPolicy.Namespace,
 			authPolicy.Name,
-			err,
 		)
 	}
 
 	if discoveryDocument.Issuer == nil || discoveryDocument.JwksURI == nil || discoveryDocument.TokenEndpoint == nil ||
 		discoveryDocument.AuthorizationEndpoint == nil || discoveryDocument.EndSessionEndpoint == nil {
 		return nil, fmt.Errorf(
-			"failed to parse discovery document from well-known uri: %s for AuthPolicy with name %s/%s",
+			"failed to parse discovery document from well-known uri: '%s' for AuthPolicy with name '%s/%s'",
 			authPolicy.Spec.WellKnownURI,
 			authPolicy.Namespace,
 			authPolicy.Name,
@@ -954,7 +954,14 @@ func resolveAuthPolicy(
 	if oAuthCredentials.ClientAuthMethod == state.PrivateKeyJWT {
 		tokenEndpointParsedAsURL, urlParseErr := utilities.GetParsedURL(*discoveryDocument.TokenEndpoint)
 		if urlParseErr != nil {
-			return nil, fmt.Errorf("unable to URL-parse %s: %w", *discoveryDocument.TokenEndpoint, urlParseErr)
+			rLog.Error(
+				urlParseErr,
+				fmt.Sprintf(
+					"Unable to URL-parse '%s'",
+					*discoveryDocument.TokenEndpoint,
+				),
+			)
+			return nil, fmt.Errorf("unable to URL-parse '%s'", *discoveryDocument.TokenEndpoint)
 		}
 		autoLoginConfig.TokenProxy.TokenEndpointParsedAsUrl = *tokenEndpointParsedAsURL
 		identityProviderUris.TokenURI = fmt.Sprintf(
@@ -997,7 +1004,7 @@ func resolveAuthPolicy(
 		}
 	}
 
-	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name %s/%s", authPolicy.Namespace, authPolicy.Name))
+	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name '%s/%s'", authPolicy.Namespace, authPolicy.Name))
 
 	return &state.Scope{
 		AuthPolicy:           *authPolicy,

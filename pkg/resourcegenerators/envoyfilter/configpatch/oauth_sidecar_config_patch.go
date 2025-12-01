@@ -4,7 +4,6 @@ import (
 	"slices"
 
 	"github.com/kartverket/ztoperator/internal/state"
-	"github.com/kartverket/ztoperator/pkg/luascript"
 	"github.com/kartverket/ztoperator/pkg/utilities"
 )
 
@@ -56,7 +55,7 @@ func GetOAuthSidecarConfigPatchValue(
 				},
 			},
 			map[string]interface{}{
-				"name": luascript.BypassOauthLoginHeaderName,
+				"name": utilities.EnvoyFilterBypassOauthLoginHeaderName,
 				"string_match": map[string]interface{}{
 					"exact": "true",
 				},
@@ -64,7 +63,7 @@ func GetOAuthSidecarConfigPatchValue(
 		},
 		"deny_redirect_matcher": []interface{}{
 			map[string]interface{}{
-				"name": luascript.DenyRedirectHeaderName,
+				"name": utilities.EnvoyFilterDenyRedirectHeaderName,
 				"string_match": map[string]interface{}{
 					"exact": "true",
 				},

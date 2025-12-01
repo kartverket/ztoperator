@@ -5,18 +5,6 @@ metadata:
   name: ztoperator
 rules:
 - apiGroups:
-  - apps/v1
-  resources:
-  - deployments
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - ""
   resources:
   - events
@@ -38,6 +26,18 @@ rules:
   - secrets
   - serviceaccounts
   - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps/v1
+  resources:
+  - deployments
   verbs:
   - create
   - delete

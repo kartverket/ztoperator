@@ -4,6 +4,7 @@ go 1.25.2
 
 require (
 	github.com/go-logr/logr v1.4.3
+	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/prometheus/client_golang v1.23.2
 	go.uber.org/zap v1.27.1
 	google.golang.org/protobuf v1.36.10

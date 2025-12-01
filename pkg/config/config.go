@@ -9,7 +9,7 @@ type Config struct {
 }
 
 var (
-	cfg Config
+	cfg     Config
 	IsLocal bool
 )
 
