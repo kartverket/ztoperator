@@ -43,7 +43,13 @@ type AutoLoginConfig struct {
 	PostLogoutRedirectURI *string
 	Scopes                []string
 	LoginParams           map[string]string
+	LuaScriptConfig       LuaScriptConfig
 	TokenProxy            TokenProxyConfig
+	EnvoySecretName       string
+}
+
+type LuaScriptConfig struct {
+	LuaScript string
 }
 
 type TokenProxyConfig struct {

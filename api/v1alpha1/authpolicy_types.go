@@ -19,7 +19,7 @@ type AuthPolicySpec struct {
 
 	// OAuthCredentials specifies a reference to a kubernetes secret in the same namespace holding OAuth credentials used for authentication.
 	//
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
 	OAuthCredentials *OAuthCredentials `json:"oAuthCredentials,omitempty"`
 
 	// WellKnownURI specifies the URi to the identity provider's discovery document (also known as well-known endpoint).
@@ -100,7 +100,7 @@ type AutoLogin struct {
 
 	// LogoutPath specifies which URI to redirect the user to when signing out.
 	// This will end the session for the application and also redirect the user
-	// to log out towards the configured identity provider ()RP-initiated logout.
+	// to log out towards the configured identity provider (RP-initiated logout).
 	// If omitted, a default path of /logout is used.
 	//
 	// +kubebuilder:validation:Optional

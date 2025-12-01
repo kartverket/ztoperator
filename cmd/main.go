@@ -167,6 +167,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if configLoadErr := config.Load(); configLoadErr != nil {
+		setupLog.Error(configLoadErr, "unable to load config")
+		os.Exit(1)
+	}
+
 	if err = (&controller.AuthPolicyReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),

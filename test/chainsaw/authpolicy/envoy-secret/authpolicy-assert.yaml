@@ -1,0 +1,7 @@
+apiVersion: v1
+data:
+  token-secret.yaml: cmVzb3VyY2VzOgotICdAdHlwZSc6IHR5cGUuZ29vZ2xlYXBpcy5jb20vZW52b3kuZXh0ZW5zaW9ucy50cmFuc3BvcnRfc29ja2V0cy50bHMudjMuU2VjcmV0CiAgZ2VuZXJpY19zZWNyZXQ6CiAgICBzZWNyZXQ6CiAgICAgIGlubGluZV9zdHJpbmc6IGR1bW15X3NlY3JldAogIG5hbWU6IHRva2VuCg==
+kind: Secret
+metadata:
+  name: auth-policy-envoy-secret
+type: Opaque
