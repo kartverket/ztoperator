@@ -1,8 +1,7 @@
 package utilities
 
 const (
-	TokenProxyImageName               = "ztoperator-token-proxy"
-	TokenProxyImageTag                = "latest"
+	TokenProxyImageName               = "ghcr.io/kartverket/token-proxy"
 	TokenProxyPort                    = 8080
 	TokenProxyTokenEndpointEnvVarName = "ZTOPERATOR_TOKEN_PROXY_TOKEN_ENDPOINT"
 	TokenProxyIssuerEnvVarName        = "ZTOPERATOR_TOKEN_PROXY_ISSUER"
@@ -19,8 +18,8 @@ const (
 	IstioHmacSecretVolumePath      = "/etc/istio/config/" + EnvoyFilterHmacSecretFileName
 	IstioCredentialsVolumePath     = "/etc/istio/config"
 
-	EnvoyFilterTokenSecretFileName = "token-secret.yaml"
-	EnvoyFilterHmacSecretFileName  = "hmac-secret.yaml"
+	EnvoyFilterTokenSecretFileName        = "token-secret.yaml"
+	EnvoyFilterHmacSecretFileName         = "hmac-secret.yaml"
 	EnvoyFilterBypassOauthLoginHeaderName = "x-bypass-login"
 	EnvoyFilterDenyRedirectHeaderName     = "x-deny-redirect"
 )

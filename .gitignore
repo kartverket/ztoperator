@@ -42,3 +42,6 @@ venv/
 
 # macOS system files
 .DS_Store
+
+# VSCode debug files
+cmd/__debug**

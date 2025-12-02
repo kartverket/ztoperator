@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/pkg/utilities"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -56,6 +57,8 @@ type TokenProxyConfig struct {
 	Name                         string
 	TokenEndpointParsedAsUrl     url.URL
 	ProtectedPodsServiceAccounts []string
+	IsInternalIDP                bool
+	KubernetesServiceURL         *utilities.KubernetesServiceURL
 }
 
 type OAuthCredentials struct {

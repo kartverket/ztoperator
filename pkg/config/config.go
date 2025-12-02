@@ -5,7 +5,8 @@ import (
 )
 
 type Config struct {
-	GitRef string `split_words:"true" default:"main"`
+	GitRef             string `split_words:"true" default:"main"`
+	TokenProxyImageTag string `split_words:"true" default:"main"`
 }
 
 var (

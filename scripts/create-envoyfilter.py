@@ -1,3 +1,6 @@
+import argparse
+import base64
+import hashlib
 import json
 import re
 import sys
@@ -8,12 +11,31 @@ from urllib.parse import quote_plus, urlparse
 import yaml
 from jinja2 import Environment, FileSystemLoader
 
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Generate EnvoyFilter from AuthPolicy")
+    parser.add_argument(
+        "--namespace",
+        help="Namespace to use when generating token proxy endpoints (required when privateJWKKey is set)",
+    )
+    return parser.parse_args()
+
+
+def base64_sha256_prefix(value: str, length: int = 6) -> str:
+    digest = hashlib.sha256(value.encode("utf-8")).digest()
+    encoded = base64.b64encode(digest).decode("ascii")
+    return encoded[:length] if length else encoded
+
+
+args = parse_args()
+
 ap = yaml.safe_load(sys.stdin)
 
 metadata = ap.get("metadata") or {}
 spec = ap.get("spec") or {}
 
 ap_name = metadata.get("name", "auth-policy")
+ap_namespace = args.namespace
 script_dir = Path(__file__).resolve().parent
 
 # Helpers ----------------------------------------------------------
@@ -140,6 +162,22 @@ use_tls = oauth_scheme == "https"
 
 if oauth_port is None:
     oauth_port = 443 if use_tls else 80
+
+oAuthCredentials = spec.get("oAuthCredentials") or {}
+private_jwk_key = (oAuthCredentials.get("privateJWKKey") or "").strip()
+
+# If private JWK is configured, route through the token proxy (internal HTTP service).
+if private_jwk_key:
+    if not ap_namespace:
+        raise SystemExit(
+            "spec.oAuthCredentials.privateJWKKey is set, but no namespace was provided "
+            "(pass --namespace or set metadata.namespace)"
+        )
+    token_proxy_name = ("token-proxy-" + base64_sha256_prefix(ap_name)).lower()
+    oauth_host = f"{token_proxy_name}.{ap_namespace}"
+    oauth_port = 8080
+    token_endpoint = f"http://{oauth_host}:{oauth_port}/token"
+    use_tls = False
 
 login_params_raw = auto.get("loginParams") or {}
 # URL-encode each login param value using + for spaces

@@ -7,6 +7,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/url"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
@@ -16,6 +19,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+type KubernetesServiceURL struct {
+	Name      string
+	Namespace string
+	Ports     []int32
+}
+
+var dnsLabelRegex = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
 
 func LowestNonZeroResult(i, j ctrl.Result) ctrl.Result {
 	switch {
@@ -103,4 +114,87 @@ func GetProtectedPods(ctx context.Context, k8sClient client.Client, authPolicy v
 		)
 	}
 	return &podList.Items, nil
+}
+
+func ParseKubernetesServiceURL(ctx context.Context, k8sClient client.Client, u url.URL) (*KubernetesServiceURL, error) {
+	if u.Scheme != "http" {
+		return nil, fmt.Errorf("unsupported scheme %q: only http is allowed", u.Scheme)
+	}
+
+	host := u.Hostname()
+	if host == "" {
+		return nil, fmt.Errorf("hostname is required")
+	}
+
+	parts := strings.Split(host, ".")
+	var service, namespace string
+
+	switch {
+	case len(parts) == 2:
+		service, namespace = parts[0], parts[1]
+	case len(parts) >= 4 && parts[2] == "svc":
+		service, namespace = parts[0], parts[1]
+	default:
+		return nil, fmt.Errorf("hostname %q must be service.namespace or service.namespace.svc.<clusterDomain>", host)
+	}
+
+	if err := validateDNSLabel(service, "service"); err != nil {
+		return nil, err
+	}
+	if err := validateDNSLabel(namespace, "namespace"); err != nil {
+		return nil, err
+	}
+
+	var ports []int32
+	portStr := u.Port()
+	if portStr == "" {
+		servicePorts, err := fetchServicePorts(ctx, k8sClient, namespace, service)
+		if err != nil {
+			return nil, err
+		}
+		ports = servicePorts
+	} else {
+		port, err := parsePort(portStr)
+		if err != nil {
+			return nil, err
+		}
+		ports = []int32{port}
+	}
+
+	return &KubernetesServiceURL{
+		Name:      service,
+		Namespace: namespace,
+		Ports:     ports,
+	}, nil
+}
+
+func validateDNSLabel(value, field string) error {
+	if len(value) == 0 || len(value) > 63 || !dnsLabelRegex.MatchString(value) {
+		return fmt.Errorf("%s %q must match %s and be 1-63 characters", field, value, dnsLabelRegex.String())
+	}
+	return nil
+}
+
+func parsePort(portStr string) (int32, error) {
+	port, err := strconv.Atoi(portStr)
+	if err != nil || port < 1 || port > 65535 {
+		return 0, fmt.Errorf("invalid port %q", portStr)
+	}
+	return int32(port), nil
+}
+
+func fetchServicePorts(ctx context.Context, k8sClient client.Client, namespace, service string) ([]int32, error) {
+	var svc v1.Service
+	if err := k8sClient.Get(ctx, types.NamespacedName{Name: service, Namespace: namespace}, &svc); err != nil {
+		return nil, fmt.Errorf("failed to get service %s/%s: %w", namespace, service, err)
+	}
+	if len(svc.Spec.Ports) == 0 {
+		return nil, fmt.Errorf("service %s/%s has no ports defined", namespace, service)
+	}
+
+	ports := make([]int32, 0, len(svc.Spec.Ports))
+	for _, p := range svc.Spec.Ports {
+		ports = append(ports, p.Port)
+	}
+	return ports, nil
 }

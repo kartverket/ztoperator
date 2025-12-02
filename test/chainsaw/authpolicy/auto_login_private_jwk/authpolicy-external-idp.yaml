@@ -1,0 +1,20 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+spec:
+  autoLogin:
+    enabled: true
+    scopes:
+      - openid
+      - profile
+  enabled: true
+  oAuthCredentials:
+    clientIDKey: CLIENT_ID
+    clientSecretKey: CLIENT_SECRET
+    privateJWKKey: PRIVATE_JWK
+    secretRef: secret
+  selector:
+    matchLabels:
+      app: application
+  wellKnownURI: https://test.idporten.no/.well-known/openid-configuration

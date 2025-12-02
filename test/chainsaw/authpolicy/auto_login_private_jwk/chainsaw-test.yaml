@@ -1,0 +1,88 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: auto-login-private-jwk
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      name: chainsaw-private-jwk
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: ../../../resources/skiperator/application-with-istio-mount.yaml
+        - apply:
+            file: ../../../resources/ingress/wildcard-ingress.yaml
+        - create:
+            file: secret-with-private-jwk.yaml
+        - create:
+            file: authpolicy-external-idp.yaml
+        - assert:
+            file: authpolicy-external-idp-assert.yaml
+        - error:
+            file: authpolicy-external-idp-error.yaml
+        - script:
+            content: |
+              cat authpolicy-external-idp.yaml | ../../../../venv/bin/python ./../../../../scripts/create-envoyfilter.py --namespace="chainsaw-private-jwk" > generated-envoyfilter-assert.yaml
+        - assert:
+            file: generated-envoyfilter-assert.yaml
+        - script:
+            content: rm -f generated-envoyfilter-assert.yaml
+        - patch:
+            resource:
+                apiVersion: ztoperator.kartverket.no/v1alpha1
+                kind: AuthPolicy
+                metadata:
+                    name: auth-policy
+                spec:
+                    wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
+        - assert:
+            file: authpolicy-internal-idp-assert.yaml
+        - error:
+            file: authpolicy-internal-idp-error.yaml            
+        - script:
+            content: |
+              sudo -n kubefwd svc -n auth >/tmp/kubefwd.log 2>&1 &
+              echo $! >/tmp/kubefwd.pid
+              sudo -n /bin/sh -c "grep -q 'mock-oauth2.auth' /etc/hosts || echo '127.0.0.1 mock-oauth2.auth' >> /etc/hosts"
+              sleep 7
+        - script:
+            content: |
+              hurl --error-format long \
+                --insecure --test test-auth-code-flow.hurl
+        - script:
+            content: |
+              # Verify exactly ONE 200 POST /token log line in the last 5 seconds
+              LOGS=$(kubectl logs -n chainsaw-private-jwk -l app=token-proxy-fvsqhk -c token-proxy-fvsqhk --tail=200 --since=5s | grep "POST" | grep "/token" || true)
+              COUNT=$(printf "%s\n" "$LOGS" | grep " 200 " | wc -l | tr -d ' ')
+              if [ "$COUNT" -ne 1 ]; then
+                echo "Expected exactly 1 POST /token 200 log line in last 5s, got $COUNT"
+                echo "$LOGS"
+                exit 1
+              fi
+        - script:
+            content: |
+              hurl --error-format long \
+                --insecure --test test-refresh-token.hurl
+        - script:
+            content: |
+              # Verify exactly TWO 200 POST /token log line in the last 5 seconds
+              LOGS=$(kubectl logs -n chainsaw-private-jwk -l app=token-proxy-fvsqhk -c token-proxy-fvsqhk --tail=200 --since=5s | grep "POST" | grep "/token" || true)
+              COUNT=$(printf "%s\n" "$LOGS" | grep " 200 " | wc -l | tr -d ' ')
+              if [ "$COUNT" -ne 2 ]; then
+                echo "Expected exactly 2 POST /token 200 log line in last 5s, got $COUNT"
+                echo "$LOGS"
+                exit 1
+              fi
+      finally:
+        - script:
+            content: |
+                sudo -n /bin/sh -c "grep -v 'mock-oauth2.auth' /etc/hosts > /tmp/hosts.cleaned && cat /tmp/hosts.cleaned > /etc/hosts"
+                if [ -f /tmp/kubefwd.pid ]; then
+                    sudo -n kill "$(cat /tmp/kubefwd.pid)" 2>/dev/null || true
+                    rm -f /tmp/kubefwd.pid
+                fi

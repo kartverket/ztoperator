@@ -116,9 +116,6 @@ spec:
         - name: "skiperator"
           image: "ghcr.io/kartverket/skiperator:${SKIPERATOR_VERSION}"
           args: ["-l", "-d"]
-          env:
-            - name: "SKIPERATOR_ENABLE_LOCAL_IMAGES"
-              value: "true"
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false

@@ -167,7 +167,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return reconcile.Result{}, err
 	}
 
-	tokenProxyNetworkPolicyName := scope.AutoLoginConfig.TokenProxy.Name + "-ingress"
+	tokenProxyNetworkPolicyName := scope.AutoLoginConfig.TokenProxy.Name
 	protectedAppNetworkPolicyName := scope.AuthPolicy.Name + "-egress-token-proxy"
 	tokenProxyAuthorizationPolicyName := scope.AutoLoginConfig.TokenProxy.Name + "-deny"
 	scope.AutoLoginConfig.EnvoySecretName = authPolicy.Name + "-envoy-secret"
@@ -289,10 +289,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 							!reflect.DeepEqual(current.Spec.GetResolution(), desired.Spec.GetResolution())
 					},
 					UpdateFields: func(current, desired *v4.ServiceEntry) {
-						current.Spec.ExportTo = desired.Spec.ExportTo
-						current.Spec.Hosts = desired.Spec.Hosts
-						current.Spec.Ports = desired.Spec.Ports
-						current.Spec.Resolution = desired.Spec.Resolution
+						current.Spec.ExportTo = desired.Spec.GetExportTo()
+						current.Spec.Hosts = desired.Spec.GetHosts()
+						current.Spec.Ports = desired.Spec.GetPorts()
+						current.Spec.Resolution = desired.Spec.GetResolution()
 					},
 				},
 			},
@@ -908,6 +908,7 @@ func resolveAuthPolicy(
 			oAuthCredentials.ClientAuthMethod = state.ClientSecretPost
 		} else {
 			oAuthCredentials.ClientAuthMethod = state.PrivateKeyJWT
+			oAuthCredentials.ClientSecret = utilities.Ptr("") // Clear client secret if PrivateJWK is used
 		}
 	}
 
@@ -947,7 +948,8 @@ func resolveAuthPolicy(
 	autoLoginConfig := state.AutoLoginConfig{
 		Enabled: false,
 		TokenProxy: state.TokenProxyConfig{
-			Name: strings.ToLower("token-proxy-" + utilities.Base64EncodedSHA256(authPolicy.Name)),
+			Name:          strings.ToLower("token-proxy-" + utilities.Base64EncodedSHA256(authPolicy.Name)),
+			IsInternalIDP: false,
 		},
 	}
 
@@ -964,6 +966,22 @@ func resolveAuthPolicy(
 			return nil, fmt.Errorf("unable to URL-parse '%s'", *discoveryDocument.TokenEndpoint)
 		}
 		autoLoginConfig.TokenProxy.TokenEndpointParsedAsUrl = *tokenEndpointParsedAsURL
+		if autoLoginConfig.TokenProxy.TokenEndpointParsedAsUrl.Scheme != "https" {
+			autoLoginConfig.TokenProxy.IsInternalIDP = true
+			kubernetesServiceURL, err := utilities.ParseKubernetesServiceURL(
+				ctx,
+				k8sClient,
+				autoLoginConfig.TokenProxy.TokenEndpointParsedAsUrl,
+			)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"unable to parse kubernetes service url for token endpoint '%s': %w",
+					autoLoginConfig.TokenProxy.TokenEndpointParsedAsUrl.String(),
+					err,
+				)
+			}
+			autoLoginConfig.TokenProxy.KubernetesServiceURL = kubernetesServiceURL
+		}
 		identityProviderUris.TokenURI = fmt.Sprintf(
 			"http://%s.%s:%d/token",
 			autoLoginConfig.TokenProxy.Name,

@@ -9,7 +9,7 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v4.ServiceEntry {
-	if !scope.ShouldHaveTokenProxy() {
+	if !scope.ShouldHaveTokenProxy() || scope.AutoLoginConfig.TokenProxy.IsInternalIDP {
 		return nil
 	}
 

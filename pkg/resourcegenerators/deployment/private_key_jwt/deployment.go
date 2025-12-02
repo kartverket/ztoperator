@@ -35,14 +35,9 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v2.Deployment {
 				Spec: v3.PodSpec{
 					Containers: []v3.Container{
 						{
-							Name:  objectMeta.Name,
-							Image: utilities.TokenProxyImageName + ":" + utilities.TokenProxyImageTag,
-							ImagePullPolicy: func() v3.PullPolicy {
-								if config.IsLocal {
-									return v3.PullNever
-								}
-								return v3.PullAlways
-							}(),
+							Name:            objectMeta.Name,
+							Image:           utilities.TokenProxyImageName + ":" + config.Get().TokenProxyImageTag,
+							ImagePullPolicy: v3.PullAlways,
 							Ports: []v3.ContainerPort{
 								{
 									Name:          "main",
