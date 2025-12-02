@@ -27,6 +27,7 @@ bin/
 .idea/
 istio-*
 !**/istio/
+.env
 
 # samples fodler
 samples/
