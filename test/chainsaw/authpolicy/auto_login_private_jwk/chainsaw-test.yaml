@@ -49,7 +49,8 @@ spec:
         # Start kubefwd to forward mock-oauth2.auth to the mock-oauth2 service in the auth namespace    
         - script:
             content: |
-              sudo kubefwd svc -n auth >/tmp/kubefwd.log 2>&1 &
+              sudo -n true || { echo "sudo -n not available without password"; exit 1; }
+              sudo -n kubefwd svc -n auth >/tmp/kubefwd.log 2>&1 &
               echo $! >/tmp/kubefwd.pid
               sleep 7
         # Verify that we can do the auth code flow against the internal mock IDP
@@ -86,8 +87,9 @@ spec:
         # Clean up kubefwd
         - script:
             content: |
-                sudo /bin/sh -c "grep -v 'mock-oauth2.auth' /etc/hosts > /tmp/hosts.cleaned && cat /tmp/hosts.cleaned > /etc/hosts"
+                sudo -n true || { echo "sudo -n not available without password"; exit 1; }
+                sudo -n /bin/sh -c "grep -v 'mock-oauth2.auth' /etc/hosts > /tmp/hosts.cleaned && cat /tmp/hosts.cleaned > /etc/hosts"
                 if [ -f /tmp/kubefwd.pid ]; then
-                    sudo kill "$(cat /tmp/kubefwd.pid)" 2>/dev/null || true
+                    sudo -n kill "$(cat /tmp/kubefwd.pid)" 2>/dev/null || true
                     rm -f /tmp/kubefwd.pid
                 fi
