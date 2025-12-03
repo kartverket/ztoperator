@@ -27,6 +27,7 @@ bin/
 .idea/
 istio-*
 !**/istio/
+.env
 
 # samples fodler
 samples/
@@ -41,3 +42,6 @@ venv/
 
 # macOS system files
 .DS_Store
+
+# VSCode debug files
+cmd/__debug**

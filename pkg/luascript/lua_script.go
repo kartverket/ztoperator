@@ -9,11 +9,7 @@ import (
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/state"
-)
-
-const (
-	BypassOauthLoginHeaderName = "x-bypass-login"
-	DenyRedirectHeaderName     = "x-deny-redirect"
+	"github.com/kartverket/ztoperator/pkg/utilities"
 )
 
 //go:embed ztoperator.lua
@@ -93,8 +89,8 @@ func GetLuaScript(
 		loginParamsAsLua,
 		*identityProviderUris.EndSessionURI,
 		queryEscapedPostLogoutRedirectURI,
-		BypassOauthLoginHeaderName,
-		DenyRedirectHeaderName,
+		utilities.EnvoyFilterBypassOauthLoginHeaderName,
+		utilities.EnvoyFilterDenyRedirectHeaderName,
 	)
 }
 

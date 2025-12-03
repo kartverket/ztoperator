@@ -67,3 +67,6 @@ make run-local
 # Run specific test
 make test-single dir=test/chainsaw/authpolicy/<TEST FOLDER>
 ```
+
+> [!IMPORTANT]
+> The test `auto_login_private_jwk` requires `sudo` to be executed. To achieve this locally you can run `sudo -v` before running the test.

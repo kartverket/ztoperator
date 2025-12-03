@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/kartverket/ztoperator/internal/state"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/utilities"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,13 +34,13 @@ func getEnvoySecret(objectMeta metav1.ObjectMeta, clientSecret string) (*v1.Secr
 	if err != nil {
 		return nil, err
 	}
-	secretData[configpatch.HmacSecretFileName] = *hmacSecretDataValue
+	secretData[utilities.EnvoyFilterHmacSecretFileName] = *hmacSecretDataValue
 
 	tokenSecretDataValue, err := getEnvoySecretDataValue("token", clientSecret, "inline_string")
 	if err != nil {
 		return nil, err
 	}
-	secretData[configpatch.TokenSecretFileName] = *tokenSecretDataValue
+	secretData[utilities.EnvoyFilterTokenSecretFileName] = *tokenSecretDataValue
 
 	return &v1.Secret{
 		ObjectMeta: objectMeta,

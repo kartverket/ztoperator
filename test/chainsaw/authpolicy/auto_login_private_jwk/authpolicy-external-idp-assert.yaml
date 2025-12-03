@@ -1,0 +1,40 @@
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: auth-policy-envoy-secret
+spec:
+  exportTo:
+  - .
+  - istio-system
+  - istio-gateways
+  hosts:
+  - test.idporten.no
+  ports:
+  - name: https
+    number: 443
+    protocol: HTTPS
+  resolution: DNS
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: token-proxy-fvsqhk
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: chainsaw-private-jwk
+      podSelector:
+        matchLabels:
+          app: application
+    ports:
+    - port: 8080
+      protocol: TCP
+    - port: 15020
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      app: token-proxy-fvsqhk
+  policyTypes:
+  - Ingress
