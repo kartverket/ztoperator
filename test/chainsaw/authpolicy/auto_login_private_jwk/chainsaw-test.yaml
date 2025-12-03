@@ -52,6 +52,7 @@ spec:
               sudo -n true || { echo "sudo -n not available without password"; exit 1; }
               sudo -n kubefwd svc -n auth >/tmp/kubefwd.log 2>&1 &
               echo $! >/tmp/kubefwd.pid
+              sudo -n /bin/sh -c "grep -q 'mock-oauth2.auth' /etc/hosts || echo '127.0.0.1 mock-oauth2.auth' >> /etc/hosts"
               sleep 7
         # Verify that we can do the auth code flow against the internal mock IDP
         - script:
