@@ -187,7 +187,13 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 					ResourceKind: "Deployment",
 					ResourceName: scope.AutoLoginConfig.TokenProxy.Name,
 					DesiredResource: utilities.Ptr(
-						deploymentprivatekeyjwt.GetDesired(scope, utilities.BuildObjectMeta(scope.AutoLoginConfig.TokenProxy.Name, authPolicy.Namespace)),
+						deploymentprivatekeyjwt.GetDesired(
+							scope,
+							utilities.BuildObjectMeta(
+								scope.AutoLoginConfig.TokenProxy.Name,
+								authPolicy.Namespace,
+							),
+						),
 					),
 					Scope: scope,
 					ShouldUpdate: func(current, desired *v3.Deployment) bool {

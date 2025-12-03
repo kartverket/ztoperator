@@ -454,6 +454,9 @@ linters:
       - path: "pkg/config/config.go"
         linters:
           - gochecknoglobals
+      - path: "pkg/utilities/constants.go"
+        linters:
+          - gosec
       - path: "pkg/resourcegenerators/envoyfilter/configpatch/lua_script_config_patch.go"
         linters:
           - gosec

@@ -176,11 +176,11 @@ func validateDNSLabel(value, field string) error {
 }
 
 func parsePort(portStr string) (int32, error) {
-	port, err := strconv.Atoi(portStr)
-	if err != nil || port < 1 || port > 65535 {
+	parsed, err := strconv.ParseInt(portStr, 10, 32)
+	if err != nil || parsed < 1 || parsed > 65535 {
 		return 0, fmt.Errorf("invalid port %q", portStr)
 	}
-	return int32(port), nil
+	return int32(parsed), nil
 }
 
 func fetchServicePorts(ctx context.Context, k8sClient client.Client, namespace, service string) ([]int32, error) {
