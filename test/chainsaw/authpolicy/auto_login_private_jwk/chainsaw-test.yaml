@@ -56,6 +56,7 @@ spec:
         # Verify that we can do the auth code flow against the internal mock IDP
         - script:
             content: |
+              cat /etc/hosts
               hurl --error-format long \
                 --insecure --test test-auth-code-flow.hurl
         # Verify that the auth code flow used token-proxy by checking that exactly ONE 200 POST /token log line was logged in the last 5 seconds
