@@ -38,6 +38,9 @@
         "pkg-path": "kubectl",
         "version": "1.33.4"
       },
+      "kubectx": {
+        "pkg-path": "kubectx"
+      },
       "kubefwd": {
         "pkg-path": "kubefwd",
         "version": "1.22.5"
@@ -1369,6 +1372,122 @@
         "convert": "/nix/store/q0q4vvlpy58b4fb5i0qf206bd9w2p4xx-kubectl-1.33.4-convert",
         "man": "/nix/store/y29ssajml6nr9ayyy46l9g543y0db2pa-kubectl-1.33.4-man",
         "out": "/nix/store/g7sdhh062sc85y74brqq4ndnl07cv6sv-kubectl-1.33.4"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "kubectx",
+      "broken": false,
+      "derivation": "/nix/store/pn3nap4jg5wzxp2jgpcpqaambaai91cr-kubectx-0.9.5.drv",
+      "description": "Fast way to switch between clusters and namespaces in kubectl",
+      "install_id": "kubectx",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=dfb2f12e899db4876308eba6d93455ab7da304cd",
+      "name": "kubectx-0.9.5",
+      "pname": "kubectx",
+      "rev": "dfb2f12e899db4876308eba6d93455ab7da304cd",
+      "rev_count": 853093,
+      "rev_date": "2025-08-28T13:12:38Z",
+      "scrape_date": "2025-08-30T03:28:01.193137Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/wyics1gbdd51i805ilzx9mj21jg54rz1-kubectx-0.9.5"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "kubectx",
+      "broken": false,
+      "derivation": "/nix/store/zhync8gk13zqvhzvqr2w5hd3washcwni-kubectx-0.9.5.drv",
+      "description": "Fast way to switch between clusters and namespaces in kubectl",
+      "install_id": "kubectx",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=dfb2f12e899db4876308eba6d93455ab7da304cd",
+      "name": "kubectx-0.9.5",
+      "pname": "kubectx",
+      "rev": "dfb2f12e899db4876308eba6d93455ab7da304cd",
+      "rev_count": 853093,
+      "rev_date": "2025-08-28T13:12:38Z",
+      "scrape_date": "2025-08-30T03:36:16.167796Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/d0nzl4si6jddvaqba88xc13xghp81mdc-kubectx-0.9.5"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "kubectx",
+      "broken": false,
+      "derivation": "/nix/store/53i0ksqn5x8wmw3647pwshdcnaw8fh5m-kubectx-0.9.5.drv",
+      "description": "Fast way to switch between clusters and namespaces in kubectl",
+      "install_id": "kubectx",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=dfb2f12e899db4876308eba6d93455ab7da304cd",
+      "name": "kubectx-0.9.5",
+      "pname": "kubectx",
+      "rev": "dfb2f12e899db4876308eba6d93455ab7da304cd",
+      "rev_count": 853093,
+      "rev_date": "2025-08-28T13:12:38Z",
+      "scrape_date": "2025-08-30T03:44:15.224086Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/37nr7ybg04sjgm756jnabcg2zbs90yg0-kubectx-0.9.5"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "kubectx",
+      "broken": false,
+      "derivation": "/nix/store/rdxr20afvcwb4ifp6zkmlsq8r96sh63b-kubectx-0.9.5.drv",
+      "description": "Fast way to switch between clusters and namespaces in kubectl",
+      "install_id": "kubectx",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=dfb2f12e899db4876308eba6d93455ab7da304cd",
+      "name": "kubectx-0.9.5",
+      "pname": "kubectx",
+      "rev": "dfb2f12e899db4876308eba6d93455ab7da304cd",
+      "rev_count": 853093,
+      "rev_date": "2025-08-28T13:12:38Z",
+      "scrape_date": "2025-08-30T03:51:42.278394Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.9.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/xfawaj5n1i81a19lrfvi25vlbh441mjv-kubectx-0.9.5"
       },
       "system": "x86_64-linux",
       "group": "toplevel",

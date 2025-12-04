@@ -47,6 +47,7 @@ python3.version = "3.12.10"
 python3.pkg-group = "python3-isolated"
 cloud-provider-kind.pkg-path = "cloud-provider-kind"
 cloud-provider-kind.version = "0.6.0"
+kubectx.pkg-path = "kubectx"
 
 
 ## Environment Variables ---------------------------------------------
