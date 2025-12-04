@@ -31,7 +31,7 @@ type AuthPolicySpec struct {
 	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
 	//
 	// +kubebuilder:validation:Optional
-	Audience []string `json:"audience,omitempty"`
+	Audience []Audience `json:"audience,omitempty"`
 
 	// If set to `true`, the original token will be kept for the upstream request. Defaults to `true`.
 	//
@@ -73,6 +73,23 @@ type AuthPolicySpec struct {
 	// The Selector specifies which workload the defined auth policy should be applied to.
 	// +kubebuilder:validation:Required
 	Selector WorkloadSelector `json:"selector"`
+}
+
+type AudienceAsString string
+
+type Audience struct {
+	*AudienceAsString `json:",inline"`
+	ValueFrom         *ValueFrom `json:"valueFrom,omitempty"`
+}
+
+type ValueFrom struct {
+	ConfigMapKeyRef *KeyRef `json:"configMapKeyRef,omitempty"`
+	SecretKeyRef    *KeyRef `json:"secretKeyRef,omitempty"`
+}
+
+type KeyRef struct {
+	Name string `json:"name"`
+	Key  string `json:"key"`
 }
 
 // AutoLogin specifies the required configuration needed to log in users.

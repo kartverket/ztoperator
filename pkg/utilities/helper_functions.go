@@ -58,6 +58,14 @@ func GetSecret(ctx context.Context, client client.Client, namespacedName types.N
 	return secret, err
 }
 
+func GetConfigMap(ctx context.Context, client client.Client, namespacedName types.NamespacedName) (v1.ConfigMap, error) {
+	configMap := v1.ConfigMap{}
+
+	err := client.Get(ctx, namespacedName, &configMap)
+
+	return configMap, err
+}
+
 func GetParsedURL(uri string) (*url.URL, error) {
 	parsedURL, err := url.Parse(uri)
 	if err != nil {

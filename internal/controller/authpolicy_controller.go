@@ -10,6 +10,7 @@ import (
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/eventhandler/pod"
+	"github.com/kartverket/ztoperator/internal/resolver"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/luascript"
@@ -802,9 +803,16 @@ func resolveAuthPolicy(
 		}
 	}
 
+	resolvedAudiences, errAudiences := resolver.ResolveAudiences(ctx, k8sClient, authPolicy.Namespace, authPolicy.Spec.Audience)
+
+	if errAudiences != nil {
+		return nil, fmt.Errorf("failed to resolve audiences: %w", errAudiences)
+	}
+
 	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name %s/%s", authPolicy.Namespace, authPolicy.Name))
 
 	return &state.Scope{
+		Audience:             *resolvedAudiences,
 		AuthPolicy:           *authPolicy,
 		AutoLoginConfig:      autoLoginConfig,
 		OAuthCredentials:     oAuthCredentials,
