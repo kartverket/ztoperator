@@ -16,7 +16,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 
 	var audiences []string
 	if scope.AuthPolicy.Spec.Audience != nil {
-		audiences = scope.AuthPolicy.Spec.Audience
+		audiences = scope.Audience
 	}
 
 	jwtRule := &securityv1.JWTRule{

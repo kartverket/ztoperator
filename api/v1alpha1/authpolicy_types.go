@@ -27,11 +27,18 @@ type AuthPolicySpec struct {
 	// +kubebuilder:validation:Required
 	WellKnownURI string `json:"wellKnownURI"`
 
+	// Deprecated: use .allowedAudiences instead.
+	// Audience defines the accepted audience (`aud`) values in the JWT.
+	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
+	//
+	// +kubebuilder:validation:Deprecated
+	Audience []string `json:"audience,omitempty"`
+
 	// Audience defines the accepted audience (`aud`) values in the JWT.
 	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
 	//
 	// +kubebuilder:validation:Optional
-	Audience []Audience `json:"audience,omitempty"`
+	AllowedAudiences []AllowedAudiences `json:"allowedAudiences,omitempty"`
 
 	// If set to `true`, the original token will be kept for the upstream request. Defaults to `true`.
 	//
@@ -75,11 +82,9 @@ type AuthPolicySpec struct {
 	Selector WorkloadSelector `json:"selector"`
 }
 
-type AudienceAsString string
-
-type Audience struct {
-	*AudienceAsString `json:",inline"`
-	ValueFrom         *ValueFrom `json:"valueFrom,omitempty"`
+type AllowedAudiences struct {
+	Value     *string    `json:"value,omitempty"`
+	ValueFrom *ValueFrom `json:"valueFrom,omitempty"`
 }
 
 type ValueFrom struct {

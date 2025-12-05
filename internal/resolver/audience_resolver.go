@@ -10,13 +10,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ResolveAudiences(ctx context.Context, k8sClient client.Client, namespace string, audiences []ztoperatorv1alpha1.Audience) (*[]string, error) {
+func ResolveAudiences(
+	ctx context.Context,
+	k8sClient client.Client,
+	namespace string,
+	allowedAudiences []ztoperatorv1alpha1.AllowedAudiences,
+	deprecatedAudiences []string,
+) (*[]string, error) {
 	var resolvedAudiences []string
-	for _, audience := range audiences {
-		if audience.AudienceAsString != nil && audience.ValueFrom != nil {
+
+	resolvedAudiences = append(resolvedAudiences, deprecatedAudiences...)
+
+	for _, audience := range allowedAudiences {
+		if audience.Value != nil && audience.ValueFrom != nil {
 			return nil, fmt.Errorf("cannot define an audience as both string and ConfigMap/Secret ref")
-		} else if audience.AudienceAsString != nil {
-			resolvedAudiences = append(resolvedAudiences, string(*audience.AudienceAsString))
+		} else if audience.Value != nil {
+			resolvedAudiences = append(resolvedAudiences, string(*audience.Value))
 		} else if audience.ValueFrom != nil {
 			if audience.ValueFrom.ConfigMapKeyRef != nil && audience.ValueFrom.SecretKeyRef != nil {
 				return nil, fmt.Errorf("cannot get value from both ConfigMap and Secret")

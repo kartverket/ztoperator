@@ -103,6 +103,7 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies;requestauthentications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
 
 func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	rLog := log.GetLogger(ctx)
@@ -803,7 +804,13 @@ func resolveAuthPolicy(
 		}
 	}
 
-	resolvedAudiences, errAudiences := resolver.ResolveAudiences(ctx, k8sClient, authPolicy.Namespace, authPolicy.Spec.Audience)
+	resolvedAudiences, errAudiences := resolver.ResolveAudiences(
+		ctx,
+		k8sClient,
+		authPolicy.Namespace,
+		authPolicy.Spec.AllowedAudiences,
+		authPolicy.Spec.Audience,
+	)
 
 	if errAudiences != nil {
 		return nil, fmt.Errorf("failed to resolve audiences: %w", errAudiences)

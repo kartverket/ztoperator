@@ -6,17 +6,17 @@ spec:
   enabled: true
   ignoreAuthRules:
     - paths:
-        - '/swagger-ui*'
-        - '/api-docs*'
-        - '/token'
-        - '/login/oauth2/code/entra'
-        - '/oauth2/authorization/entra'
-        - '/dummy/vulnerabilities/*'
-        - '/api/public/metrikker/avdeling'
+        - "/swagger-ui*"
+        - "/api-docs*"
+        - "/token"
+        - "/login/oauth2/code/entra"
+        - "/oauth2/authorization/entra"
+        - "/dummy/vulnerabilities/*"
+        - "/api/public/metrikker/avdeling"
       methods:
         - GET
     - paths:
-        - '/api/backstage/catalogInfo'
+        - "/api/backstage/catalogInfo"
       methods:
         - POST
   authRules:

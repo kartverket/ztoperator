@@ -53,8 +53,42 @@ spec:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
+              allowedAudiences:
+                description: |-
+                  Audience defines the accepted audience (`aud`) values in the JWT.
+                  At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
+                items:
+                  properties:
+                    value:
+                      type: string
+                    valueFrom:
+                      properties:
+                        configMapKeyRef:
+                          properties:
+                            key:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                        secretKeyRef:
+                          properties:
+                            key:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                          - key
+                          - name
+                          type: object
+                      type: object
+                  type: object
+                type: array
               audience:
                 description: |-
+                  Deprecated: use .allowedAudiences instead.
                   Audience defines the accepted audience (`aud`) values in the JWT.
                   At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
                 items:
