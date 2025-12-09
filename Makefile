@@ -83,7 +83,7 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 ##@ Build
 
 .PHONY: build
-build: manifests generate fmt vet ## Build manager binary.
+build: manifests generate install fmt vet ## Build manager binary.
 	go build -o bin/ztoperator cmd/main.go
 
 .PHONY: run
