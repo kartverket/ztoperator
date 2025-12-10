@@ -21,7 +21,7 @@ spec:
       - User.Read
   audience:
     - some-audience
-  wellKnownURI: https://test.idporten.no/.well-known/openid-configuration
+  wellKnownURI: https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0/.well-known/openid-configuration
   selector:
     matchLabels:
       app: application

@@ -1,0 +1,18 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: enforce-resource-indicators
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: ../../../resources/skiperator/application.yaml
+        - create:
+            file: authpolicy.yaml

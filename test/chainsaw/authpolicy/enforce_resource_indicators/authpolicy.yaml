@@ -1,0 +1,10 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+spec:
+  enabled: true
+  wellKnownURI: https://test.idporten.no/.well-known/openid-configuration
+  selector:
+    matchLabels:
+      app: application
