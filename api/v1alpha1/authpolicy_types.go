@@ -82,11 +82,15 @@ type AuthPolicySpec struct {
 	Selector WorkloadSelector `json:"selector"`
 }
 
+// +kubebuilder:validation:XValidation:message="either 'value' or 'valueFrom' must be set",rule="has(self.value) || has(self.valueFrom)"
+// +kubebuilder:validation:XValidation:message="one audience cannot be defined from both 'value' and 'valueFrom'",rule="!(has(self.value) && has(self.valueFrom))"
 type AllowedAudiences struct {
 	Value     *string    `json:"value,omitempty"`
 	ValueFrom *ValueFrom `json:"valueFrom,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:message="either 'configMapKeyRef' or 'secretKeyRef' must be set",rule="has(self.configMapKeyRef) || has(self.secretKeyRef)"
+// +kubebuilder:validation:XValidation:message="cannot reference both a ConfigMap and a Secret",rule="!(has(self.configMapKeyRef) && has(self.secretKeyRef))"
 type ValueFrom struct {
 	ConfigMapKeyRef *KeyRef `json:"configMapKeyRef,omitempty"`
 	SecretKeyRef    *KeyRef `json:"secretKeyRef,omitempty"`

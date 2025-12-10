@@ -84,7 +84,19 @@ spec:
                           - name
                           type: object
                       type: object
+                      x-kubernetes-validations:
+                      - message: either 'configMapKeyRef' or 'secretKeyRef' must be
+                          set
+                        rule: has(self.configMapKeyRef) || has(self.secretKeyRef)
+                      - message: cannot reference both a ConfigMap and a Secret
+                        rule: '!(has(self.configMapKeyRef) && has(self.secretKeyRef))'
                   type: object
+                  x-kubernetes-validations:
+                  - message: either 'value' or 'valueFrom' must be set
+                    rule: has(self.value) || has(self.valueFrom)
+                  - message: one audience cannot be defined from both 'value' and
+                      'valueFrom'
+                    rule: '!(has(self.value) && has(self.valueFrom))'
                 type: array
               audience:
                 description: |-
