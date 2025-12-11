@@ -58,26 +58,52 @@ spec:
                   Audience defines the accepted audience (`aud`) values in the JWT.
                   At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
                 items:
+                  description: |-
+                    AllowedAudiences defines a single audience that is accepted for JWT validation.
+                    The audience can be defined either as a static value or retrieved from a kubernetes resource.
                   properties:
                     value:
+                      description: Value specifies a static audience value.
                       type: string
                     valueFrom:
+                      description: ValueFrom specifies a reference to a kubernetes
+                        resource to retrieve the audience value from.
                       properties:
                         configMapKeyRef:
+                          description: ConfigMapKeyRef specifies a reference to a
+                            key in a ConfigMap.
                           properties:
                             key:
+                              description: Key specifies the data entry name within
+                                the ConfigMap/Secret; must follow key naming rules.
+                              minLength: 1
+                              pattern: ^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$
                               type: string
                             name:
+                              description: Name specifies the name of the ConfigMap/Secret;
+                                must satisfy DNS-1123 subdomain naming.
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                               type: string
                           required:
                           - key
                           - name
                           type: object
                         secretKeyRef:
+                          description: SecretKeyRef specifies a reference to a key
+                            in a Secret.
                           properties:
                             key:
+                              description: Key specifies the data entry name within
+                                the ConfigMap/Secret; must follow key naming rules.
+                              minLength: 1
+                              pattern: ^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$
                               type: string
                             name:
+                              description: Name specifies the name of the ConfigMap/Secret;
+                                must satisfy DNS-1123 subdomain naming.
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                               type: string
                           required:
                           - key

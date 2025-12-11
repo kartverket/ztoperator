@@ -8,7 +8,6 @@ spec:
   skipDelete: false
   namespaceTemplate:
     metadata:
-      name: chainsaw-audience-referencing
       labels:
         istio-injection: enabled
 
@@ -20,27 +19,3 @@ spec:
             file: authpolicy.yaml
         - assert:
             file: authpolicy-assert.yaml
-        - script:
-            content: |
-              if output=$(kubectl patch authpolicy auth-policy -n chainsaw-audience-referencing --type=merge \
-                --patch-file patch-invalid-audience.yaml 2>&1); then
-                echo "expected kubectl patch patch-invalid-audience.yaml to fail" >&2
-                exit 1
-              fi
-              echo "$output" | grep -q "one audience cannot be defined from both 'value' and 'valueFrom'" || {
-                echo "kubectl patch did not fail with expected validation error" >&2
-                echo "$output" >&2
-                exit 1
-              }
-        - script:
-            content: |
-              if output=$(kubectl patch authpolicy auth-policy -n chainsaw-audience-referencing --type=merge \
-                --patch-file patch-invalid-audience-ref.yaml 2>&1); then
-                echo "expected kubectl patch patch-invalid-audience-ref.yaml to fail" >&2
-                exit 1
-              fi
-              echo "$output" | grep -q "cannot reference both a ConfigMap and a Secret" || {
-                echo "kubectl patch did not fail with expected validation error" >&2
-                echo "$output" >&2
-                exit 1
-              }

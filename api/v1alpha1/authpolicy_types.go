@@ -32,6 +32,7 @@ type AuthPolicySpec struct {
 	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
 	//
 	// +kubebuilder:validation:Deprecated
+	// +kubebuilder:validation:Optional
 	Audience []string `json:"audience,omitempty"`
 
 	// Audience defines the accepted audience (`aud`) values in the JWT.
@@ -82,23 +83,58 @@ type AuthPolicySpec struct {
 	Selector WorkloadSelector `json:"selector"`
 }
 
+// AllowedAudiences defines a single audience that is accepted for JWT validation.
+// The audience can be defined either as a static value or retrieved from a kubernetes resource.
+//
 // +kubebuilder:validation:XValidation:message="either 'value' or 'valueFrom' must be set",rule="has(self.value) || has(self.valueFrom)"
 // +kubebuilder:validation:XValidation:message="one audience cannot be defined from both 'value' and 'valueFrom'",rule="!(has(self.value) && has(self.valueFrom))"
+// +kubebuilder:object:generate=true
 type AllowedAudiences struct {
-	Value     *string    `json:"value,omitempty"`
+	// Value specifies a static audience value.
+	//
+	// +kubebuilder:validation:Optional
+	Value *string `json:"value,omitempty"`
+
+	// ValueFrom specifies a reference to a kubernetes resource to retrieve the audience value from.
+	//
+	// +kubebuilder:validation:Optional
 	ValueFrom *ValueFrom `json:"valueFrom,omitempty"`
 }
 
+// ValueFrom specifies a reference to a kubernetes resource to retrieve a value from.
+//
 // +kubebuilder:validation:XValidation:message="either 'configMapKeyRef' or 'secretKeyRef' must be set",rule="has(self.configMapKeyRef) || has(self.secretKeyRef)"
 // +kubebuilder:validation:XValidation:message="cannot reference both a ConfigMap and a Secret",rule="!(has(self.configMapKeyRef) && has(self.secretKeyRef))"
+// +kubebuilder:object:generate=true
 type ValueFrom struct {
+	// ConfigMapKeyRef specifies a reference to a key in a ConfigMap.
+	//
+	// +kubebuilder:validation:Optional
 	ConfigMapKeyRef *KeyRef `json:"configMapKeyRef,omitempty"`
-	SecretKeyRef    *KeyRef `json:"secretKeyRef,omitempty"`
+
+	// SecretKeyRef specifies a reference to a key in a Secret.
+	//
+	// +kubebuilder:validation:Optional
+	SecretKeyRef *KeyRef `json:"secretKeyRef,omitempty"`
 }
 
+// KeyRef specifies a reference to a specific key within a kubernetes resource.
+//
+// +kubebuilder:object:generate=true
 type KeyRef struct {
+	// Name specifies the name of the ConfigMap/Secret; must satisfy DNS-1123 subdomain naming.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
-	Key  string `json:"key"`
+
+	// Key specifies the data entry name within the ConfigMap/Secret; must follow key naming rules.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$`
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
 }
 
 // AutoLogin specifies the required configuration needed to log in users.
