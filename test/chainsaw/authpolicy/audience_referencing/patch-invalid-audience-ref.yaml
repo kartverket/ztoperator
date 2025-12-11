@@ -1,0 +1,9 @@
+spec:
+  allowedAudiences:
+    - valueFrom:
+        configMapKeyRef:
+          name: cm
+          key: KEY
+        secretKeyRef:
+          name: secret
+          key: KEY

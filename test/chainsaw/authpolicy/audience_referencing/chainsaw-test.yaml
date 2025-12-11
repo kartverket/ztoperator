@@ -8,8 +8,10 @@ spec:
   skipDelete: false
   namespaceTemplate:
     metadata:
+      name: chainsaw-audience-referencing
       labels:
         istio-injection: enabled
+
   steps:
     - try:
         - create:
@@ -18,31 +20,27 @@ spec:
             file: authpolicy.yaml
         - assert:
             file: authpolicy-assert.yaml
-        - patch:
-            resource:
-              apiVersion: ztoperator.kartverket.no/v1alpha1
-              kind: AuthPolicy
-              metadata:
-                name: auth-policy
-              spec:
-                allowedAudiences:
-                  - value: blablabla
-                    valueFrom:
-                      configMapKeyRef:
-                        name: cm
-                        key: KEY
-            expect:
-              - match:
-                  apiVersion: ztoperator.kartverket.no/v1alpha1
-                  kind: AuthPolicy
-                  metadata:
-                    name: auth-policy
-                check:
-                  # patch MUST fail
-                  ($error != null): true
-
-                  # validation message MUST be present
-                  contains(
-                    $error,
-                    "AuthPolicy.ztoperator.kartverket.no \"auth-policy\" is invalid: spec.allowedAudiences[0]: Invalid value: \"object\": one audience cannot be defined from both 'value' and 'valueFrom'"
-                  ): true
+        - script:
+            content: |
+              if output=$(kubectl patch authpolicy auth-policy -n chainsaw-audience-referencing --type=merge \
+                --patch-file patch-invalid-audience.yaml 2>&1); then
+                echo "expected kubectl patch patch-invalid-audience.yaml to fail" >&2
+                exit 1
+              fi
+              echo "$output" | grep -q "one audience cannot be defined from both 'value' and 'valueFrom'" || {
+                echo "kubectl patch did not fail with expected validation error" >&2
+                echo "$output" >&2
+                exit 1
+              }
+        - script:
+            content: |
+              if output=$(kubectl patch authpolicy auth-policy -n chainsaw-audience-referencing --type=merge \
+                --patch-file patch-invalid-audience-ref.yaml 2>&1); then
+                echo "expected kubectl patch patch-invalid-audience-ref.yaml to fail" >&2
+                exit 1
+              fi
+              echo "$output" | grep -q "cannot reference both a ConfigMap and a Secret" || {
+                echo "kubectl patch did not fail with expected validation error" >&2
+                echo "$output" >&2
+                exit 1
+              }
