@@ -8,11 +8,16 @@ spec:
   skipDelete: false
   namespaceTemplate:
     metadata:
+      name: chainsaw-enforce-resource-indicators
       labels:
         istio-injection: enabled
   steps:
     - try:
-        - create:
-            file: ../../../resources/skiperator/application.yaml
-        - create:
-            file: authpolicy.yaml
+        - script:
+            content: |
+              set -euo pipefail
+              if output=$(kubectl apply -n chainsaw-enforce-resource-indicators -f authpolicy.yaml 2>&1); then
+                echo "expected kubectl apply to fail" >&2
+                exit 1
+              fi
+              echo "$output" | grep -q 'The AuthPolicy "auth-policy" is invalid: spec: Invalid value: "object": acceptedResources must be non-empty when using Ansattporten or ID-Porten'
