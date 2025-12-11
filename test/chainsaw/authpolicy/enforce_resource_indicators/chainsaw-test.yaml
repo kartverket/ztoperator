@@ -15,7 +15,6 @@ spec:
     - try:
         - script:
             content: |
-              set -euo pipefail
               if output=$(kubectl apply -n chainsaw-enforce-resource-indicators -f authpolicy.yaml 2>&1); then
                 echo "expected kubectl apply to fail" >&2
                 exit 1
