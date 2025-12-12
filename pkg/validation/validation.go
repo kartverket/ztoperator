@@ -9,8 +9,8 @@ import (
 
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/config"
+	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
-	"github.com/kartverket/ztoperator/pkg/utilities"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -200,7 +200,7 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 		return nil
 	}
 
-	pods, getPodsErr := utilities.GetProtectedPods(ctx, k8sClient, scope.AuthPolicy)
+	pods, getPodsErr := helperfunctions.GetProtectedPods(ctx, k8sClient, scope.AuthPolicy)
 	if getPodsErr != nil {
 		return fmt.Errorf(
 			"error when getting pods matching the configured labelSelector %s: %w",

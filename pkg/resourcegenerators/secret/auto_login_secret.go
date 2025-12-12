@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
-	"github.com/kartverket/ztoperator/pkg/utilities"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -27,7 +27,7 @@ func GetDesired(scope *state.Scope, objectMeta metav1.ObjectMeta) *v1.Secret {
 func getEnvoySecret(objectMeta metav1.ObjectMeta, clientSecret string) (*v1.Secret, error) {
 	secretData := map[string][]byte{}
 
-	hmacSecret, err := utilities.GenerateHMACSecret(32)
+	hmacSecret, err := helperfunctions.GenerateHMACSecret(32)
 	if err != nil {
 		return nil, err
 	}

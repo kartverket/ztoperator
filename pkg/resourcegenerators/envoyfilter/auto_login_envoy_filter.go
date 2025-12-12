@@ -9,8 +9,8 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
-	"github.com/kartverket/ztoperator/pkg/utilities"
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFilter {
@@ -19,7 +19,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 		return nil
 	}
 
-	idpAsParsedURL, err := utilities.GetParsedURL(scope.IdentityProviderUris.TokenURI)
+	idpAsParsedURL, err := helperfunctions.GetParsedURL(scope.IdentityProviderUris.TokenURI)
 	if err != nil {
 		panic(
 			"failed to get issuer hostname from issuer URI " + scope.IdentityProviderUris.IssuerURI + " due to the following error: " + err.Error(),

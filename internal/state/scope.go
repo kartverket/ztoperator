@@ -10,6 +10,7 @@ import (
 
 type Scope struct {
 	AuthPolicy             ztoperatorv1alpha1.AuthPolicy
+	Audience               []string
 	AutoLoginConfig        AutoLoginConfig
 	OAuthCredentials       OAuthCredentials
 	IdentityProviderUris   IdentityProviderUris

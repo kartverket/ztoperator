@@ -2,8 +2,12 @@ name: Check linting
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - README.md
+    paths:
+      - api/**
+      - cmd/**
+      - internal/**
+      - pkg/**
+      - .github/workflows/golangci-lint.yml
 
 permissions:
   contents: read
@@ -16,8 +20,6 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
-        with:
-          version: v2.5.0
+          go-version: '1.25.2'
+      - name: Lint project
+        run: make lint

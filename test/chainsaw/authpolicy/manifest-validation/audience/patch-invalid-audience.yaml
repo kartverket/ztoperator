@@ -1,0 +1,7 @@
+spec:
+  allowedAudiences:
+    - value: inline-value
+      valueFrom:
+        configMapKeyRef:
+          name: cm
+          key: KEY

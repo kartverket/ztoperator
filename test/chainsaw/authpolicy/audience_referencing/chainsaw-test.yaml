@@ -1,0 +1,29 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: audience-referencing
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+
+  steps:
+    - try:
+        - create:
+            file: ../../../resources/skiperator/application.yaml
+        - create:
+            file: authpolicy.yaml
+        - assert:
+            file: authpolicy-assert.yaml
+        - update:
+            file: authpolicy-with-deprecated-audience.yaml
+        - assert:
+            file: authpolicy-with-deprecated-audience-assert.yaml
+        - update:
+            file: authpolicy-with-allowed-audience.yaml
+        - assert:
+            file: authpolicy-with-allowed-audience-assert.yaml            

@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap
+data:
+  AUDIENCE: "audience-from-configmap"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret
+type: Opaque
+data:
+  AUDIENCE: YXVkaWVuY2UtZnJvbS1zZWNyZXQ=
+---
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+spec:
+  enabled: true
+  audience:
+    - audience-inline-deprecated
+  allowedAudiences:
+    - value: audience-inline
+    - valueFrom:
+        configMapKeyRef:
+          name: configmap
+          key: AUDIENCE
+    - valueFrom:
+        secretKeyRef:
+          name: secret
+          key: AUDIENCE
+  wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
+  selector:
+    matchLabels:
+      app: application
