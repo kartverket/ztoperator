@@ -16,7 +16,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 
 	var audiences []string
 
-	if scope.AuthPolicy.Spec.Audience != nil {
+	if len(scope.Audience) > 0 {
 		audiences = scope.Audience
 	}
 
