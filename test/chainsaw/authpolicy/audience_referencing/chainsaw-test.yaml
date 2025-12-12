@@ -19,3 +19,11 @@ spec:
             file: authpolicy.yaml
         - assert:
             file: authpolicy-assert.yaml
+        - update:
+            file: authpolicy-with-deprecated-audience.yaml
+        - assert:
+            file: authpolicy-with-deprecated-audience-assert.yaml
+        - update:
+            file: authpolicy-with-allowed-audience.yaml
+        - assert:
+            file: authpolicy-with-allowed-audience-assert.yaml            
