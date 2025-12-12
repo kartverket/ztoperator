@@ -17,17 +17,18 @@ spec:
       - openid
     loginParams:
       acr_values: entraid
-      authorization_details: '[
-        {
-          "type": "ansattporten:altinn:service",
-          "resource": "urn:altinn:resource:2480:40"
-        },
-        {
-          "type": "ansattporten:altinn:service",
-          "resource": "urn:altinn:resource:5900:1",
-          "allow_multiple_organizations": true
-        }
-      ]'
+      authorization_details: |
+        [
+          {
+            "type": "ansattporten:altinn:service",
+            "resource": "urn:altinn:resource:2480:40"
+          },
+          {
+            "type": "ansattporten:altinn:service",
+            "resource": "urn:altinn:resource:5900:1",
+            "allow_multiple_organizations": true
+          }
+        ]
   audience:
     - entraid_server
   wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
