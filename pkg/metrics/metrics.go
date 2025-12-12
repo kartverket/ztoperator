@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/log"
-	"github.com/kartverket/ztoperator/pkg/utilities"
 	"github.com/prometheus/client_golang/prometheus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -75,7 +75,7 @@ func RefreshAuthPolicyInfo(ctx context.Context, k8sClient client.Client, authPol
 	var namespace v1.Namespace
 	_ = k8sClient.Get(ctx, client.ObjectKey{Name: authPolicy.Namespace}, &namespace)
 
-	idpAsParsedURL, err := utilities.GetParsedURL(authPolicy.Spec.WellKnownURI)
+	idpAsParsedURL, err := helperfunctions.GetParsedURL(authPolicy.Spec.WellKnownURI)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to get issuer hostname from issuer URI %s due to the following error: %w",
@@ -84,7 +84,7 @@ func RefreshAuthPolicyInfo(ctx context.Context, k8sClient client.Client, authPol
 		)
 	}
 
-	protectedPods, getProtectedPodsErr := utilities.GetProtectedPods(ctx, k8sClient, authPolicy)
+	protectedPods, getProtectedPodsErr := helperfunctions.GetProtectedPods(ctx, k8sClient, authPolicy)
 	if getProtectedPodsErr != nil {
 		return err
 	}

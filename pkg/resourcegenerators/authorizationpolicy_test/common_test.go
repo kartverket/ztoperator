@@ -18,7 +18,6 @@ func TestConstructAcceptedResourcesWithAudienceNil(t *testing.T) {
 	if len(actualValues) != 0 {
 		t.Fatalf("expecting an empty array, but got an array with %d", len(actualValues))
 	}
-
 }
 
 func TestConstructAcceptedResourcesWithAudience(t *testing.T) {
@@ -35,7 +34,6 @@ func TestConstructAcceptedResourcesWithAudience(t *testing.T) {
 	if !reflect.DeepEqual(expectedAudiences, actualValues) {
 		t.Fatalf("expected != actual, expected: %v\n, actual: %v\n", expectedAudiences, actualValues)
 	}
-
 }
 
 func TestConstructAcceptedResourcesWithAudienceAndAcceptedResources(t *testing.T) {
@@ -50,7 +48,9 @@ func TestConstructAcceptedResourcesWithAudienceAndAcceptedResources(t *testing.T
 		"https://audience3.com",
 	}
 
-	expectedValues := append(expectedAudiences, expectedAcceptedResources...)
+	var expectedValues []string
+	expectedValues = append(expectedValues, expectedAudiences...)
+	expectedValues = append(expectedValues, expectedAcceptedResources...)
 
 	scope := state.Scope{
 		Audience: expectedAudiences,
@@ -65,5 +65,4 @@ func TestConstructAcceptedResourcesWithAudienceAndAcceptedResources(t *testing.T
 	if !reflect.DeepEqual(expectedValues, actualValues) {
 		t.Fatalf("expected != actual, expected: %v\n, actual: %v\n", expectedValues, actualValues)
 	}
-
 }

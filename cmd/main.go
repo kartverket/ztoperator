@@ -179,7 +179,7 @@ func main() {
 	// +kubebuilder:scaffold:builder
 
 	if healthCheckErr := mgr.AddHealthzCheck("healthz", healthz.Ping); healthCheckErr != nil {
-		setupLog.Error(err, "unable to set up health check")
+		setupLog.Error(healthCheckErr, "unable to set up health check")
 		os.Exit(1)
 	}
 	if readyCheckErr := mgr.AddReadyzCheck("readyz", healthz.Ping); readyCheckErr != nil {
