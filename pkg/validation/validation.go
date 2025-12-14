@@ -9,7 +9,6 @@ import (
 
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/config"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/utilities"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,9 +16,6 @@ import (
 )
 
 const (
-	istioUserVolumeAnnotation      = "sidecar.istio.io/userVolume"
-	istioUserVolumeMountAnnotation = "sidecar.istio.io/userVolumeMount"
-
 	matchOneTemplate = "{*}"
 	matchAnyTemplate = "{**}"
 
@@ -92,19 +88,19 @@ func collectIstioVolumesAndMountsFromPod(
 	podAnnotations map[string]string,
 ) ([]istioUserVolume, []istioUserVolumeMount, error) {
 	var volumes []istioUserVolume
-	if err := json.Unmarshal([]byte(podAnnotations[istioUserVolumeAnnotation]), &volumes); err != nil {
+	if err := json.Unmarshal([]byte(podAnnotations[utilities.IstioUserVolumeAnnotation]), &volumes); err != nil {
 		return nil, nil, fmt.Errorf(
 			"the required annotation '%s' is either missing or its content is not properly formatted, %s",
-			istioUserVolumeAnnotation,
+			utilities.IstioUserVolumeAnnotation,
 			podAnnotationErrorMessageSuffix(),
 		)
 	}
 
 	var volumeMounts []istioUserVolumeMount
-	if err := json.Unmarshal([]byte(podAnnotations[istioUserVolumeMountAnnotation]), &volumeMounts); err != nil {
+	if err := json.Unmarshal([]byte(podAnnotations[utilities.IstioUserVolumeMountAnnotation]), &volumeMounts); err != nil {
 		return nil, nil, fmt.Errorf(
 			"the required annotation '%s' is either missing or its content is not properly formatted, %s",
-			istioUserVolumeMountAnnotation,
+			utilities.IstioUserVolumeMountAnnotation,
 			podAnnotationErrorMessageSuffix(),
 		)
 	}
@@ -237,7 +233,7 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 	}
 	userVolumes = append(userVolumes, volumes...)
 	for _, volumeMount := range volumeMounts {
-		if volumeMount.MountPath == configpatch.IstioCredentialsDirectory {
+		if volumeMount.MountPath == utilities.IstioCredentialsVolumePath {
 			envoySecretVolumeMounts = append(envoySecretVolumeMounts, volumeMount)
 		}
 	}

@@ -2,10 +2,19 @@ package state
 
 import (
 	"fmt"
+	"net/url"
 	"reflect"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/pkg/utilities"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+type ClientAuthMethod int
+
+const (
+	ClientSecretPost ClientAuthMethod = iota
+	PrivateKeyJWT
 )
 
 type Scope struct {
@@ -19,11 +28,12 @@ type Scope struct {
 }
 
 type IdentityProviderUris struct {
-	IssuerURI        string
-	JwksURI          string
-	TokenURI         string
-	AuthorizationURI string
-	EndSessionURI    *string
+	IssuerURI                    string
+	JwksURI                      string
+	TokenURI                     string
+	TokenProxyConfiguredEndpoint *string
+	AuthorizationURI             string
+	EndSessionURI                *string
 }
 
 type AutoLoginConfig struct {
@@ -35,6 +45,7 @@ type AutoLoginConfig struct {
 	Scopes                []string
 	LoginParams           map[string]string
 	LuaScriptConfig       LuaScriptConfig
+	TokenProxy            TokenProxyConfig
 	EnvoySecretName       string
 }
 
@@ -42,9 +53,18 @@ type LuaScriptConfig struct {
 	LuaScript string
 }
 
+type TokenProxyConfig struct {
+	Name                         string
+	TokenEndpointParsedAsUrl     url.URL
+	ProtectedPodsServiceAccounts []string
+	IsInternalIDP                bool
+	KubernetesServiceURL         *utilities.KubernetesServiceURL
+}
+
 type OAuthCredentials struct {
-	ClientID     *string
-	ClientSecret *string
+	ClientID         *string
+	ClientSecret     *string
+	ClientAuthMethod ClientAuthMethod
 }
 
 type Descendant[T client.Object] struct {
@@ -111,4 +131,9 @@ func (a *AutoLoginConfig) SetSaneDefaults(autoLogin ztoperatorv1alpha1.AutoLogin
 	} else {
 		a.LogoutPath = *autoLogin.LogoutPath
 	}
+}
+
+func (s *Scope) ShouldHaveTokenProxy() bool {
+	return !s.IsMisconfigured() &&
+		s.OAuthCredentials.ClientAuthMethod == PrivateKeyJWT
 }

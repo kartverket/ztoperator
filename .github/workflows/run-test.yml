@@ -1,4 +1,4 @@
-name: Test
+name: Run specific test
 
 on:
   pull_request:
@@ -36,5 +36,5 @@ jobs:
           curl -L https://github.com/txn2/kubefwd/releases/download/1.22.5/kubefwd_Linux_x86_64.tar.gz | tar xz
           sudo mv kubefwd /usr/local/bin/
       
-      - name: Run chainsaw tests
-        run: make run-test
+      - name: Run specific test
+        run: make run-test-single dir=test/chainsaw/authpolicy/auto_login_private_jwk

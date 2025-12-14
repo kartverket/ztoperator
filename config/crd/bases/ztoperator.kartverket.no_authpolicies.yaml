@@ -249,12 +249,15 @@ spec:
                     description: ClientSecretKey specifies the data key to access
                       the client secret.
                     type: string
+                  privateJWKKey:
+                    description: PrivateJWKKey specifies the data key to access the
+                      private JSON Web Key.
+                    type: string
                   secretRef:
                     description: SecretRef specifies the name of the kubernetes secret.
                     type: string
                 required:
                 - clientIDKey
-                - clientSecretKey
                 - secretRef
                 type: object
               outputClaimToHeaders:

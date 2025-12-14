@@ -22,7 +22,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 	idpAsParsedURL, err := utilities.GetParsedURL(scope.IdentityProviderUris.TokenURI)
 	if err != nil {
 		panic(
-			"failed to get issuer hostname from issuer URI " + scope.IdentityProviderUris.IssuerURI + " due to the following error: " + err.Error(),
+			"failed to get issuer hostname from token URI " + scope.IdentityProviderUris.TokenURI + " due to the following error: " + err.Error(),
 		)
 	}
 	var oAuthClusterConfigPatchValue map[string]interface{}

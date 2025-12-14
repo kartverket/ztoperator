@@ -253,6 +253,12 @@ install-sample:
 	@kubectl apply -f samples/ --recursive --context $(KUBECONTEXT)
 
 #### TESTS ####
+.PHONY: is-running
+is-running:
+	@echo "Checking if Ztoperator is running..."
+	@lsof -i :8081 | grep -E 'ztoperato|___Ztoper|___[0-9]+Ztope|___[10-99]+Ztop|___[100-999]+Zto|___[1000-9999]+Zt|___[10000-99999]+Z|___[100000-999999]' > /dev/null && echo "Ztoperator is running with PID $$PID" || (echo "ztoperator is not running" && exit 1)
+	@echo "Proceeding..."
+
 .PHONY: expose-ingress
 expose-ingress:
 	@lsof -ni :8443 | grep LISTEN && (echo "Port 8443 is already in use. Trying to kill kubectl" && killall kubectl) || true
@@ -260,15 +266,12 @@ expose-ingress:
 	@KUBECONTEXT=$(KUBECONTEXT) kubectl port-forward --context $(KUBECONTEXT) -n istio-gateways svc/istio-ingressgateway 8443:443 2>&1 & \
 
 .PHONY: test-single
-test-single: chainsaw install
+test-single: chainsaw install is-running
 	@./bin/chainsaw test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
     echo "Test succeeded" || (echo "Test failed" && exit 1)
 
 .PHONY: test
-test:
-	@echo "Checking if ztoperator is running..."
-	@lsof -i :8081 | grep -E '___Ztoper|___[0-9]+Ztope|___[10-99]+Ztop|___[100-999]+Zto|___[1000-9999]+Zt|___[10000-99999]+Z|___[100000-999999]' > /dev/null || (echo "ztoperator is not running. Please start it first." && exit 1)
-	@echo "ztoperator is running. Proceeding with tests..."
+test: chainsaw install is-running
 	@bash -ec ' \
 		for dir in test/chainsaw/authpolicy/*/ ; do \
 			echo "Running test in $$dir"; \
@@ -316,3 +319,20 @@ run-test: build
 		echo "running unit tests..."; \
 		$(MAKE) run-unit-tests; \
 	) || (echo "Test or ztoperator failed." && exit 1)
+
+.PHONY: run-test-single
+export IMAGE_PULL_0_REGISTRY := ghcr.io
+export IMAGE_PULL_1_REGISTRY := https://index.docker.io/v1/
+export IMAGE_PULL_0_TOKEN :=
+export IMAGE_PULL_1_TOKEN :=
+run-test-single: build
+	@echo "Starting ztoperator in background..."; \
+	LOG_FILE=$$(mktemp -t ztoperator-test.XXXXXXX); \
+	./bin/ztoperator -metrics-bind-address=0.0.0.0:8181 -metrics-secure=false > "$$LOG_FILE" 2>&1 & \
+	PID=$$!; \
+	echo "ztoperator PID: $$PID"; \
+	echo "Log redirected to file: $$LOG_FILE"; \
+	$(MAKE) test-single dir=$(dir) && echo "Test succeeded" || (echo "Test failed" && exit 1); \
+	echo "Stopping ztoperator (PID $$PID)..."; \
+	kill $$PID
+

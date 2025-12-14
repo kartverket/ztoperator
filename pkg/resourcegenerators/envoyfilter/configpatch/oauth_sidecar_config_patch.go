@@ -4,15 +4,7 @@ import (
 	"slices"
 
 	"github.com/kartverket/ztoperator/internal/state"
-	"github.com/kartverket/ztoperator/pkg/luascript"
-)
-
-const (
-	TokenSecretFileName       = "token-secret.yaml"
-	HmacSecretFileName        = "hmac-secret.yaml"
-	IstioTokenSecretSource    = "/etc/istio/config/" + TokenSecretFileName
-	IstioHmacSecretSource     = "/etc/istio/config/" + HmacSecretFileName
-	IstioCredentialsDirectory = "/etc/istio/config"
+	"github.com/kartverket/ztoperator/pkg/utilities"
 )
 
 func GetOAuthSidecarConfigPatchValue(
@@ -63,7 +55,7 @@ func GetOAuthSidecarConfigPatchValue(
 				},
 			},
 			map[string]interface{}{
-				"name": luascript.BypassOauthLoginHeaderName,
+				"name": utilities.EnvoyFilterBypassOauthLoginHeaderName,
 				"string_match": map[string]interface{}{
 					"exact": "true",
 				},
@@ -71,7 +63,7 @@ func GetOAuthSidecarConfigPatchValue(
 		},
 		"deny_redirect_matcher": []interface{}{
 			map[string]interface{}{
-				"name": luascript.DenyRedirectHeaderName,
+				"name": utilities.EnvoyFilterDenyRedirectHeaderName,
 				"string_match": map[string]interface{}{
 					"exact": "true",
 				},
@@ -83,9 +75,9 @@ func GetOAuthSidecarConfigPatchValue(
 				"name": "token",
 				"sds_config": map[string]interface{}{
 					"path_config_source": map[string]interface{}{
-						"path": IstioTokenSecretSource,
+						"path": utilities.IstioTokenSecretVolumePath,
 						"watched_directory": map[string]interface{}{
-							"path": IstioCredentialsDirectory,
+							"path": utilities.IstioCredentialsVolumePath,
 						},
 					},
 				},
@@ -94,9 +86,9 @@ func GetOAuthSidecarConfigPatchValue(
 				"name": "hmac",
 				"sds_config": map[string]interface{}{
 					"path_config_source": map[string]interface{}{
-						"path": IstioHmacSecretSource,
+						"path": utilities.IstioHmacSecretVolumePath,
 						"watched_directory": map[string]interface{}{
-							"path": IstioCredentialsDirectory,
+							"path": utilities.IstioCredentialsVolumePath,
 						},
 					},
 				},
