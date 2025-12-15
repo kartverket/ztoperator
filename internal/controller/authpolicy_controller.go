@@ -10,7 +10,9 @@ import (
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/eventhandler/pod"
+	"github.com/kartverket/ztoperator/internal/resolver"
 	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/luascript"
 	"github.com/kartverket/ztoperator/pkg/metrics"
@@ -23,7 +25,6 @@ import (
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
 	"github.com/kartverket/ztoperator/pkg/rest"
-	"github.com/kartverket/ztoperator/pkg/utilities"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
@@ -102,6 +103,7 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies;requestauthentications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
 
 func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	rLog := log.GetLogger(ctx)
@@ -167,10 +169,13 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*v1.Secret]{
 					ResourceKind: "Secret",
 					ResourceName: scope.AutoLoginConfig.EnvoySecretName,
-					DesiredResource: utilities.Ptr(
+					DesiredResource: helperfunctions.Ptr(
 						secret.GetDesired(
 							scope,
-							utilities.BuildObjectMeta(scope.AutoLoginConfig.EnvoySecretName, authPolicy.Namespace),
+							helperfunctions.BuildObjectMeta(
+								scope.AutoLoginConfig.EnvoySecretName,
+								authPolicy.Namespace,
+							),
 						),
 					),
 					Scope: scope,
@@ -190,10 +195,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*v1alpha4.EnvoyFilter]{
 					ResourceKind: "EnvoyFilter",
 					ResourceName: autoLoginEnvoyFilter,
-					DesiredResource: utilities.Ptr(
+					DesiredResource: helperfunctions.Ptr(
 						envoyfilter.GetDesired(
 							scope,
-							utilities.BuildObjectMeta(autoLoginEnvoyFilter, authPolicy.Namespace),
+							helperfunctions.BuildObjectMeta(autoLoginEnvoyFilter, authPolicy.Namespace),
 						),
 					),
 					Scope: scope,
@@ -218,10 +223,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.RequestAuthentication]{
 					ResourceKind: "RequestAuthentication",
 					ResourceName: requestAuthenticationName,
-					DesiredResource: utilities.Ptr(
+					DesiredResource: helperfunctions.Ptr(
 						requestauthentication.GetDesired(
 							scope,
-							utilities.BuildObjectMeta(requestAuthenticationName, authPolicy.Namespace),
+							helperfunctions.BuildObjectMeta(requestAuthenticationName, authPolicy.Namespace),
 						),
 					),
 					Scope: scope,
@@ -241,10 +246,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
 					ResourceKind: "AuthorizationPolicy",
 					ResourceName: denyAuthorizationPolicyName,
-					DesiredResource: utilities.Ptr(
+					DesiredResource: helperfunctions.Ptr(
 						deny.GetDesired(
 							scope,
-							utilities.BuildObjectMeta(denyAuthorizationPolicyName, authPolicy.Namespace),
+							helperfunctions.BuildObjectMeta(denyAuthorizationPolicyName, authPolicy.Namespace),
 						),
 					),
 					Scope: scope,
@@ -264,10 +269,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
 					ResourceKind: "AuthorizationPolicy",
 					ResourceName: ignoreAuthAuthorizationPolicyName,
-					DesiredResource: utilities.Ptr(
+					DesiredResource: helperfunctions.Ptr(
 						ignore.GetDesired(
 							scope,
-							utilities.BuildObjectMeta(ignoreAuthAuthorizationPolicyName, authPolicy.Namespace),
+							helperfunctions.BuildObjectMeta(ignoreAuthAuthorizationPolicyName, authPolicy.Namespace),
 						),
 					),
 					Scope: scope,
@@ -287,10 +292,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
 					ResourceKind: "AuthorizationPolicy",
 					ResourceName: requireAuthAuthorizationPolicyName,
-					DesiredResource: utilities.Ptr(
+					DesiredResource: helperfunctions.Ptr(
 						require.GetDesired(
 							scope,
-							utilities.BuildObjectMeta(requireAuthAuthorizationPolicyName, authPolicy.Namespace),
+							helperfunctions.BuildObjectMeta(requireAuthAuthorizationPolicyName, authPolicy.Namespace),
 						),
 					),
 					Scope: scope,
@@ -341,7 +346,7 @@ func (r *AuthPolicyReconciler) doReconcile(
 		if len(errs) > 0 {
 			continue
 		}
-		result = utilities.LowestNonZeroResult(result, reconcileResult)
+		result = helperfunctions.LowestNonZeroResult(result, reconcileResult)
 	}
 
 	if len(errs) > 0 {
@@ -713,7 +718,7 @@ func resolveAuthPolicy(
 	if authPolicy.Spec.OAuthCredentials != nil &&
 		authPolicy.Spec.AutoLogin != nil &&
 		authPolicy.Spec.AutoLogin.Enabled {
-		oAuthSecret, err := utilities.GetSecret(ctx, k8sClient, types.NamespacedName{
+		oAuthSecret, err := helperfunctions.GetSecret(ctx, k8sClient, types.NamespacedName{
 			Namespace: authPolicy.Namespace,
 			Name:      authPolicy.Spec.OAuthCredentials.SecretRef,
 		})
@@ -802,9 +807,23 @@ func resolveAuthPolicy(
 		}
 	}
 
+	resolvedAudiences, errAudiences := resolver.ResolveAudiences(
+		ctx,
+		k8sClient,
+		authPolicy.Namespace,
+		authPolicy.Spec.AllowedAudiences,
+		//nolint:staticcheck // we have to use this field for backward compatibility
+		authPolicy.Spec.Audience,
+	)
+
+	if errAudiences != nil {
+		return nil, fmt.Errorf("failed to resolve audiences: %w", errAudiences)
+	}
+
 	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name %s/%s", authPolicy.Namespace, authPolicy.Name))
 
 	return &state.Scope{
+		Audiences:            *resolvedAudiences,
 		AuthPolicy:           *authPolicy,
 		AutoLoginConfig:      autoLoginConfig,
 		OAuthCredentials:     oAuthCredentials,

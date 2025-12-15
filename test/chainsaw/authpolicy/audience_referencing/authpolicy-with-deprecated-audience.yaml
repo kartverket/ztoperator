@@ -1,0 +1,14 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+spec:
+  enabled: true
+  audience:
+    - audience-deprecated-1
+    - audience-deprecated-2
+    - audience-deprecated-3
+  wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
+  selector:
+    matchLabels:
+      app: application

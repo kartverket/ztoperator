@@ -27,11 +27,21 @@ type AuthPolicySpec struct {
 	// +kubebuilder:validation:Required
 	WellKnownURI string `json:"wellKnownURI"`
 
+	// Deprecated: use .allowedAudiences instead.
 	// Audience defines the accepted audience (`aud`) values in the JWT.
 	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
 	//
+	// +kubebuilder:validation:Deprecated
 	// +kubebuilder:validation:Optional
 	Audience []string `json:"audience,omitempty"`
+
+	// AllowedAudiences defines the allowed audience (`aud`) values in the JWT.
+	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
+	//
+	// The normative behaviour for an OAuth / OIDC-compliant identity provider is to validate the presense of one or more client IDs as allowed audiences.
+	//
+	// +kubebuilder:validation:Optional
+	AllowedAudiences []AllowedAudience `json:"allowedAudiences,omitempty"`
 
 	// If set to `true`, the original token will be kept for the upstream request. Defaults to `true`.
 	//
@@ -45,10 +55,16 @@ type AuthPolicySpec struct {
 	// +kubebuilder:validation:Optional
 	OutputClaimToHeaders *[]ClaimToHeader `json:"outputClaimToHeaders,omitempty"`
 
-	// AcceptedResources is used as a validation field following [RFC8707](https://datatracker.ietf.org/doc/html/rfc8707).
+	// AcceptedResources specifies resource indicators used to request an audience limited access token following [RFC8707](https://datatracker.ietf.org/doc/html/rfc8707).
 	// It defines accepted audience resource indicators in the JWT token.
 	//
-	// Each resource indicator must be a valid URI, and the indicator must be present as the `aud` claim in the JWT token.
+	// The resource indicators specified will be added to the initial authorize request towards the configured identity provider.
+	// Each resource indicator must be a valid URI,
+	// and the access token returned by the identity provider will set the resource indicators in the `aud` claim in the JWT token.
+	// If none of the specified resource indicators is present in the `aud` claim in the JWT, the request will be denied.
+	//
+	// Please note that this alone is not sufficient to securely restrict access to a resource based on the `aud` claim.
+	// Use .allowedAudiences to specify one or more allowed client IDs.
 	//
 	// +listType=set
 	// +kubebuilder:validation:Items.Pattern=`^(https?):\/\/[^\s\/$.?#].[^\s]*$`
@@ -73,6 +89,60 @@ type AuthPolicySpec struct {
 	// The Selector specifies which workload the defined auth policy should be applied to.
 	// +kubebuilder:validation:Required
 	Selector WorkloadSelector `json:"selector"`
+}
+
+// AllowedAudience defines an audience that is validated against the `aud` claim in the JWT.
+// An audience can be defined as a static value or retrieved from a kubernetes resource.
+//
+// +kubebuilder:validation:XValidation:message="either 'value' or 'valueFrom' must be set",rule="has(self.value) || has(self.valueFrom)"
+// +kubebuilder:validation:XValidation:message="one audience cannot be defined from both 'value' and 'valueFrom'",rule="!(has(self.value) && has(self.valueFrom))"
+// +kubebuilder:object:generate=true
+type AllowedAudience struct {
+	// Value specifies a static audience value.
+	//
+	// +kubebuilder:validation:Optional
+	Value *string `json:"value,omitempty"`
+
+	// ValueFrom specifies a reference to a kubernetes resource to retrieve the audience value from.
+	//
+	// +kubebuilder:validation:Optional
+	ValueFrom *ValueFrom `json:"valueFrom,omitempty"`
+}
+
+// ValueFrom specifies a reference to a kubernetes resource to retrieve a value from.
+//
+// +kubebuilder:validation:XValidation:message="either 'configMapKeyRef' or 'secretKeyRef' must be set",rule="has(self.configMapKeyRef) || has(self.secretKeyRef)"
+// +kubebuilder:validation:XValidation:message="cannot reference both a ConfigMap and a Secret",rule="!(has(self.configMapKeyRef) && has(self.secretKeyRef))"
+// +kubebuilder:object:generate=true
+type ValueFrom struct {
+	// ConfigMapKeyRef specifies a reference to a key in a ConfigMap.
+	//
+	// +kubebuilder:validation:Optional
+	ConfigMapKeyRef *KeyRef `json:"configMapKeyRef,omitempty"`
+
+	// SecretKeyRef specifies a reference to a key in a Secret.
+	//
+	// +kubebuilder:validation:Optional
+	SecretKeyRef *KeyRef `json:"secretKeyRef,omitempty"`
+}
+
+// KeyRef specifies a reference to a specific key within a kubernetes resource.
+//
+// +kubebuilder:object:generate=true
+type KeyRef struct {
+	// Name specifies the name of the ConfigMap/Secret; must satisfy DNS-1123 subdomain naming.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Key specifies the data entry name within the ConfigMap/Secret; must follow key naming rules.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$`
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
 }
 
 // AutoLogin specifies the required configuration needed to log in users.
