@@ -18,7 +18,7 @@ spec:
             file: ../../../resources/skiperator/application.yaml
         - create:
             file: audience/authpolicy.yaml
-        - script:
+        - script: # Audience
             content: |
               ./../../../../scripts/patch-invalid-spec.sh \
                 audience/patch-invalid-audience.yaml \
@@ -26,4 +26,10 @@ spec:
 
               ./../../../../scripts/patch-invalid-spec.sh \
                 audience/patch-invalid-audience-ref.yaml \
-                "cannot reference both a ConfigMap and a Secret"                
+                "cannot reference both a ConfigMap and a Secret"
+              
+        - script: # Accepted resources
+            content: |
+              ./../../../../scripts/patch-invalid-spec.sh \
+                accepted_resources/patch-idporten-wellknown.yaml \
+                "acceptedResources must be non-empty when using Ansattporten or ID-Porten"

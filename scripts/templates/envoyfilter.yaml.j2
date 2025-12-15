@@ -102,6 +102,12 @@ spec:
                 path:
                   exact: {{ redirect_path }}
               redirect_uri: https://%REQ(:authority)%{{ redirect_path }}
+{% if resources %}
+              resources:
+{% for resource in resources %}
+                - {{ resource }}
+{% endfor %}
+{% endif %}
               retry_policy: {}
               signout_path:
                 path:

@@ -154,6 +154,14 @@ login_params_lua = lua_table_from_map(login_params)
 
 scopes = auto.get("scopes") or ["openid", "offline_access", "User.Read"]
 match_labels = (spec.get("selector") or {}).get("matchLabels") or {}
+accepted_resources_raw = spec.get("acceptedResources")
+
+if isinstance(accepted_resources_raw, list):
+    resources = [str(r) for r in accepted_resources_raw]
+elif accepted_resources_raw is not None:
+    raise SystemExit("spec.acceptedResources must be a list of strings")
+else:
+    resources = []
 
 # Load external Lua file template with %s placeholders
 lua_file_path = script_dir.parent / "pkg" / "luascript" / "ztoperator.lua"
@@ -201,6 +209,7 @@ rendered = template.render(
     logout_path=logout_path,
     token_endpoint=token_endpoint,
     match_labels=match_labels,
+    resources=resources,
 )
 
 print(rendered, end="")

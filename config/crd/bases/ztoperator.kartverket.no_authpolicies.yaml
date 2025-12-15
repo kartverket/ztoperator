@@ -394,6 +394,13 @@ spec:
             - selector
             - wellKnownURI
             type: object
+            x-kubernetes-validations:
+            - message: acceptedResources must be non-empty when using Ansattporten
+                or ID-Porten
+              rule: '!(self.wellKnownURI in [''https://test.idporten.no/.well-known/openid-configuration'',
+                ''https://idporten.no/.well-known/openid-configuration'', ''https://test.ansattporten.no/.well-known/openid-configuration'',
+                ''https://ansattporten.no/.well-known/openid-configuration'']) ||
+                (has(self.acceptedResources) && self.acceptedResources.size() > 0)'
           status:
             description: AuthPolicyStatus defines the observed state of AuthPolicy.
             properties:

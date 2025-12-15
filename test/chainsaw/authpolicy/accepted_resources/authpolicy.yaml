@@ -4,24 +4,18 @@ metadata:
   name: auth-policy
 spec:
   enabled: true
-  ignoreAuthRules:
-    - paths:
-        - /public*
   oAuthCredentials:
     clientIDKey: CLIENT_ID
     clientSecretKey: CLIENT_SECRET
     secretRef: oauth-secret
   autoLogin:
     enabled: true
-    logoutPath: /logout
-    redirectPath: /oauth2/callback
     scopes:
       - openid
-      - offline_access
-      - User.Read
-  audience:
-    - some-audience
-  wellKnownURI: https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0/.well-known/openid-configuration
+  acceptedResources:
+    - https://example.com/api-1
+    - https://example.com/api-2
+  wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
   selector:
     matchLabels:
       app: application
