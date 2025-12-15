@@ -1,0 +1,39 @@
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: auth-policy
+spec:
+  jwtRules:
+    - audiences:
+        - audience-deprecated-1
+        - audience-deprecated-2
+        - audience-deprecated-3
+      forwardOriginalToken: true
+      issuer: http://mock-oauth2.auth:8080/entraid
+      jwksUri: http://mock-oauth2.auth:8080/entraid/jwks
+  selector:
+    matchLabels:
+      app: application
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-require-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            paths:
+              - "*"
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - http://mock-oauth2.auth:8080/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - audience-deprecated-1
+            - audience-deprecated-2
+            - audience-deprecated-3
+  selector:
+    matchLabels:
+      app: application

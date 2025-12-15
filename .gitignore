@@ -41,3 +41,9 @@ venv/
 
 # macOS system files
 .DS_Store
+
+# Environment variables file
+.env
+
+# Debug binary
+cmd/__debug_bin*
