@@ -49,8 +49,17 @@ spec:
       app: some-app
   enabled: true
   wellKnownURI: https://example.com/.well-known/openid-configuration
-  audience:
-    - example-audience
+  allowedAudiences:
+    - value: static-audience-1
+    - value: static-audience-2
+    - valueFrom:
+        configMapKeyRef:
+          name: configmap
+          key: AUDIENCE
+    - valueFrom:
+        secretKeyRef:
+          name: secret
+          key: AUDIENCE
   acceptedResources:
     - https://some-app.com
   autoLogin:
