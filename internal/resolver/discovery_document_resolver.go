@@ -40,7 +40,7 @@ func ResolveDiscoveryDocument(
 		if discoveryDocument.AuthorizationEndpoint == nil || discoveryDocument.EndSessionEndpoint == nil {
 			return nil, fmt.Errorf(
 				"issuer %s for AuthPolicy with name %s/%s does not support authorization endpoint or end session endpoint required for autologin",
-				discoveryDocument.Issuer,
+				*discoveryDocument.Issuer,
 				authPolicy.Namespace,
 				authPolicy.Name,
 			)
@@ -50,8 +50,12 @@ func ResolveDiscoveryDocument(
 	identityProviderUris.IssuerURI = *discoveryDocument.Issuer
 	identityProviderUris.JwksURI = *discoveryDocument.JwksURI
 	identityProviderUris.TokenURI = *discoveryDocument.TokenEndpoint
-	identityProviderUris.AuthorizationURI = *discoveryDocument.AuthorizationEndpoint
-	identityProviderUris.EndSessionURI = discoveryDocument.EndSessionEndpoint
+	if discoveryDocument.AuthorizationEndpoint != nil {
+		identityProviderUris.AuthorizationURI = discoveryDocument.AuthorizationEndpoint
+	}
+	if discoveryDocument.EndSessionEndpoint != nil {
+		identityProviderUris.EndSessionURI = discoveryDocument.EndSessionEndpoint
+	}
 
 	return &identityProviderUris, nil
 }
