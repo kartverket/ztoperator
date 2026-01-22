@@ -1,11 +1,13 @@
-package resolver
+package resolver_test
 
 import (
 	"context"
 	"testing"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/resolver"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -18,24 +20,23 @@ func TestInvalidWellKnownUriGivesError(t *testing.T) {
 	)
 
 	// 2. Act
-	result, err := ResolveDiscoveryDocument(ctx, authPolicy)
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy)
 
 	// 3. Assert
-	assert.Error(t, err, "ResolveDiscoveryDocument should return an error for invalid well-known URI")
+	require.Error(t, err, "ResolveDiscoveryDocument should return an error for invalid well-known URI")
 	assert.Nil(t, result, "Result should be nil on error")
-
 	assert.Contains(t, err.Error(), "resolve discovery document")
 }
 
-func TestMissingIssuerInDiscoveryDocumentGivesError(t *testing.T) {
+func TestMissingIssuerInDiscoveryDocumentGivesError(_ *testing.T) {
 	// TODO: Implement a mock REST client to simulate a discovery document missing the issuer field
 }
 
-func TestMissingJwksURIInDiscoveryDocumentGivesError(t *testing.T) {
+func TestMissingJwksURIInDiscoveryDocumentGivesError(_ *testing.T) {
 	// TODO: Implement a mock REST client to simulate a discovery document missing the jwks_uri field
 }
 
-func TestMissingTokenEndpointInDiscoveryDocumentGivesError(t *testing.T) {
+func TestMissingTokenEndpointInDiscoveryDocumentGivesError(_ *testing.T) {
 	// TODO: Implement a mock REST client to simulate a discovery document missing the token_endpoint field
 }
 
@@ -53,12 +54,15 @@ func TestMissingAuthorizationEndpointWithAutoLoginGivesError(t *testing.T) {
 	}
 
 	// 2. Act
-	result, err := ResolveDiscoveryDocument(ctx, authPolicy)
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy)
 
 	// 3. Assert
-	assert.Error(t, err, "ResolveDiscoveryDocument should return an error when auto-login is enabled but authorization endpoint is missing")
+	require.Error(
+		t,
+		err,
+		"ResolveDiscoveryDocument should return an error when auto-login is enabled but authorization endpoint is missing",
+	)
 	assert.Nil(t, result, "Result should be nil on error")
-
 	assert.Contains(t, err.Error(), "does not support authorization endpoint")
 }
 
@@ -76,11 +80,11 @@ func TestMissingAuthorizationEndpointWithoutAutoLoginResolvesSuccessfully(t *tes
 	}
 
 	// 2. Act
-	result, err := ResolveDiscoveryDocument(ctx, authPolicy)
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy)
 
 	// 3. Assert
-	assert.NoError(t, err, "ResolveDiscoveryDocument should not return an error when autologin is disabled")
-	assert.NotNil(t, result, "Result should not be nil when autologin is disabled")
+	require.NoError(t, err, "ResolveDiscoveryDocument should not return an error when autologin is disabled")
+	require.NotNil(t, result, "Result should not be nil when autologin is disabled")
 
 	assert.NotNil(t, result.IssuerURI, "IssuerURI should not be nil")
 	assert.NotNil(t, result.JwksURI, "JwksURI should not be nil")
@@ -100,11 +104,11 @@ func TestValidWellKnownUriResolvesSuccessfully(t *testing.T) {
 	)
 
 	// 2. Act
-	result, err := ResolveDiscoveryDocument(ctx, authPolicy)
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy)
 
 	// 3. Assert
-	assert.NoError(t, err, "ResolveDiscoveryDocument should not return an error for valid well-known URI")
-	assert.NotNil(t, result, "Result should not be nil for valid well-known URI")
+	require.NoError(t, err, "ResolveDiscoveryDocument should not return an error for valid well-known URI")
+	require.NotNil(t, result, "Result should not be nil for valid well-known URI")
 
 	assert.NotNil(t, result.IssuerURI, "IssuerURI should not be nil")
 	assert.NotNil(t, result.JwksURI, "JwksURI should not be nil")
