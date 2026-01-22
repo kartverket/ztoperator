@@ -24,7 +24,6 @@ import (
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
-	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
@@ -750,7 +749,6 @@ func resolveAuthPolicy(
 		}
 	}
 
-	var identityProviderUris state.IdentityProviderUris
 	rLog.Info(
 		fmt.Sprintf(
 			"Trying to resolve discovery document from well-known uri: %s for AuthPolicy with name %s/%s",
@@ -759,31 +757,13 @@ func resolveAuthPolicy(
 			authPolicy.Name,
 		),
 	)
-	discoveryDocument, err := rest.GetOAuthDiscoveryDocument(authPolicy.Spec.WellKnownURI, rLog)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to resolve discovery document from well-known uri: %s for AuthPolicy with name %s/%s: %w",
-			authPolicy.Spec.WellKnownURI,
-			authPolicy.Namespace,
-			authPolicy.Name,
-			err,
-		)
+	var identityProviderUris, errIdentityProviderUris = resolver.ResolveDiscoveryDocument(
+		ctx,
+		authPolicy,
+	)
+	if errIdentityProviderUris != nil {
+		return nil, errIdentityProviderUris
 	}
-
-	if discoveryDocument.Issuer == nil || discoveryDocument.JwksURI == nil || discoveryDocument.TokenEndpoint == nil ||
-		discoveryDocument.AuthorizationEndpoint == nil || discoveryDocument.EndSessionEndpoint == nil {
-		return nil, fmt.Errorf(
-			"failed to parse discovery document from well-known uri: %s for AuthPolicy with name %s/%s",
-			authPolicy.Spec.WellKnownURI,
-			authPolicy.Namespace,
-			authPolicy.Name,
-		)
-	}
-	identityProviderUris.IssuerURI = *discoveryDocument.Issuer
-	identityProviderUris.JwksURI = *discoveryDocument.JwksURI
-	identityProviderUris.TokenURI = *discoveryDocument.TokenEndpoint
-	identityProviderUris.AuthorizationURI = *discoveryDocument.AuthorizationEndpoint
-	identityProviderUris.EndSessionURI = discoveryDocument.EndSessionEndpoint
 
 	autoLoginConfig := state.AutoLoginConfig{
 		Enabled: false,
@@ -802,7 +782,7 @@ func resolveAuthPolicy(
 			LuaScript: luascript.GetLuaScript(
 				authPolicy,
 				autoLoginConfig,
-				identityProviderUris,
+				*identityProviderUris,
 			),
 		}
 	}
@@ -827,7 +807,7 @@ func resolveAuthPolicy(
 		AuthPolicy:           *authPolicy,
 		AutoLoginConfig:      autoLoginConfig,
 		OAuthCredentials:     oAuthCredentials,
-		IdentityProviderUris: identityProviderUris,
+		IdentityProviderUris: *identityProviderUris,
 	}, nil
 }
 
