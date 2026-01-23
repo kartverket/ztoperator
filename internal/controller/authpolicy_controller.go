@@ -45,8 +45,9 @@ import (
 // AuthPolicyReconciler reconciles a AuthPolicy object.
 type AuthPolicyReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme                    *runtime.Scheme
+	Recorder                  record.EventRecorder
+	DiscoveryDocumentResolver rest.DiscoveryDocumentResolver
 }
 
 type AuthPolicyAdapter[T client.Object] struct {
@@ -141,7 +142,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, nil
 	}
 
-	scope, err := resolveAuthPolicy(ctx, r.Client, authPolicy)
+	scope, err := resolveAuthPolicy(ctx, r.Client, authPolicy, r.DiscoveryDocumentResolver)
 	if err != nil {
 		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.NamespacedName.String()))
 		authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
@@ -706,6 +707,7 @@ func resolveAuthPolicy(
 	ctx context.Context,
 	k8sClient client.Client,
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
+	discoveryDocumentResolver rest.DiscoveryDocumentResolver,
 ) (*state.Scope, error) {
 	rLog := log.GetLogger(ctx)
 	if authPolicy == nil {
@@ -750,7 +752,6 @@ func resolveAuthPolicy(
 		}
 	}
 
-	var identityProviderUris state.IdentityProviderUris
 	rLog.Info(
 		fmt.Sprintf(
 			"Trying to resolve discovery document from well-known uri: %s for AuthPolicy with name %s/%s",
@@ -759,31 +760,14 @@ func resolveAuthPolicy(
 			authPolicy.Name,
 		),
 	)
-	discoveryDocument, err := rest.GetOAuthDiscoveryDocument(authPolicy.Spec.WellKnownURI, rLog)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to resolve discovery document from well-known uri: %s for AuthPolicy with name %s/%s: %w",
-			authPolicy.Spec.WellKnownURI,
-			authPolicy.Namespace,
-			authPolicy.Name,
-			err,
-		)
+	var identityProviderUris, errIdentityProviderUris = resolver.ResolveDiscoveryDocument(
+		ctx,
+		authPolicy,
+		discoveryDocumentResolver,
+	)
+	if errIdentityProviderUris != nil {
+		return nil, errIdentityProviderUris
 	}
-
-	if discoveryDocument.Issuer == nil || discoveryDocument.JwksURI == nil || discoveryDocument.TokenEndpoint == nil ||
-		discoveryDocument.AuthorizationEndpoint == nil || discoveryDocument.EndSessionEndpoint == nil {
-		return nil, fmt.Errorf(
-			"failed to parse discovery document from well-known uri: %s for AuthPolicy with name %s/%s",
-			authPolicy.Spec.WellKnownURI,
-			authPolicy.Namespace,
-			authPolicy.Name,
-		)
-	}
-	identityProviderUris.IssuerURI = *discoveryDocument.Issuer
-	identityProviderUris.JwksURI = *discoveryDocument.JwksURI
-	identityProviderUris.TokenURI = *discoveryDocument.TokenEndpoint
-	identityProviderUris.AuthorizationURI = *discoveryDocument.AuthorizationEndpoint
-	identityProviderUris.EndSessionURI = discoveryDocument.EndSessionEndpoint
 
 	autoLoginConfig := state.AutoLoginConfig{
 		Enabled: false,
@@ -802,7 +786,7 @@ func resolveAuthPolicy(
 			LuaScript: luascript.GetLuaScript(
 				authPolicy,
 				autoLoginConfig,
-				identityProviderUris,
+				*identityProviderUris,
 			),
 		}
 	}
@@ -827,7 +811,7 @@ func resolveAuthPolicy(
 		AuthPolicy:           *authPolicy,
 		AutoLoginConfig:      autoLoginConfig,
 		OAuthCredentials:     oAuthCredentials,
-		IdentityProviderUris: identityProviderUris,
+		IdentityProviderUris: *identityProviderUris,
 	}, nil
 }
 

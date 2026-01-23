@@ -9,7 +9,20 @@ import (
 	"github.com/kartverket/ztoperator/pkg/log"
 )
 
-func GetOAuthDiscoveryDocument(uri string, rLog log.Logger) (*DiscoveryDocument, error) {
+type DiscoveryDocumentResolver interface {
+	GetOAuthDiscoveryDocument(uri string, rLog log.Logger) (*DiscoveryDocument, error)
+}
+
+type DefaultDiscoveryDocumentResolver struct{}
+
+func NewDefaultDiscoveryDocumentResolver() *DefaultDiscoveryDocumentResolver {
+	return &DefaultDiscoveryDocumentResolver{}
+}
+
+func (r *DefaultDiscoveryDocumentResolver) GetOAuthDiscoveryDocument(
+	uri string,
+	rLog log.Logger,
+) (*DiscoveryDocument, error) {
 	var discoveryDocument DiscoveryDocument
 
 	wellknownURIToDiscoveryDocument := GetWellknownURIToDiscoveryDocument()
