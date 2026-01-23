@@ -129,7 +129,9 @@ jobs:
 
       - name: Commit and Push Changes to Repo
         run: |
-          BRANCH="ztoperator-bot/update-image-${{ needs.build.outputs.image_digest }}"
+          DIGEST="${{ needs.build.outputs.image_digest }}"
+          SAFE_DIGEST="${DIGEST//:/-}"
+          BRANCH="ztoperator-bot/update-image-${SAFE_DIGEST}"
           git checkout -b "$BRANCH"
           git add -A
           git commit -m "chore(manifests): update ztoperator image to ${IMAGE_DIGEST}"
