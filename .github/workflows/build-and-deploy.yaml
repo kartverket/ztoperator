@@ -87,7 +87,7 @@ jobs:
       image_digest: ${{ steps.build-docker.outputs.digest }}
 
   pharos-scan:
-    if: (!github.event.pull_request.draft)
+    if: (!github.event.pull_request.draft && github.ref != 'refs/heads/main')
     name: Run Pharos Security Scan
     needs: build
     runs-on: ubuntu-latest
@@ -127,12 +127,23 @@ jobs:
           echo "\"${{ needs.build.outputs.image_digest }}\"" > "env/atgcp1-sandbox/ztoperator-system/digest"
           echo "\"${{ needs.build.outputs.image_digest }}\"" > "env/atkv3-sandbox/ztoperator-system/digest"
 
-      - name: Commit Changes to Repo
+      - name: Commit and Push Changes to Repo
         run: |
-          git config --global user.email "noreply@kartverket.no"
-          git config --global user.name "Ztoperator Deploy Action"
-          git commit -aF- <<EOF
-          ztoperator ${{ github.ref_name }}[${{ github.event.after }}]: ${{ github.event.head_commit.message }}
-          EOF
+          BRANCH="ztoperator-bot/update-image-${{ needs.build.outputs.image_digest }}"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "chore(manifests): update ztoperator image to ${IMAGE_DIGEST}"
+          git push -u origin "$BRANCH"
+          
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
 
-          git push
+      - name: Create PR and Enable Auto-merge
+        run: |
+          PR_URL=$(gh pr create \
+            --repo "kartverket/tilgangsstyring-apps" \
+            --base "main" \
+            --head "$BRANCH" \
+            --title "chore(manifests): Update Ztoperator image-sha to ${{ needs.build.outputs.image_digest }}" \
+            --body "Automated update from ${{ github.repository }}. Bumping Ztoperator image to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{needs.build.outputs.image_digest}}")
+          
+          gh pr merge --auto --merge "$PR_URL"
