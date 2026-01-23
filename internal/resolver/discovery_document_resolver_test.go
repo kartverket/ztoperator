@@ -6,6 +6,9 @@ import (
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/resolver"
+	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	"github.com/kartverket/ztoperator/pkg/log"
+	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,7 +23,7 @@ func TestInvalidWellKnownUriGivesError(t *testing.T) {
 	)
 
 	// 2. Act
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy)
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, rest.NewDefaultDiscoveryDocumentResolver())
 
 	// 3. Assert
 	require.Error(t, err, "ResolveDiscoveryDocument should return an error for invalid well-known URI")
@@ -28,16 +31,76 @@ func TestInvalidWellKnownUriGivesError(t *testing.T) {
 	assert.Contains(t, err.Error(), "resolve discovery document")
 }
 
-func TestMissingIssuerInDiscoveryDocumentGivesError(_ *testing.T) {
-	// TODO: Implement a mock REST client to simulate a discovery document missing the issuer field
+func TestMissingIssuerInDiscoveryDocumentGivesError(t *testing.T) {
+	ctx := context.Background()
+
+	// 1. Arrange
+	authPolicy := defaultZtoperatorAuthPolicy("http://test-idp.example.com/.well-known/openid-configuration")
+	mockResolver := &mockDiscoveryDocumentResolver{
+		document: &rest.DiscoveryDocument{
+			Issuer:                nil, // Missing issuer
+			TokenEndpoint:         helperfunctions.Ptr("http://test-idp.example.com/token"),
+			JwksURI:               helperfunctions.Ptr("http://test-idp.example.com/jwks"),
+			AuthorizationEndpoint: helperfunctions.Ptr("http://test-idp.example.com/authorize"),
+			EndSessionEndpoint:    helperfunctions.Ptr("http://test-idp.example.com/session"),
+		},
+	}
+
+	// 2. Act
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+
+	// 3. Assert
+	require.Error(t, err, "ResolveDiscoveryDocument should return an error when issuer is missing")
+	assert.Nil(t, result, "Result should be nil on error")
+	assert.Contains(t, err.Error(), "failed to parse discovery document")
 }
 
-func TestMissingJwksURIInDiscoveryDocumentGivesError(_ *testing.T) {
-	// TODO: Implement a mock REST client to simulate a discovery document missing the jwks_uri field
+func TestMissingJwksURIInDiscoveryDocumentGivesError(t *testing.T) {
+	ctx := context.Background()
+
+	// 1. Arrange
+	authPolicy := defaultZtoperatorAuthPolicy("http://test-idp.example.com/.well-known/openid-configuration")
+	mockResolver := &mockDiscoveryDocumentResolver{
+		document: &rest.DiscoveryDocument{
+			Issuer:                helperfunctions.Ptr("http://test-idp.example.com"),
+			TokenEndpoint:         helperfunctions.Ptr("http://test-idp.example.com/token"),
+			JwksURI:               nil, // Missing jwks_uri
+			AuthorizationEndpoint: helperfunctions.Ptr("http://test-idp.example.com/authorize"),
+			EndSessionEndpoint:    helperfunctions.Ptr("http://test-idp.example.com/session"),
+		},
+	}
+
+	// 2. Act
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+
+	// 3. Assert
+	require.Error(t, err, "ResolveDiscoveryDocument should return an error when jwks_uri is missing")
+	assert.Nil(t, result, "Result should be nil on error")
+	assert.Contains(t, err.Error(), "failed to parse discovery document")
 }
 
-func TestMissingTokenEndpointInDiscoveryDocumentGivesError(_ *testing.T) {
-	// TODO: Implement a mock REST client to simulate a discovery document missing the token_endpoint field
+func TestMissingTokenEndpointInDiscoveryDocumentGivesError(t *testing.T) {
+	ctx := context.Background()
+
+	// 1. Arrange
+	authPolicy := defaultZtoperatorAuthPolicy("http://test-idp.example.com/.well-known/openid-configuration")
+	mockResolver := &mockDiscoveryDocumentResolver{
+		document: &rest.DiscoveryDocument{
+			Issuer:                helperfunctions.Ptr("http://test-idp.example.com"),
+			TokenEndpoint:         nil, // Missing token_endpoint
+			JwksURI:               helperfunctions.Ptr("http://test-idp.example.com/jwks"),
+			AuthorizationEndpoint: helperfunctions.Ptr("http://test-idp.example.com/authorize"),
+			EndSessionEndpoint:    helperfunctions.Ptr("http://test-idp.example.com/session"),
+		},
+	}
+
+	// 2. Act
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+
+	// 3. Assert
+	require.Error(t, err, "ResolveDiscoveryDocument should return an error when token_endpoint is missing")
+	assert.Nil(t, result, "Result should be nil on error")
+	assert.Contains(t, err.Error(), "failed to parse discovery document")
 }
 
 func TestMissingAuthorizationEndpointWithAutoLoginGivesError(t *testing.T) {
@@ -54,7 +117,7 @@ func TestMissingAuthorizationEndpointWithAutoLoginGivesError(t *testing.T) {
 	}
 
 	// 2. Act
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy)
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, rest.NewDefaultDiscoveryDocumentResolver())
 
 	// 3. Assert
 	require.Error(
@@ -80,7 +143,7 @@ func TestMissingAuthorizationEndpointWithoutAutoLoginResolvesSuccessfully(t *tes
 	}
 
 	// 2. Act
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy)
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, rest.NewDefaultDiscoveryDocumentResolver())
 
 	// 3. Assert
 	require.NoError(t, err, "ResolveDiscoveryDocument should not return an error when autologin is disabled")
@@ -90,7 +153,11 @@ func TestMissingAuthorizationEndpointWithoutAutoLoginResolvesSuccessfully(t *tes
 	assert.NotNil(t, result.JwksURI, "JwksURI should not be nil")
 	assert.NotNil(t, result.TokenURI, "TokenURI should not be nil")
 
-	assert.Nil(t, result.AuthorizationURI, "AuthorizationURI should be nil when missing in discovery document")
+	assert.Empty(
+		t,
+		result.AuthorizationURI,
+		"AuthorizationURI should be empty string when missing in discovery document",
+	)
 	assert.Nil(t, result.EndSessionURI, "EndSessionURI should be nil when missing in discovery document")
 }
 
@@ -104,7 +171,7 @@ func TestValidWellKnownUriResolvesSuccessfully(t *testing.T) {
 	)
 
 	// 2. Act
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy)
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, rest.NewDefaultDiscoveryDocumentResolver())
 
 	// 3. Assert
 	require.NoError(t, err, "ResolveDiscoveryDocument should not return an error for valid well-known URI")
@@ -130,4 +197,16 @@ func defaultZtoperatorAuthPolicy(
 			Enabled:      true,
 		},
 	}
+}
+
+type mockDiscoveryDocumentResolver struct {
+	document *rest.DiscoveryDocument
+	err      error
+}
+
+func (m *mockDiscoveryDocumentResolver) GetOAuthDiscoveryDocument(
+	_ string,
+	_ log.Logger,
+) (*rest.DiscoveryDocument, error) {
+	return m.document, m.err
 }

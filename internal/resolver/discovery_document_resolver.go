@@ -13,10 +13,11 @@ import (
 func ResolveDiscoveryDocument(
 	ctx context.Context,
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
+	resolver rest.DiscoveryDocumentResolver,
 ) (*state.IdentityProviderUris, error) {
 	rLog := log.GetLogger(ctx)
 	var identityProviderUris state.IdentityProviderUris
-	discoveryDocument, err := rest.GetOAuthDiscoveryDocument(authPolicy.Spec.WellKnownURI, rLog)
+	discoveryDocument, err := resolver.GetOAuthDiscoveryDocument(authPolicy.Spec.WellKnownURI, rLog)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to resolve discovery document from well-known uri: %s for AuthPolicy with name %s/%s: %w",

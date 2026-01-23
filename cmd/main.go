@@ -25,6 +25,7 @@ import (
 
 	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/metrics"
+	"github.com/kartverket/ztoperator/pkg/rest"
 	"go.uber.org/zap/zapcore"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -169,9 +170,10 @@ func main() {
 	}
 
 	if err = (&controller.AuthPolicyReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("authpolicy-controller"),
+		Client:                    mgr.GetClient(),
+		Scheme:                    mgr.GetScheme(),
+		Recorder:                  mgr.GetEventRecorderFor("authpolicy-controller"),
+		DiscoveryDocumentResolver: rest.NewDefaultDiscoveryDocumentResolver(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthPolicy")
 		os.Exit(1)
