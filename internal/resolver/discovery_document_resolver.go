@@ -51,7 +51,7 @@ func ResolveDiscoveryDocument(
 	identityProviderUris.JwksURI = *discoveryDocument.JwksURI
 	identityProviderUris.TokenURI = *discoveryDocument.TokenEndpoint
 	if discoveryDocument.AuthorizationEndpoint != nil {
-		identityProviderUris.AuthorizationURI = discoveryDocument.AuthorizationEndpoint
+		identityProviderUris.AuthorizationURI = *discoveryDocument.AuthorizationEndpoint
 	}
 	if discoveryDocument.EndSessionEndpoint != nil {
 		identityProviderUris.EndSessionURI = discoveryDocument.EndSessionEndpoint

@@ -23,7 +23,7 @@ type IdentityProviderUris struct {
 	IssuerURI        string
 	JwksURI          string
 	TokenURI         string
-	AuthorizationURI *string
+	AuthorizationURI string
 	EndSessionURI    *string
 }
 
