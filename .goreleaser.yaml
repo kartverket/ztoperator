@@ -54,6 +54,7 @@ archives:
 dockers:
   - image_templates:
       - "ghcr.io/kartverket/ztoperator:{{ .Tag }}-linux-amd64"
+      - "ghcr.io/kartverket/ztoperator:latest"
     use: buildx
     dockerfile: Dockerfile.goreleaser
     build_flag_templates:
@@ -63,6 +64,7 @@ dockers:
     goarch: amd64
   - image_templates:
       - "ghcr.io/kartverket/ztoperator:{{ .Tag }}-linux-arm64"
+      - "ghcr.io/kartverket/ztoperator:latest"
     use: buildx
     dockerfile: Dockerfile.goreleaser
     build_flag_templates:
