@@ -69,6 +69,8 @@ jobs:
           tags: |
             # Always tag with the git SHA
             type=sha,format=long
+            # Also tag as :main only for pushes to the main branch
+            type=raw,value=main,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
       - name: Build and push Docker image
         id: build-docker
