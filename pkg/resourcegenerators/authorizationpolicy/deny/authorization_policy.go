@@ -41,10 +41,9 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 
 	var denyRules []*v1beta1.Rule
 
-	baseConditions := authorizationpolicy.GetBaseConditions(
+	audienceAndIssuerConditions := authorizationpolicy.GetAudienceAndIssuerConditionsForDenyPolicy(
 		authorizationpolicy.ConstructAcceptedResources(*scope),
 		scope.IdentityProviderUris.IssuerURI,
-		true,
 	)
 	if scope.AuthPolicy.Spec.AuthRules != nil {
 		for _, rule := range *scope.AuthPolicy.Spec.AuthRules {

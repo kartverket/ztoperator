@@ -5,26 +5,35 @@ import (
 	"istio.io/api/security/v1beta1"
 )
 
-func GetBaseConditions(acceptedResources []string, issuer string, notValues bool) []*v1beta1.Condition {
+func GetAudienceAndIssuerConditionsForAllowPolicy(acceptedResources []string, issuer string) []*v1beta1.Condition {
 	makeCondition := func(key string, values []string) *v1beta1.Condition {
-		if notValues {
-			return &v1beta1.Condition{
-				Key:       key,
-				NotValues: values,
-			}
-		}
 		return &v1beta1.Condition{
 			Key:    key,
 			Values: values,
 		}
 	}
+	return getAudienceAndIssuerConditions(acceptedResources, issuer, makeCondition)
+}
 
-	conditions := []*v1beta1.Condition{
-		makeCondition("request.auth.claims[iss]", []string{issuer}),
+func GetAudienceAndIssuerConditionsForDenyPolicy(acceptedResources []string, issuer string) []*v1beta1.Condition {
+	makeCondition := func(key string, values []string) *v1beta1.Condition {
+		return &v1beta1.Condition{
+			Key:       key,
+			NotValues: values, // NB! NotValues used in combination with deny rule
+		}
 	}
+	return getAudienceAndIssuerConditions(acceptedResources, issuer, makeCondition)
+}
 
+func getAudienceAndIssuerConditions(
+	acceptedResources []string,
+	issuer string,
+	makeConditionFunc func(key string, values []string) *v1beta1.Condition,
+) []*v1beta1.Condition {
+	var conditions []*v1beta1.Condition
+	conditions = append(conditions, makeConditionFunc("request.auth.claims[iss]", []string{issuer}))
 	if len(acceptedResources) > 0 {
-		conditions = append(conditions, makeCondition("request.auth.claims[aud]", acceptedResources))
+		conditions = append(conditions, makeConditionFunc("request.auth.claims[aud]", acceptedResources))
 	}
 	return conditions
 }

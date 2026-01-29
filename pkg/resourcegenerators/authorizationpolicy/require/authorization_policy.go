@@ -19,10 +19,9 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 
 	var authorizationPolicyRules []*v1beta1.Rule
 
-	baseConditions := authorizationpolicy.GetBaseConditions(
+	audienceAndIssuerConditions := authorizationpolicy.GetAudienceAndIssuerConditionsForAllowPolicy(
 		authorizationpolicy.ConstructAcceptedResources(*scope),
 		scope.IdentityProviderUris.IssuerURI,
-		false,
 	)
 
 	if (scope.AuthPolicy.Spec.AuthRules == nil || len(*scope.AuthPolicy.Spec.AuthRules) == 0) &&
