@@ -2,8 +2,8 @@ package ignore
 
 import (
 	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy"
 	"istio.io/api/security/v1beta1"
-	v1beta2 "istio.io/api/type/v1beta1"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -16,8 +16,14 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 
 	ignoreAuthRequestMatchers := scope.AuthPolicy.GetIgnoreAuthRequestMatchers()
 
-	var ruleToList []*v1beta1.Rule_To
+	if len(ignoreAuthRequestMatchers) == 0 {
+		// No IgnoreAuthRules defined, thus no allow rules to create
+		return nil
+	}
 
+	// Create allow rules based on the specified ignore auth rules
+
+	var ruleToList []*v1beta1.Rule_To
 	for _, ignoreAuthRequestMatcher := range ignoreAuthRequestMatchers {
 		ruleTo := &v1beta1.Rule_To{
 			Operation: &v1beta1.Operation{
@@ -28,7 +34,6 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 		ruleToList = append(ruleToList, ruleTo)
 	}
 
-	if len(ruleToList) > 0 {
 	return authorizationpolicy.AllowAuthorizationPolicy(
 		scope,
 		objectMeta,
