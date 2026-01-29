@@ -55,6 +55,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 				},
 			})
 		}
+		return authorizationpolicy.AllowAuthorizationPolicy(scope, objectMeta, allPathsRule)
 
 		toList = append(toList, &v1beta1.Rule_To{
 			Operation: &v1beta1.Operation{
@@ -73,6 +74,11 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 				if authRule.When != nil {
 					for _, condition := range *authRule.When {
 						authPolicyConditionsAsIstioConditions = append(authPolicyConditionsAsIstioConditions, &v1beta1.Condition{
+	return authorizationpolicy.AllowAuthorizationPolicy(
+		scope,
+		objectMeta,
+		allAllowRules,
+	)
 							Key:    fmt.Sprintf("request.auth.claims[%s]", condition.Claim),
 							Values: condition.Values,
 						})
@@ -92,11 +98,6 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 			}
 		}
 	}
-	return &istioclientsecurityv1.AuthorizationPolicy{
-		ObjectMeta: objectMeta,
-		Spec: v1beta1.AuthorizationPolicy{
-			Selector: &v1beta2.WorkloadSelector{
-				MatchLabels: scope.AuthPolicy.Spec.Selector.MatchLabels,
 			},
 			Rules: authorizationPolicyRules,
 		},

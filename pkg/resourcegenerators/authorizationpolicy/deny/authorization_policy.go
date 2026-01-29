@@ -17,14 +17,6 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 	}
 
 	if scope.InvalidConfig {
-		return &istioclientsecurityv1.AuthorizationPolicy{
-			ObjectMeta: objectMeta,
-			Spec: v1beta1.AuthorizationPolicy{
-				Action: v1beta1.AuthorizationPolicy_DENY,
-				Selector: &v1beta2.WorkloadSelector{
-					MatchLabels: scope.AuthPolicy.Spec.Selector.MatchLabels,
-				},
-				Rules: []*v1beta1.Rule{
 					{
 						To: []*v1beta1.Rule_To{
 							{
@@ -37,6 +29,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 				},
 			},
 		}
+		return authorizationpolicy.DenyAuthorizationPolicy(scope, objectMeta, allPathsRule)
 	}
 
 	var denyRules []*v1beta1.Rule
@@ -77,16 +70,11 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 	}
 
 	if len(denyRules) > 0 {
-		return &istioclientsecurityv1.AuthorizationPolicy{
-			ObjectMeta: objectMeta,
-			Spec: v1beta1.AuthorizationPolicy{
-				Action: v1beta1.AuthorizationPolicy_DENY,
-				Selector: &v1beta2.WorkloadSelector{
-					MatchLabels: scope.AuthPolicy.Spec.Selector.MatchLabels,
 				},
 				Rules: denyRules,
 			},
 		}
 	}
-	return nil
+
+	return authorizationpolicy.DenyAuthorizationPolicy(scope, objectMeta, denyRules)
 }

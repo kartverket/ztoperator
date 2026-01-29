@@ -28,19 +28,13 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 	}
 
 	if len(ruleToList) > 0 {
-		return &istioclientsecurityv1.AuthorizationPolicy{
-			ObjectMeta: objectMeta,
-			Spec: v1beta1.AuthorizationPolicy{
-				Selector: &v1beta2.WorkloadSelector{
-					MatchLabels: scope.AuthPolicy.Spec.Selector.MatchLabels,
-				},
-				Rules: []*v1beta1.Rule{
-					{
-						To: ruleToList,
-					},
-				},
+	return authorizationpolicy.AllowAuthorizationPolicy(
+		scope,
+		objectMeta,
+		[]*v1beta1.Rule{
+			{
+				To: ruleToList,
 			},
-		}
-	}
-	return nil
+		},
+	)
 }
