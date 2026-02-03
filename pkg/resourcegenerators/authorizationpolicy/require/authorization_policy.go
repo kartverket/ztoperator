@@ -2,6 +2,7 @@ package require
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/state"
@@ -21,10 +22,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 		return nil
 	}
 
-	audienceAndIssuerConditions := authorizationpolicy.GetAudienceAndIssuerConditionsForAllowPolicy(
-		authorizationpolicy.ConstructAcceptedResources(*scope),
-		scope.IdentityProviderUris.IssuerURI,
-	)
+	baseConditions := constructBaseConditions(scope)
 
 	hasAuthRules := scope.AuthPolicy.Spec.AuthRules != nil && len(*scope.AuthPolicy.Spec.AuthRules) > 0
 	hasIgnoreAuthRules := scope.AuthPolicy.Spec.IgnoreAuthRules != nil &&
@@ -42,15 +40,15 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 						},
 					},
 				},
-				When: audienceAndIssuerConditions,
+				When: baseConditions,
 			},
 		}
 		return authorizationpolicy.AllowAuthorizationPolicy(scope, objectMeta, allPathsRule)
 	}
 
-	specifiedPathsRules := constructSpecifiedPathsAllowRules(scope, audienceAndIssuerConditions)
+	specifiedPathsRules := constructSpecifiedPathsAllowRules(scope, baseConditions)
 
-	unspecifiedPathsRule := constructUnspecifiedPathsAllowRule(scope, audienceAndIssuerConditions)
+	unspecifiedPathsRule := constructUnspecifiedPathsAllowRule(scope, baseConditions)
 
 	allAllowRules := append([]*v1beta1.Rule{unspecifiedPathsRule}, specifiedPathsRules...)
 	return authorizationpolicy.AllowAuthorizationPolicy(
@@ -58,6 +56,34 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 		objectMeta,
 		allAllowRules,
 	)
+}
+
+/*
+Audience and issuer conditions are always included as base conditions.
+Additionally, any conditions specified as baseline auth are also included.
+*/
+func constructBaseConditions(scope *state.Scope) []*v1beta1.Condition {
+	audienceAndIssuerConditions := authorizationpolicy.GetAudienceAndIssuerConditionsForAllowPolicy(
+		authorizationpolicy.ConstructAcceptedResources(*scope),
+		scope.IdentityProviderUris.IssuerURI,
+	)
+
+	var additionalBaseConditions []*v1beta1.Condition
+	if scope.AuthPolicy.Spec.BaselineAuth != nil && scope.AuthPolicy.Spec.BaselineAuth.Claims != nil &&
+		len(*scope.AuthPolicy.Spec.BaselineAuth.Claims) > 0 {
+		for _, condition := range *scope.AuthPolicy.Spec.BaselineAuth.Claims {
+			additionalBaseConditions = append(
+				additionalBaseConditions,
+				&v1beta1.Condition{
+					Key:    fmt.Sprintf("request.auth.claims[%s]", condition.Claim),
+					Values: condition.Values,
+				},
+			)
+		}
+	}
+
+	allBaseConditions := slices.Concat(audienceAndIssuerConditions, additionalBaseConditions)
+	return allBaseConditions
 }
 
 /*

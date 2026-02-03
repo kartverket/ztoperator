@@ -53,6 +53,18 @@
         },
         {
           "requestParam": "code",
+          "match": "entraid_other_client",
+          "claims": {
+            "iss":  "http://mock-oauth2.auth:8080/entraid",
+            "sub": "entraid_client",
+            "role": "entraid_other_role",
+            "aud": [
+              "entraid_server"
+            ]
+          }
+        },
+        {
+          "requestParam": "code",
           "match": "entraid_user",
           "claims": {
             "iss": "http://mock-oauth2.auth:8080/entraid",
