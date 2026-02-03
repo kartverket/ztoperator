@@ -255,7 +255,7 @@ type RequestAuthRule struct {
 
 	// When defines additional conditions based on JWT claims that must be met.
 	//
-	// The request is permitted if at least one of the specified conditions is satisfied.
+	// The request is permitted if all the specified conditions are satisfied.
 	// +kubebuilder:validation:Optional
 	When *[]Condition `json:"when,omitempty"`
 
