@@ -12,7 +12,11 @@ import (
 )
 
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
-	if scope.IsMisconfigured() {
+	if !scope.AuthPolicy.Spec.Enabled {
+		return nil
+	}
+
+	if scope.InvalidConfig {
 		// We rely on deny.authorizationpolicy to create an auth policy which block all requests.
 		return nil
 	}

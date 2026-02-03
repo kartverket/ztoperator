@@ -97,10 +97,6 @@ func GetID(resourceKind, resourceName string) string {
 	return fmt.Sprintf("%s-%s", resourceKind, resourceName)
 }
 
-func (s *Scope) IsMisconfigured() bool {
-	return !s.AuthPolicy.Spec.Enabled || s.InvalidConfig
-}
-
 func (a *AutoLoginConfig) SetSaneDefaults(autoLogin ztoperatorv1alpha1.AutoLogin) {
 	if autoLogin.RedirectPath == nil || *autoLogin.RedirectPath == "" {
 		a.RedirectPath = "/oauth2/callback"
