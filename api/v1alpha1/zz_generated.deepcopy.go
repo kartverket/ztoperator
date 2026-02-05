@@ -271,13 +271,9 @@ func (in *BaselineAuth) DeepCopyInto(out *BaselineAuth) {
 	*out = *in
 	if in.Claims != nil {
 		in, out := &in.Claims, &out.Claims
-		*out = new([]Condition)
-		if **in != nil {
-			in, out := *in, *out
-			*out = make([]Condition, len(*in))
-			for i := range *in {
-				(*in)[i].DeepCopyInto(&(*out)[i])
-			}
+		*out = make([]Condition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 }

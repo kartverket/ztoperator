@@ -269,13 +269,14 @@ spec:
                 type: object
               baselineAuth:
                 description: |-
-                  BaselineAuth defines additional baseline authentication conditions
-                  These conditions are applied to all paths not explicitly ignored by IgnoreAuthRules,
-                  including those covered by other specified AuthRules.
+                  BaselineAuth defines additional JWT authentication, beyond standard JWT verification.
+                  Baseline authentication applies to all combinations of paths and methods not explicitly ignored by .ignoreAuthRules.
                 properties:
                   claims:
                     description: |-
                       Claims defines conditions based on JWT claims that must be met.
+                      These conditions are applied to all paths and methods not explicitly ignored in .ignoreAuthRules,
+                      including those covered by other specified AuthRules.
 
                       The request is permitted if all the specified conditions are satisfied.
                     items:
@@ -307,6 +308,9 @@ spec:
                 required:
                 - claims
                 type: object
+                x-kubernetes-validations:
+                - message: claims must be a non-empty list
+                  rule: has(self.claims) && self.claims.size() > 0
               enabled:
                 description: |-
                   Whether to enable JWT validation.

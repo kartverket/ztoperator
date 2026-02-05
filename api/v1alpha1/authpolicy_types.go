@@ -74,7 +74,7 @@ type AuthPolicySpec struct {
 	AcceptedResources *[]string `json:"acceptedResources,omitempty"`
 
 	// BaselineAuth defines additional JWT authentication, beyond standard JWT verification.
-	// Baseline authentication applies to all combinations of path and method not explicitly ignored by IgnoreAuthRules.
+	// Baseline authentication applies to all combinations of paths and methods not explicitly ignored by .ignoreAuthRules.
 	//
 	// +kubebuilder:validation:Optional
 	BaselineAuth *BaselineAuth `json:"baselineAuth,omitempty"`
@@ -256,14 +256,15 @@ type ClaimToHeader struct {
 // BaselineAuth defines additional JWT authentication, beyond standard JWT verification.
 //
 // +kubebuilder:object:generate=true
+// +kubebuilder:validation:XValidation:message="claims must be a non-empty list",rule="has(self.claims) && self.claims.size() > 0"
 type BaselineAuth struct {
 	// Claims defines conditions based on JWT claims that must be met.
-	// These conditions are applied to all paths not explicitly ignored by IgnoreAuthRules,
+	// These conditions are applied to all paths and methods not explicitly ignored in .ignoreAuthRules,
 	// including those covered by other specified AuthRules.
 	//
 	// The request is permitted if all the specified conditions are satisfied.
 	// +kubebuilder:validation:Required
-	Claims *[]Condition `json:"claims"`
+	Claims []Condition `json:"claims"`
 }
 
 // RequestAuthRule defines a rule for controlling access to HTTP requests using JWT authentication.
