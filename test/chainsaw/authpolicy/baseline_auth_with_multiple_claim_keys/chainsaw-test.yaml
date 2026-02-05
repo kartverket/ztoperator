@@ -1,0 +1,28 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: baseline-auth-with-only-baseline-auth
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: ../../../resources/skiperator/application.yaml
+        - apply:
+            file: ../../../resources/ingress/wildcard-ingress.yaml
+        - create:
+            file: authpolicy.yaml
+        - script:
+            content: sleep 7
+        - script:
+            content: |
+              hurl --error-format long \
+              --insecure --test tests.hurl \
+              --variable entraid_token_client="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client --token_name access_token)" \
+              --variable entraid_token_user="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_user --token_name access_token)"
