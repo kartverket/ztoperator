@@ -1,0 +1,29 @@
+# AuthorizationPolicy (require-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-only-baseline-auth-require-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            paths:
+              - '*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - http://mock-oauth2.auth:8080/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+        - key: request.auth.claims[role]
+          values:
+            - role1
+        - key: request.auth.claims[role]
+          values:
+            - role2
+  selector:
+    matchLabels:
+      app: application
+---
+

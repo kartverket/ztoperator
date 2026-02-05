@@ -67,22 +67,11 @@ func constructBaseConditions(scope *state.Scope) []*v1beta1.Condition {
 		authorizationpolicy.ConstructAcceptedResources(*scope),
 		scope.IdentityProviderUris.IssuerURI,
 	)
+	baselineAuthConditions := authorizationpolicy.GetBaselineAuthConditionsForAllowPolicy(
+		scope.AuthPolicy.Spec.BaselineAuth,
+	)
 
-	var additionalBaseConditions []*v1beta1.Condition
-	if scope.AuthPolicy.Spec.BaselineAuth != nil && scope.AuthPolicy.Spec.BaselineAuth.Claims != nil &&
-		len(*scope.AuthPolicy.Spec.BaselineAuth.Claims) > 0 {
-		for _, condition := range *scope.AuthPolicy.Spec.BaselineAuth.Claims {
-			additionalBaseConditions = append(
-				additionalBaseConditions,
-				&v1beta1.Condition{
-					Key:    fmt.Sprintf("request.auth.claims[%s]", condition.Claim),
-					Values: condition.Values,
-				},
-			)
-		}
-	}
-
-	allBaseConditions := slices.Concat(audienceAndIssuerConditions, additionalBaseConditions)
+	allBaseConditions := slices.Concat(audienceAndIssuerConditions, baselineAuthConditions)
 	return allBaseConditions
 }
 

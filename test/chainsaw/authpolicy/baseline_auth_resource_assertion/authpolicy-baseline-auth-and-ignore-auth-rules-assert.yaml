@@ -1,0 +1,41 @@
+# AuthorizationPolicy (require-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-baseline-auth-and-ignore-auth-rules-require-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            notMethods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - HEAD
+            - OPTIONS
+            - TRACE
+            - CONNECT
+            paths:
+            - /public*
+        - operation:
+            notPaths:
+            - /public*
+            paths:
+              - '*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - http://mock-oauth2.auth:8080/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+        - key: request.auth.claims[role]
+          values:
+            - baseline_role
+  selector:
+    matchLabels:
+      app: application
+---
+

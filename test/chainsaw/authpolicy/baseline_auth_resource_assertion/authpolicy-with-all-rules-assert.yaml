@@ -1,0 +1,109 @@
+# AuthorizationPolicy (ignore-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-with-all-rules-ignore-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            methods:
+              - GET
+            paths:
+              - /public*
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (require-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-with-all-rules-require-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            notMethods:
+            - POST
+            paths:
+            - /api*
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /unreachable*
+        - operation:
+            notMethods:
+            - GET
+            paths:
+            - /public*
+        - operation:
+            notPaths:
+            - /api*
+            - /unreachable*
+            - /public*
+            paths:
+              - '*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - http://mock-oauth2.auth:8080/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+        - key: request.auth.claims[role]
+          values:
+            - entraid_role
+    - to:
+      - operation:
+          methods:
+          - POST
+          paths:
+          - /api*
+      when:
+      - key: request.auth.claims[iss]
+        values:
+        - http://mock-oauth2.auth:8080/entraid
+      - key: request.auth.claims[aud]
+        values:
+        - entraid_server
+      - key: request.auth.claims[role]
+        values:
+        - entraid_role
+      - key: request.auth.claims[role]
+        values:
+        - entra_user_role
+    - to:
+      - operation:
+          paths:
+          - /unreachable*
+      when:
+      - key: request.auth.claims[iss]
+        values:
+        - http://mock-oauth2.auth:8080/entraid
+      - key: request.auth.claims[aud]
+        values:
+        - entraid_server
+      - key: request.auth.claims[role]
+        values:
+        - entraid_role
+      - key: request.auth.claims[role]
+        values:
+        - entra_user_role
+      - key: request.auth.claims[sub]
+        values:
+        - entraid_client
+  selector:
+    matchLabels:
+      app: application
+---
+

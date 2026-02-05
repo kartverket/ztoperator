@@ -2,6 +2,7 @@ package deny
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy"
@@ -39,15 +40,12 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 
 	// Create deny rules based on the specified auth rules
 
-	var denyRules []*v1beta1.Rule
-	audienceAndIssuerConditions := authorizationpolicy.GetAudienceAndIssuerConditionsForDenyPolicy(
-		authorizationpolicy.ConstructAcceptedResources(*scope),
-		scope.IdentityProviderUris.IssuerURI,
-	)
+	baseDenyConditions := constructBaseConditionsForDenyPolicy(scope)
 
+	var denyRules []*v1beta1.Rule
 	for _, rule := range *scope.AuthPolicy.Spec.AuthRules {
 		// Audience and issuer conditions are always included
-		authPolicyDenyConditions := audienceAndIssuerConditions
+		authPolicyDenyConditions := baseDenyConditions
 		// Additional conditions from the "when" clause
 		if rule.When != nil {
 			for _, condition := range *rule.When {
@@ -77,4 +75,20 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 	}
 
 	return authorizationpolicy.DenyAuthorizationPolicy(scope, objectMeta, denyRules)
+}
+
+/*
+Audience and issuer conditions are always included as base conditions.
+Additionally, any conditions specified as baseline auth are also included.
+*/
+func constructBaseConditionsForDenyPolicy(scope *state.Scope) []*v1beta1.Condition {
+	audienceAndIssuerConditions := authorizationpolicy.GetAudienceAndIssuerConditionsForDenyPolicy(
+		authorizationpolicy.ConstructAcceptedResources(*scope),
+		scope.IdentityProviderUris.IssuerURI,
+	)
+	baselineAuthConditions := authorizationpolicy.GetBaselineAuthConditionsForDenyPolicy(
+		scope.AuthPolicy.Spec.BaselineAuth,
+	)
+	allBaseConditions := slices.Concat(audienceAndIssuerConditions, baselineAuthConditions)
+	return allBaseConditions
 }
