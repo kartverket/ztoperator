@@ -37,11 +37,12 @@ make run-local
 
 ## Running integration tests locally
 
-To run the integration tests locally, you first need to set up a local Kubernetes cluster as explained 
-[above](#local-cluster-and-dependencies). 
+To run the integration tests locally, you need:
+- a local Kubernetes cluster
+- a mock OAuth2-provider to issue and validate OAuth2-tokens
+- to expose a test application which can be reached from outside the cluster
 
-You also need to install a mock OAuth2-provider to issue and validate OAuth2-tokens, 
-and expose a test application which can be reached from outside the cluster. This can all be done by running:
+All this can all be done by running:
 
 ```shell
 make setup-local-test
