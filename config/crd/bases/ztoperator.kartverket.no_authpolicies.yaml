@@ -186,7 +186,7 @@ spec:
                       description: |-
                         When defines additional conditions based on JWT claims that must be met.
 
-                        The request is permitted if at least one of the specified conditions is satisfied.
+                        The request is permitted if all the specified conditions are satisfied.
                       items:
                         description: |-
                           Condition represents a rule that evaluates JWT claims to determine access control.
@@ -267,6 +267,50 @@ spec:
                 - enabled
                 - scopes
                 type: object
+              baselineAuth:
+                description: |-
+                  BaselineAuth defines additional JWT authentication, beyond standard JWT verification.
+                  Baseline authentication applies to all combinations of paths and methods not explicitly ignored by .ignoreAuthRules.
+                properties:
+                  claims:
+                    description: |-
+                      Claims defines conditions based on JWT claims that must be met.
+                      These conditions are applied to all paths and methods not explicitly ignored in .ignoreAuthRules,
+                      including those covered by other specified AuthRules.
+
+                      The request is permitted if all the specified conditions are satisfied.
+                    items:
+                      description: |-
+                        Condition represents a rule that evaluates JWT claims to determine access control.
+
+                        This type allows defining conditions that check whether a specific claim in
+                        the JWT token contains one of the expected values.
+
+                        If multiple conditions are specified, all must be met (AND logic) for the request to be allowed.
+                      properties:
+                        claim:
+                          description: Claim specifies the name of the JWT claim to
+                            check.
+                          type: string
+                        values:
+                          description: |-
+                            Values specifies a list of allowed values for the claim.
+                            If the claim in the JWT contains any of these values (OR logic), the condition is met.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: set
+                      required:
+                      - claim
+                      - values
+                      type: object
+                    type: array
+                required:
+                - claims
+                type: object
+                x-kubernetes-validations:
+                - message: claims must be a non-empty list
+                  rule: has(self.claims) && self.claims.size() > 0
               enabled:
                 description: |-
                   Whether to enable JWT validation.

@@ -1,0 +1,103 @@
+---
+# AuthorizationPolicy (deny-auth-rules)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-baseline-auth-and-auth-rules-deny-auth-rules
+spec:
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            paths:
+            - /user*
+      when:
+      - key: request.auth.claims[iss]
+        notValues:
+        - http://mock-oauth2.auth:8080/entraid
+    - to:
+      - operation:
+          paths:
+          - /user*
+      when:
+      - key: request.auth.claims[aud]
+        notValues:
+        - entraid_server
+    - to:
+      - operation:
+          paths:
+          - /user*
+      when:
+      - key: request.auth.claims[role]
+        notValues:
+        - baseline_role
+    - to:
+      - operation:
+          paths:
+          - /user*
+      when:
+      - key: request.auth.claims[role]
+        notValues:
+        - path_specific_role
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (require-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-baseline-auth-and-auth-rules-require-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            notMethods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - HEAD
+            - OPTIONS
+            - TRACE
+            - CONNECT
+            paths:
+            - /user*
+        - operation:
+            notPaths:
+            - /user*
+            paths:
+              - '*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - http://mock-oauth2.auth:8080/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+        - key: request.auth.claims[role]
+          values:
+            - baseline_role
+    - to:
+        - operation:
+            paths:
+              - '/user*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - http://mock-oauth2.auth:8080/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
+        - key: request.auth.claims[role]
+          values:
+            - baseline_role
+        - key: request.auth.claims[role]
+          values:
+            - path_specific_role
+  selector:
+    matchLabels:
+      app: application
+---
+

@@ -1,7 +1,7 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: audience-referencing
+  name: manifest-validation
 spec:
   skip: false
   concurrent: true
@@ -16,6 +16,7 @@ spec:
     - try:
         - create:
             file: ../../../resources/skiperator/application.yaml
+
         - create:
             file: audience/authpolicy.yaml
         - script: # Audience
@@ -27,9 +28,25 @@ spec:
               ./../../../../scripts/patch-invalid-spec.sh \
                 audience/patch-invalid-audience-ref.yaml \
                 "cannot reference both a ConfigMap and a Secret"
-              
+        - delete:
+            file: audience/authpolicy.yaml
+
+        - create:
+            file: accepted_resources/authpolicy.yaml
         - script: # Accepted resources
             content: |
               ./../../../../scripts/patch-invalid-spec.sh \
                 accepted_resources/patch-idporten-wellknown.yaml \
                 "acceptedResources must be non-empty when using Ansattporten or ID-Porten"
+        - delete:
+            file: accepted_resources/authpolicy.yaml
+
+        - create:
+            file: baseline_auth/authpolicy.yaml
+        - script: # Accepted resources
+            content: |
+              ./../../../../scripts/patch-invalid-spec.sh \
+                baseline_auth/patch-empty-claims.yaml \
+                "claims must be a non-empty list"
+        - delete:
+            file: baseline_auth/authpolicy.yaml

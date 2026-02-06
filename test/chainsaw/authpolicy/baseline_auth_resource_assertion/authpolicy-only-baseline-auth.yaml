@@ -1,0 +1,20 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy-only-baseline-auth
+spec:
+  enabled: true
+  baselineAuth:
+    claims:
+      - claim: role
+        values:
+          - role1
+      - claim: role
+        values:
+          - role2
+  audience:
+    - entraid_server
+  wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
+  selector:
+    matchLabels:
+      app: application

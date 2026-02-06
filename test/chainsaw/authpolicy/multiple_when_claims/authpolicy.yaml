@@ -1,0 +1,49 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+spec:
+  enabled: true
+  authRules:
+    - paths:
+        - /client-sub-with-client-role*
+      when:
+        - claim: sub
+          values:
+            - entraid_client
+        - claim: role
+          values:
+            - entraid_role
+    - paths:
+        - /client-sub-with-user-role*
+      when:
+        - claim: sub
+          values:
+            - entraid_client
+        - claim: role
+          values:
+            - entra_user_role
+    - paths:
+        - /user-sub-with-client-role*
+      when:
+        - claim: sub
+          values:
+            - entraid_user
+        - claim: role
+          values:
+            - entraid_role
+    - paths:
+        - /user-sub-with-user-role*
+      when:
+        - claim: sub
+          values:
+            - entraid_user
+        - claim: role
+          values:
+            - entra_user_role
+  audience:
+    - entraid_server
+  wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
+  selector:
+    matchLabels:
+      app: application
