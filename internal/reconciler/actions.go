@@ -43,14 +43,6 @@ func secretReconcileAction(scope *state.Scope) AuthPolicyAdapter[*v1.Secret] {
 			scope.AuthPolicy.Namespace,
 		),
 	)
-	shouldUpdateFunc := func(current, desired *v1.Secret) bool {
-		desiredTokenSecret, hasDesired := desired.Data[configpatch.TokenSecretFileName]
-		currentTokenSecret, hasCurrent := current.Data[configpatch.TokenSecretFileName]
-		return !hasDesired || !hasCurrent || !bytes.Equal(currentTokenSecret, desiredTokenSecret)
-	}
-	updateFieldsFunc := func(current, desired *v1.Secret) {
-		current.Data = desired.Data
-	}
 
 	return AuthPolicyAdapter[*v1.Secret]{
 		reconciliation.ReconcileFuncAdapter[*v1.Secret]{
@@ -59,11 +51,21 @@ func secretReconcileAction(scope *state.Scope) AuthPolicyAdapter[*v1.Secret] {
 				ResourceName:    scope.AutoLoginConfig.EnvoySecretName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate:    shouldUpdateFunc,
-				UpdateFields:    updateFieldsFunc,
+				ShouldUpdate:    secretShouldUpdate,
+				UpdateFields:    secretUpdateFields,
 			},
 		},
 	}
+}
+
+func secretShouldUpdate(current, desired *v1.Secret) bool {
+	desiredTokenSecret, hasDesired := desired.Data[configpatch.TokenSecretFileName]
+	currentTokenSecret, hasCurrent := current.Data[configpatch.TokenSecretFileName]
+	return !hasDesired || !hasCurrent || !bytes.Equal(currentTokenSecret, desiredTokenSecret)
+}
+
+func secretUpdateFields(current, desired *v1.Secret) {
+	current.Data = desired.Data
 }
 
 /*
@@ -76,19 +78,6 @@ func envoyFilterReconcileAction(scope *state.Scope) AuthPolicyAdapter[*v1alpha4.
 		scope,
 		helperfunctions.BuildObjectMeta(autoLoginEnvoyFilterName, scope.AuthPolicy.Namespace),
 	)
-	shouldUpdateFunc := func(current, desired *v1alpha4.EnvoyFilter) bool {
-		return !reflect.DeepEqual(
-			current.Spec.GetWorkloadSelector(),
-			desired.Spec.GetWorkloadSelector(),
-		) || !reflect.DeepEqual(
-			current.Spec.GetConfigPatches(),
-			desired.Spec.GetConfigPatches(),
-		)
-	}
-	updateFieldsFunc := func(current, desired *v1alpha4.EnvoyFilter) {
-		current.Spec.WorkloadSelector = desired.Spec.GetWorkloadSelector()
-		current.Spec.ConfigPatches = desired.Spec.GetConfigPatches()
-	}
 
 	return AuthPolicyAdapter[*v1alpha4.EnvoyFilter]{
 		reconciliation.ReconcileFuncAdapter[*v1alpha4.EnvoyFilter]{
@@ -97,11 +86,26 @@ func envoyFilterReconcileAction(scope *state.Scope) AuthPolicyAdapter[*v1alpha4.
 				ResourceName:    autoLoginEnvoyFilterName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate:    shouldUpdateFunc,
-				UpdateFields:    updateFieldsFunc,
+				ShouldUpdate:    envoyFilterShouldUpdate,
+				UpdateFields:    envoyFilterUpdateFields,
 			},
 		},
 	}
+}
+
+func envoyFilterShouldUpdate(current, desired *v1alpha4.EnvoyFilter) bool {
+	return !reflect.DeepEqual(
+		current.Spec.GetWorkloadSelector(),
+		desired.Spec.GetWorkloadSelector(),
+	) || !reflect.DeepEqual(
+		current.Spec.GetConfigPatches(),
+		desired.Spec.GetConfigPatches(),
+	)
+}
+
+func envoyFilterUpdateFields(current, desired *v1alpha4.EnvoyFilter) {
+	current.Spec.WorkloadSelector = desired.Spec.GetWorkloadSelector()
+	current.Spec.ConfigPatches = desired.Spec.GetConfigPatches()
 }
 
 /*
@@ -116,14 +120,6 @@ func requestAuthenticationReconcileAction(
 		scope,
 		helperfunctions.BuildObjectMeta(requestAuthenticationName, scope.AuthPolicy.Namespace),
 	)
-	shouldUpdateFunc := func(current, desired *istioclientsecurityv1.RequestAuthentication) bool {
-		return !reflect.DeepEqual(current.Spec.GetSelector(), desired.Spec.GetSelector()) ||
-			!reflect.DeepEqual(current.Spec.GetJwtRules(), desired.Spec.GetJwtRules())
-	}
-	updateFieldsFunc := func(current, desired *istioclientsecurityv1.RequestAuthentication) {
-		current.Spec.Selector = desired.Spec.GetSelector()
-		current.Spec.JwtRules = desired.Spec.GetJwtRules()
-	}
 
 	return AuthPolicyAdapter[*istioclientsecurityv1.RequestAuthentication]{
 		reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.RequestAuthentication]{
@@ -132,11 +128,21 @@ func requestAuthenticationReconcileAction(
 				ResourceName:    requestAuthenticationName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate:    shouldUpdateFunc,
-				UpdateFields:    updateFieldsFunc,
+				ShouldUpdate:    requestAuthenticationShouldUpdate,
+				UpdateFields:    requestAuthenticationUpdateFields,
 			},
 		},
 	}
+}
+
+func requestAuthenticationShouldUpdate(current, desired *istioclientsecurityv1.RequestAuthentication) bool {
+	return !reflect.DeepEqual(current.Spec.GetSelector(), desired.Spec.GetSelector()) ||
+		!reflect.DeepEqual(current.Spec.GetJwtRules(), desired.Spec.GetJwtRules())
+}
+
+func requestAuthenticationUpdateFields(current, desired *istioclientsecurityv1.RequestAuthentication) {
+	current.Spec.Selector = desired.Spec.GetSelector()
+	current.Spec.JwtRules = desired.Spec.GetJwtRules()
 }
 
 /*
@@ -152,14 +158,6 @@ func denyAuthorizationPolicyReconcileAction(
 		scope,
 		helperfunctions.BuildObjectMeta(denyAuthorizationPolicyName, scope.AuthPolicy.Namespace),
 	)
-	shouldUpdateFunc := func(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
-		return !reflect.DeepEqual(current.Spec.GetSelector(), desired.Spec.GetSelector()) ||
-			!reflect.DeepEqual(current.Spec.GetRules(), desired.Spec.GetRules())
-	}
-	updateFieldsFunc := func(current, desired *istioclientsecurityv1.AuthorizationPolicy) {
-		current.Spec.Selector = desired.Spec.GetSelector()
-		current.Spec.Rules = desired.Spec.GetRules()
-	}
 
 	return AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
 		reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
@@ -168,8 +166,8 @@ func denyAuthorizationPolicyReconcileAction(
 				ResourceName:    denyAuthorizationPolicyName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate:    shouldUpdateFunc,
-				UpdateFields:    updateFieldsFunc,
+				ShouldUpdate:    authorizationPolicyShouldUpdate,
+				UpdateFields:    authorizationPolicyUpdateFields,
 			},
 		},
 	}
@@ -188,14 +186,6 @@ func ignoreAuthorizationPolicyReconcileAction(
 		scope,
 		helperfunctions.BuildObjectMeta(ignoreAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
 	)
-	shouldUpdateFunc := func(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
-		return !reflect.DeepEqual(current.Spec.GetSelector(), desired.Spec.GetSelector()) ||
-			!reflect.DeepEqual(current.Spec.GetRules(), desired.Spec.GetRules())
-	}
-	updateFieldsFunc := func(current, desired *istioclientsecurityv1.AuthorizationPolicy) {
-		current.Spec.Selector = desired.Spec.GetSelector()
-		current.Spec.Rules = desired.Spec.GetRules()
-	}
 
 	return AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
 		reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
@@ -204,8 +194,8 @@ func ignoreAuthorizationPolicyReconcileAction(
 				ResourceName:    ignoreAuthAuthorizationPolicyName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate:    shouldUpdateFunc,
-				UpdateFields:    updateFieldsFunc,
+				ShouldUpdate:    authorizationPolicyShouldUpdate,
+				UpdateFields:    authorizationPolicyUpdateFields,
 			},
 		},
 	}
@@ -224,14 +214,6 @@ func requireAuthorizationPolicyReconcileAction(
 		scope,
 		helperfunctions.BuildObjectMeta(requireAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
 	)
-	shouldUpdateFunc := func(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
-		return !reflect.DeepEqual(current.Spec.GetSelector(), desired.Spec.GetSelector()) ||
-			!reflect.DeepEqual(current.Spec.GetRules(), desired.Spec.GetRules())
-	}
-	updateFieldsFunc := func(current, desired *istioclientsecurityv1.AuthorizationPolicy) {
-		current.Spec.Selector = desired.Spec.GetSelector()
-		current.Spec.Rules = desired.Spec.GetRules()
-	}
 
 	return AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
 		reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
@@ -240,9 +222,19 @@ func requireAuthorizationPolicyReconcileAction(
 				ResourceName:    requireAuthAuthorizationPolicyName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate:    shouldUpdateFunc,
-				UpdateFields:    updateFieldsFunc,
+				ShouldUpdate:    authorizationPolicyShouldUpdate,
+				UpdateFields:    authorizationPolicyUpdateFields,
 			},
 		},
 	}
+}
+
+func authorizationPolicyShouldUpdate(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
+	return !reflect.DeepEqual(current.Spec.GetSelector(), desired.Spec.GetSelector()) ||
+		!reflect.DeepEqual(current.Spec.GetRules(), desired.Spec.GetRules())
+}
+
+func authorizationPolicyUpdateFields(current, desired *istioclientsecurityv1.AuthorizationPolicy) {
+	current.Spec.Selector = desired.Spec.GetSelector()
+	current.Spec.Rules = desired.Spec.GetRules()
 }
