@@ -18,6 +18,7 @@ COPY pkg/ pkg/
 COPY internal/controller/ internal/controller/
 COPY internal/eventhandler/ internal/eventhandler/
 COPY internal/state/ internal/state/
+COPY internal/reconciler/ internal/reconciler/
 COPY internal/resolver/ internal/resolver/
 
 # Build
