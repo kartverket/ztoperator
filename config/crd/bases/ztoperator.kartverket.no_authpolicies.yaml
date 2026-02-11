@@ -132,14 +132,6 @@ spec:
                       'valueFrom'
                     rule: '!(has(self.value) && has(self.valueFrom))'
                 type: array
-              audience:
-                description: |-
-                  Deprecated: use .allowedAudiences instead.
-                  Audience defines the accepted audience (`aud`) values in the JWT.
-                  At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
-                items:
-                  type: string
-                type: array
               authRules:
                 description: |-
                   AuthRules defines rules for allowing HTTP requests based on conditions

@@ -39,8 +39,8 @@ spec:
           values:
             - githubkvmail.lese.alt
             - sikkerhetsmetrikker.lese.alt
-  audience:
-    - audience
+  allowedAudiences:
+    - value: audience
   wellKnownURI: http://mock-oauth2.auth:8080/smapi/.well-known/openid-configuration
   selector:
     matchLabels:
