@@ -28,35 +28,12 @@ func TestResolveAudiences_WithNoAudiences_ReturnsEmptyList(t *testing.T) {
 		k8sClient,
 		"default",
 		[]ztoperatorv1alpha1.AllowedAudience{},
-		[]string{},
 	)
 
 	// 3. Assert
 	require.NoError(t, err, "ResolveAudiences should not return an error with empty audiences")
 	require.NotNil(t, result, "Result should not be nil")
 	assert.Empty(t, *result, "Result should be empty list")
-}
-
-func TestResolveAudiences_WithDeprecatedAudiences_ReturnsDeprecatedAudiences(t *testing.T) {
-	ctx := context.Background()
-
-	// 1. Arrange
-	deprecatedAudiences := []string{"audience1", "audience2"}
-	k8sClient := createFakeClientForAudiences()
-
-	// 2. Act
-	result, err := resolver.ResolveAudiences(
-		ctx,
-		k8sClient,
-		"default",
-		[]ztoperatorv1alpha1.AllowedAudience{},
-		deprecatedAudiences,
-	)
-
-	// 3. Assert
-	require.NoError(t, err, "ResolveAudiences should not return an error with deprecated audiences")
-	require.NotNil(t, result, "Result should not be nil")
-	assert.Equal(t, deprecatedAudiences, *result, "Result should match deprecated audiences")
 }
 
 func TestResolveAudiences_WithStaticValueAudience_ReturnsValue(t *testing.T) {
@@ -69,7 +46,7 @@ func TestResolveAudiences_WithStaticValueAudience_ReturnsValue(t *testing.T) {
 	k8sClient := createFakeClientForAudiences()
 
 	// 2. Act
-	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences, []string{})
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences)
 
 	// 3. Assert
 	require.NoError(t, err, "ResolveAudiences should not return an error with static value")
@@ -87,7 +64,7 @@ func TestResolveAudiences_WithEmptyStaticValue_ReturnsError(t *testing.T) {
 	k8sClient := createFakeClientForAudiences()
 
 	// 2. Act
-	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences, []string{})
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveAudiences should return an error with empty static value")
@@ -122,7 +99,7 @@ func TestResolveAudiences_WithConfigMapRef_ReturnsConfigMapValue(t *testing.T) {
 	k8sClient := createFakeClientForAudiences(configMap)
 
 	// 2. Act
-	result, err := resolver.ResolveAudiences(ctx, k8sClient, "test-namespace", allowedAudiences, []string{})
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "test-namespace", allowedAudiences)
 
 	// 3. Assert
 	require.NoError(t, err, "ResolveAudiences should not return an error with valid ConfigMap")
@@ -147,7 +124,7 @@ func TestResolveAudiences_WithMissingConfigMap_ReturnsError(t *testing.T) {
 	k8sClient := createFakeClientForAudiences()
 
 	// 2. Act
-	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences, []string{})
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveAudiences should return an error when ConfigMap is missing")
@@ -181,7 +158,7 @@ func TestResolveAudiences_WithSecretRef_ReturnsSecretValue(t *testing.T) {
 	k8sClient := createFakeClientForAudiences(secret)
 
 	// 2. Act
-	result, err := resolver.ResolveAudiences(ctx, k8sClient, "test-namespace", allowedAudiences, []string{})
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "test-namespace", allowedAudiences)
 
 	// 3. Assert
 	require.NoError(t, err, "ResolveAudiences should not return an error with valid Secret")
@@ -206,7 +183,7 @@ func TestResolveAudiences_WithMissingSecret_ReturnsError(t *testing.T) {
 	k8sClient := createFakeClientForAudiences()
 
 	// 2. Act
-	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences, []string{})
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveAudiences should return an error when Secret is missing")
@@ -256,16 +233,15 @@ func TestResolveAudiences_WithMultipleAudiences_ReturnsAllAudiences(t *testing.T
 			},
 		},
 	}
-	deprecatedAudiences := []string{"deprecated-audience"}
 	k8sClient := createFakeClientForAudiences(configMap, secret)
 
 	// 2. Act
-	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences, deprecatedAudiences)
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences)
 
 	// 3. Assert
 	require.NoError(t, err, "ResolveAudiences should not return an error with multiple valid audiences")
 	require.NotNil(t, result, "Result should not be nil")
-	expected := []string{"deprecated-audience", "static-audience", "audience-from-configmap", "audience-from-secret"}
+	expected := []string{"static-audience", "audience-from-configmap", "audience-from-secret"}
 	assert.Equal(t, expected, *result, "Result should contain all audiences in correct order")
 }
 
@@ -287,7 +263,7 @@ func TestResolveAudiences_WithBothValueAndValueFrom_ReturnsError(t *testing.T) {
 	k8sClient := createFakeClientForAudiences()
 
 	// 2. Act
-	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences, []string{})
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveAudiences should return an error when both value and valueFrom are set")
@@ -316,7 +292,7 @@ func TestResolveAudiences_WithBothConfigMapAndSecretRef_ReturnsError(t *testing.
 	k8sClient := createFakeClientForAudiences()
 
 	// 2. Act
-	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences, []string{})
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveAudiences should return an error when both ConfigMap and Secret refs are set")
@@ -352,7 +328,7 @@ func TestResolveAudiences_WithEmptyConfigMapValue_ReturnsError(t *testing.T) {
 	k8sClient := createFakeClientForAudiences(configMap)
 
 	// 2. Act
-	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences, []string{})
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveAudiences should return an error with empty ConfigMap value")
@@ -388,7 +364,7 @@ func TestResolveAudiences_WithEmptySecretValue_ReturnsError(t *testing.T) {
 	k8sClient := createFakeClientForAudiences(secret)
 
 	// 2. Act
-	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences, []string{})
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveAudiences should return an error with empty Secret value")
@@ -424,7 +400,7 @@ func TestResolveAudiences_WithMissingConfigMapKey_ReturnsError(t *testing.T) {
 	k8sClient := createFakeClientForAudiences(configMap)
 
 	// 2. Act
-	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences, []string{})
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveAudiences should return an error with missing ConfigMap key")
@@ -460,7 +436,7 @@ func TestResolveAudiences_WithMissingSecretKey_ReturnsError(t *testing.T) {
 	k8sClient := createFakeClientForAudiences(secret)
 
 	// 2. Act
-	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences, []string{})
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveAudiences should return an error with missing Secret key")

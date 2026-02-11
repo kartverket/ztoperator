@@ -16,11 +16,8 @@ func ResolveAudiences(
 	k8sClient client.Client,
 	namespace string,
 	allowedAudiences []ztoperatorv1alpha1.AllowedAudience,
-	deprecatedAudiences []string,
 ) (*[]string, error) {
 	var resolvedAudiences []string
-
-	resolvedAudiences = append(resolvedAudiences, deprecatedAudiences...)
 
 	for _, audience := range allowedAudiences {
 		if audience.Value != nil && audience.ValueFrom != nil {

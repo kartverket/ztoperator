@@ -218,8 +218,6 @@ func resolveAuthPolicy(
 		k8sClient,
 		authPolicy.Namespace,
 		authPolicy.Spec.AllowedAudiences,
-		//nolint:staticcheck // we have to use this field for backward compatibility
-		authPolicy.Spec.Audience,
 	)
 	if errAudiences != nil {
 		return nil, fmt.Errorf("failed to resolve audiences: %w", errAudiences)

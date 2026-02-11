@@ -30,14 +30,6 @@ type AuthPolicySpec struct {
 	// +kubebuilder:validation:Required
 	WellKnownURI string `json:"wellKnownURI"`
 
-	// Deprecated: use .allowedAudiences instead.
-	// Audience defines the accepted audience (`aud`) values in the JWT.
-	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
-	//
-	// +kubebuilder:validation:Deprecated
-	// +kubebuilder:validation:Optional
-	Audience []string `json:"audience,omitempty"`
-
 	// AllowedAudiences defines the allowed audience (`aud`) values in the JWT.
 	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
 	//
