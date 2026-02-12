@@ -147,6 +147,7 @@ func convertToRE2Regex(requestMatchers []v1alpha1.RequestMatcher) []v1alpha1.Req
 }
 
 func convertRequestMatcherPathToRegex(path string) string {
+	path = strings.ReplaceAll(path, "-", "%-")
 	if strings.Contains(path, "*") || strings.Contains(path, "{") {
 		path = convertToEnvoyWildcards(path)
 		return envoyWildcardsToRE2Regex(path)
