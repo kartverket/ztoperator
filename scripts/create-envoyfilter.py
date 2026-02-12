@@ -37,6 +37,8 @@ def lua_rules_from_matchers(matchers):
 
         for p in paths:
             regex = str(p)
+            # append '%' in front of the special character '-'
+            regex = regex.replace("-", "%-")
             # If the path has a wildcard, convert "*" to ".*" and anchor at start.
             if "*" in regex:
                 regex = "^" + regex.replace("*", ".*")
