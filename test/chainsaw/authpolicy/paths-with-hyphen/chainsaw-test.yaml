@@ -1,0 +1,37 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: auto-login-saas
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: ../../../resources/skiperator/application-with-istio-mount.yaml
+        - apply:
+            file: ../../../resources/ingress/wildcard-ingress.yaml
+        - create:
+            file: ../../../resources/secret/oauth-secret.yaml
+        - create:
+            file: authpolicy.yaml
+        - script:
+            content: |
+              cat authpolicy.yaml | ../../../../venv/bin/python ./../../../../scripts/create-envoyfilter.py > generated-envoyfilter-assert.yaml
+        - assert:
+            file: generated-envoyfilter-assert.yaml
+        - script:
+            content: rm -f generated-envoyfilter-assert.yaml
+        - script:
+            content: sleep 7
+        - script:
+            content: |
+              hurl --error-format long \
+              --insecure --test tests.hurl \
+              --variable location_header="http://mock-oauth2.auth:8080/entraid/authorize?client_id=entraid_server&code_challenge=" \
+              --variable token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client --token_name access_token)" \
