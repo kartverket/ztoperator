@@ -37,6 +37,8 @@ def lua_rules_from_matchers(matchers):
 
         for p in paths:
             regex = str(p)
+            # we need to escape '-' because it is a special character in Lua pattern matching
+            regex = regex.replace("-", "%-")
             # If the path has a wildcard, convert "*" to ".*" and anchor at start.
             if "*" in regex:
                 regex = "^" + regex.replace("*", ".*")
@@ -67,13 +69,20 @@ def lua_table_from_map(mapping):
 # Extract rules ----------------------------------------------------
 
 ignore_matchers = spec.get("ignoreAuthRules") or []
+auth_matcher_raw = spec.get("authRules") or []
+auth_matcher = []
+for m in auth_matcher_raw:
+    if isinstance(m, dict):
+        # filter out optional 'when' clauses
+        mm = {k: v for k, v in m.items() if k != "when"}
+        auth_matcher.append(mm)
 
 auto = spec.get("autoLogin") or {}
 login_path = auto.get("loginPath")
 redirect_path = auto.get("redirectPath") or "/oauth2/callback"
 logout_path = auto.get("logoutPath") or "/logout"
 
-require_matchers = []
+require_matchers = auth_matcher  # authRules are the "require" rules in the Lua script
 if redirect_path:
     require_matchers.append({"paths": [redirect_path], "methods": []})
 if logout_path:
