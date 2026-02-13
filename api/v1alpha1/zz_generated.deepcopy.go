@@ -122,11 +122,6 @@ func (in *AuthPolicySpec) DeepCopyInto(out *AuthPolicySpec) {
 		*out = new(OAuthCredentials)
 		**out = **in
 	}
-	if in.Audience != nil {
-		in, out := &in.Audience, &out.Audience
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	if in.AllowedAudiences != nil {
 		in, out := &in.AllowedAudiences, &out.AllowedAudiences
 		*out = make([]AllowedAudience, len(*in))

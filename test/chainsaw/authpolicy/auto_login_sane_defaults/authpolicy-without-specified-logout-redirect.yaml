@@ -12,8 +12,8 @@ spec:
     enabled: true
     scopes:
       - openid
-  audience:
-    - entraid_server
+  allowedAudiences:
+    - value: entraid_server
   wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
   selector:
     matchLabels:

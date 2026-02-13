@@ -11,9 +11,9 @@ spec:
       header: x-token-role
     - claim: aud
       header: x-token-aud
-  audience:
-    - maskinporten_client
-    - maskinporten_server
+  allowedAudiences:
+    - value: maskinporten_client
+    - value: maskinporten_server
   wellKnownURI: http://mock-oauth2.auth:8080/maskinporten/.well-known/openid-configuration
   selector:
     matchLabels:
