@@ -13,7 +13,6 @@ import (
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/log"
-	"github.com/kartverket/ztoperator/pkg/luascript"
 	"github.com/kartverket/ztoperator/pkg/metrics"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/kartverket/ztoperator/pkg/rest"
@@ -111,8 +110,6 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 		return reconcile.Result{}, err
 	}
-
-	scope.AutoLoginConfig.EnvoySecretName = authPolicy.Name + "-envoy-secret"
 
 	scope = validateAuthPolicy(ctx, r.Client, scope)
 
@@ -336,27 +333,7 @@ func resolveAuthPolicy(
 		return nil, errIdentityProviderUris
 	}
 
-	autoLoginConfig := state.AutoLoginConfig{
-		Enabled: false,
-	}
-
-	if authPolicy.Spec.AutoLogin != nil && authPolicy.Spec.AutoLogin.Enabled {
-		autoLoginConfig.Enabled = authPolicy.Spec.AutoLogin.Enabled
-		autoLoginConfig.LoginPath = authPolicy.Spec.AutoLogin.LoginPath
-		autoLoginConfig.PostLogoutRedirectURI = authPolicy.Spec.AutoLogin.PostLogoutRedirectURI
-		autoLoginConfig.Scopes = authPolicy.Spec.AutoLogin.Scopes
-		autoLoginConfig.LoginParams = authPolicy.Spec.AutoLogin.LoginParams
-
-		autoLoginConfig.SetSaneDefaults(*authPolicy.Spec.AutoLogin)
-
-		autoLoginConfig.LuaScriptConfig = state.LuaScriptConfig{
-			LuaScript: luascript.GetLuaScript(
-				authPolicy,
-				autoLoginConfig,
-				*identityProviderUris,
-			),
-		}
-	}
+	autoLoginConfig := resolver.ResolveAutoLoginConfig(authPolicy, *identityProviderUris)
 
 	resolvedAudiences, errAudiences := resolver.ResolveAudiences(
 		ctx,
