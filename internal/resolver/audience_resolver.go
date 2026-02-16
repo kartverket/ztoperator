@@ -68,7 +68,12 @@ func resolveAudienceRef(
 
 		value := configMap.Data[valueFrom.ConfigMapKeyRef.Key]
 		if value == "" {
-			return nil, fmt.Errorf("audience value from configmap %s/%s key %s is empty or missing", namespace, valueFrom.ConfigMapKeyRef.Name, valueFrom.ConfigMapKeyRef.Key)
+			return nil, fmt.Errorf(
+				"audience value from configmap %s/%s key %s is empty or missing",
+				namespace,
+				valueFrom.ConfigMapKeyRef.Name,
+				valueFrom.ConfigMapKeyRef.Key,
+			)
 		}
 
 		return helperfunctions.Ptr(value), nil
@@ -88,7 +93,12 @@ func resolveAudienceRef(
 
 	value := string(secret.Data[valueFrom.SecretKeyRef.Key])
 	if value == "" {
-		return nil, fmt.Errorf("audience value from secret %s/%s key %s is empty or missing", namespace, valueFrom.SecretKeyRef.Name, valueFrom.SecretKeyRef.Key)
+		return nil, fmt.Errorf(
+			"audience value from secret %s/%s key %s is empty or missing",
+			namespace,
+			valueFrom.SecretKeyRef.Name,
+			valueFrom.SecretKeyRef.Key,
+		)
 	}
 
 	return helperfunctions.Ptr(value), nil
