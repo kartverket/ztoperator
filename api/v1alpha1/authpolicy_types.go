@@ -104,6 +104,7 @@ type AuthPolicySpec struct {
 //
 // +kubebuilder:validation:XValidation:message="either 'value' or 'valueFrom' must be set",rule="has(self.value) || has(self.valueFrom)"
 // +kubebuilder:validation:XValidation:message="one audience cannot be defined from both 'value' and 'valueFrom'",rule="!(has(self.value) && has(self.valueFrom))"
+// +kubebuilder:validation:XValidation:message="field 'value' cannot be empty string",rule="!has(self.value) || size(self.value) > 0"
 // +kubebuilder:object:generate=true
 type AllowedAudience struct {
 	// Value specifies a static audience value.
