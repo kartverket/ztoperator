@@ -19,7 +19,7 @@ func TestResolveOAuthCredentials_WithAutoLoginDisabled_ReturnsEmptyCredentials(t
 	ctx := context.Background()
 
 	// 1. Arrange
-	authPolicy := createAuthPolicyWithOAuth("default", "oauth-secret", "client-id", "client-secret", false)
+	authPolicy := createAuthPolicyWithOAuth("oauth-secret", false)
 	k8sClient := createFakeClientForOauthCredentials()
 
 	// 2. Act
@@ -53,7 +53,7 @@ func TestResolveOAuthCredentials_WithMissingSecret_ReturnsError(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. Arrange
-	authPolicy := createAuthPolicyWithOAuth("default", "non-existent-secret", "client-id", "client-secret", true)
+	authPolicy := createAuthPolicyWithOAuth("non-existent-secret", true)
 	k8sClient := createFakeClientForOauthCredentials()
 
 	// 2. Act
@@ -81,7 +81,7 @@ func TestResolveOAuthCredentials_WithEmptyClientID_ReturnsError(t *testing.T) {
 		},
 	}
 
-	authPolicy := createAuthPolicyWithOAuth("default", "oauth-secret", "client-id", "client-secret", true)
+	authPolicy := createAuthPolicyWithOAuth("oauth-secret", true)
 	k8sClient := createFakeClientForOauthCredentials(secret)
 
 	// 2. Act
@@ -109,7 +109,7 @@ func TestResolveOAuthCredentials_WithEmptyClientSecret_ReturnsError(t *testing.T
 		},
 	}
 
-	authPolicy := createAuthPolicyWithOAuth("default", "oauth-secret", "client-id", "client-secret", true)
+	authPolicy := createAuthPolicyWithOAuth("oauth-secret", true)
 	k8sClient := createFakeClientForOauthCredentials(secret)
 
 	// 2. Act
@@ -126,7 +126,7 @@ func TestResolveOAuthCredentials_WithNilAutoLogin_ReturnsEmptyCredentials(t *tes
 	ctx := context.Background()
 
 	// 1. Arrange
-	authPolicy := createAuthPolicyWithNilAutoLogin("default", "oauth-secret", "client-id", "client-secret")
+	authPolicy := createAuthPolicyWithNilAutoLogin("default", "oauth-secret")
 	k8sClient := createFakeClientForOauthCredentials()
 
 	// 2. Act
@@ -157,7 +157,7 @@ func TestResolveOAuthCredentials_WithValidSecret_ReturnsCredentials(t *testing.T
 		},
 	}
 
-	authPolicy := createAuthPolicyWithOAuth("default", "oauth-secret", "client-id", "client-secret", true)
+	authPolicy := createAuthPolicyWithOAuth("oauth-secret", true)
 	k8sClient := createFakeClientForOauthCredentials(secret)
 
 	// 2. Act
@@ -173,13 +173,13 @@ func TestResolveOAuthCredentials_WithValidSecret_ReturnsCredentials(t *testing.T
 }
 
 func createAuthPolicyWithOAuth(
-	namespace, secretRef, clientIDKey, clientSecretKey string,
+	secretRef string,
 	autoLoginEnabled bool,
 ) *ztoperatorv1alpha1.AuthPolicy {
 	return &ztoperatorv1alpha1.AuthPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-policy",
-			Namespace: namespace,
+			Namespace: "default",
 		},
 		Spec: ztoperatorv1alpha1.AuthPolicySpec{
 			WellKnownURI: "http://test-idp.example.com/.well-known/openid-configuration",
@@ -188,8 +188,8 @@ func createAuthPolicyWithOAuth(
 			},
 			OAuthCredentials: &ztoperatorv1alpha1.OAuthCredentials{
 				SecretRef:       secretRef,
-				ClientIDKey:     clientIDKey,
-				ClientSecretKey: clientSecretKey,
+				ClientIDKey:     "client-id",
+				ClientSecretKey: "client-secret",
 			},
 		},
 	}
@@ -212,7 +212,7 @@ func createAuthPolicyWithoutOAuth(namespace string, autoLoginEnabled bool) *ztop
 }
 
 func createAuthPolicyWithNilAutoLogin(
-	namespace, secretRef, clientIDKey, clientSecretKey string,
+	namespace, secretRef string,
 ) *ztoperatorv1alpha1.AuthPolicy {
 	return &ztoperatorv1alpha1.AuthPolicy{
 		ObjectMeta: metav1.ObjectMeta{
@@ -224,8 +224,8 @@ func createAuthPolicyWithNilAutoLogin(
 			AutoLogin:    nil,
 			OAuthCredentials: &ztoperatorv1alpha1.OAuthCredentials{
 				SecretRef:       secretRef,
-				ClientIDKey:     clientIDKey,
-				ClientSecretKey: clientSecretKey,
+				ClientIDKey:     "client-id",
+				ClientSecretKey: "client-secret",
 			},
 		},
 	}
