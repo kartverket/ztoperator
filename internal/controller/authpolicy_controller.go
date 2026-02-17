@@ -314,41 +314,9 @@ func resolveAuthPolicy(
 	}
 	rLog.Info(fmt.Sprintf("Trying to resolve auth policy %s/%s", authPolicy.Namespace, authPolicy.Name))
 
-	var oAuthCredentials state.OAuthCredentials
-
-	if authPolicy.Spec.OAuthCredentials != nil &&
-		authPolicy.Spec.AutoLogin != nil &&
-		authPolicy.Spec.AutoLogin.Enabled {
-		oAuthSecret, err := helperfunctions.GetSecret(ctx, k8sClient, types.NamespacedName{
-			Namespace: authPolicy.Namespace,
-			Name:      authPolicy.Spec.OAuthCredentials.SecretRef,
-		})
-		if err != nil {
-			return nil, err
-		}
-		clientID := string(oAuthSecret.Data[authPolicy.Spec.OAuthCredentials.ClientIDKey])
-		oAuthCredentials.ClientID = &clientID
-
-		clientSecret := string(oAuthSecret.Data[authPolicy.Spec.OAuthCredentials.ClientSecretKey])
-		oAuthCredentials.ClientSecret = &clientSecret
-
-		if oAuthCredentials.ClientID == nil || *oAuthCredentials.ClientID == "" {
-			return nil, fmt.Errorf(
-				"client id with key: %s was nil or empty when retrieving it from Secret with name %s/%s",
-				authPolicy.Spec.OAuthCredentials.ClientIDKey,
-				authPolicy.Namespace,
-				authPolicy.Spec.OAuthCredentials.SecretRef,
-			)
-		}
-
-		if oAuthCredentials.ClientSecret == nil || *oAuthCredentials.ClientSecret == "" {
-			return nil, fmt.Errorf(
-				"client secret with key: %s was nil or empty when retrieving it from Secret with name %s/%s",
-				authPolicy.Spec.OAuthCredentials.ClientSecretKey,
-				authPolicy.Namespace,
-				authPolicy.Spec.OAuthCredentials.SecretRef,
-			)
-		}
+	oAuthCredentials, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+	if err != nil {
+		return nil, err
 	}
 
 	rLog.Info(
@@ -408,7 +376,7 @@ func resolveAuthPolicy(
 		Audiences:            *resolvedAudiences,
 		AuthPolicy:           *authPolicy,
 		AutoLoginConfig:      autoLoginConfig,
-		OAuthCredentials:     oAuthCredentials,
+		OAuthCredentials:     *oAuthCredentials,
 		IdentityProviderUris: *identityProviderUris,
 	}, nil
 }
