@@ -122,6 +122,62 @@ func TestResolveOAuthCredentials_WithEmptyClientSecret_ReturnsError(t *testing.T
 	assert.Contains(t, err.Error(), "default/oauth-secret")
 }
 
+func TestResolveOAuthCredentials_WithMissingClientIDKey_ReturnsError(t *testing.T) {
+	ctx := context.Background()
+
+	// 1. Arrange
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oauth-secret",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			// client-id key is missing
+			"client-secret": []byte("my-client-secret"),
+		},
+	}
+
+	authPolicy := createAuthPolicyWithOAuth("oauth-secret", true)
+	k8sClient := createFakeClientForOauthCredentials(secret)
+
+	// 2. Act
+	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+
+	// 3. Assert
+	require.Error(t, err, "ResolveOAuthCredentials should return an error when client ID key is missing")
+	assert.Nil(t, result, "Result should be nil on error")
+	assert.Contains(t, err.Error(), "client id with key: client-id was nil or empty")
+	assert.Contains(t, err.Error(), "default/oauth-secret")
+}
+
+func TestResolveOAuthCredentials_WithMissingClientSecretKey_ReturnsError(t *testing.T) {
+	ctx := context.Background()
+
+	// 1. Arrange
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oauth-secret",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"client-id": []byte("my-client-id"),
+			// client-secret key is missing
+		},
+	}
+
+	authPolicy := createAuthPolicyWithOAuth("oauth-secret", true)
+	k8sClient := createFakeClientForOauthCredentials(secret)
+
+	// 2. Act
+	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+
+	// 3. Assert
+	require.Error(t, err, "ResolveOAuthCredentials should return an error when client secret key is missing")
+	assert.Nil(t, result, "Result should be nil on error")
+	assert.Contains(t, err.Error(), "client secret with key: client-secret was nil or empty")
+	assert.Contains(t, err.Error(), "default/oauth-secret")
+}
+
 func TestResolveOAuthCredentials_WithNilAutoLogin_ReturnsEmptyCredentials(t *testing.T) {
 	ctx := context.Background()
 
