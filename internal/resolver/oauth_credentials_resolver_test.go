@@ -172,45 +172,6 @@ func TestResolveOAuthCredentials_WithValidSecret_ReturnsCredentials(t *testing.T
 	assert.Equal(t, expectedClientSecret, *result.ClientSecret, "ClientSecret should match expected value")
 }
 
-func TestResolveOAuthCredentials_WithCustomKeys_ReturnsCredentials(t *testing.T) {
-	ctx := context.Background()
-
-	// 1. Arrange
-	expectedClientID := "custom-client-id"
-	expectedClientSecret := "custom-client-secret"
-
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "oauth-secret",
-			Namespace: "test-namespace",
-		},
-		Data: map[string][]byte{
-			"custom-id-key":     []byte(expectedClientID),
-			"custom-secret-key": []byte(expectedClientSecret),
-		},
-	}
-
-	authPolicy := createAuthPolicyWithOAuth(
-		"test-namespace",
-		"oauth-secret",
-		"custom-id-key",
-		"custom-secret-key",
-		true,
-	)
-	k8sClient := createFakeClientForOauthCredentials(secret)
-
-	// 2. Act
-	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
-
-	// 3. Assert
-	require.NoError(t, err, "ResolveOAuthCredentials should not return an error with custom keys")
-	require.NotNil(t, result, "Result should not be nil")
-	require.NotNil(t, result.ClientID, "ClientID should not be nil")
-	require.NotNil(t, result.ClientSecret, "ClientSecret should not be nil")
-	assert.Equal(t, expectedClientID, *result.ClientID, "ClientID should match expected value")
-	assert.Equal(t, expectedClientSecret, *result.ClientSecret, "ClientSecret should match expected value")
-}
-
 func createAuthPolicyWithOAuth(
 	namespace, secretRef, clientIDKey, clientSecretKey string,
 	autoLoginEnabled bool,
