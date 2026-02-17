@@ -28,6 +28,10 @@ spec:
               ./../../../../scripts/patch-invalid-spec.sh \
                 audience/patch-invalid-audience-ref.yaml \
                 "cannot reference both a ConfigMap and a Secret"
+
+              ./../../../../scripts/patch-invalid-spec.sh \
+                audience/patch-empty-audience.yaml \
+                "field 'value' cannot be empty string"
         - delete:
             file: audience/authpolicy.yaml
 
