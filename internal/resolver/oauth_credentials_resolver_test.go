@@ -19,7 +19,7 @@ func TestResolveOAuthCredentials_WithAutoLoginDisabled_ReturnsEmptyCredentials(t
 	ctx := context.Background()
 
 	// 1. Arrange
-	authPolicy := createAuthPolicyWithOAuth("default", "oauth-secret", "client-id", "client-secret", false)
+	authPolicy := createAuthPolicyWithOAuth("oauth-secret", false)
 	k8sClient := createFakeClientForOauthCredentials()
 
 	// 2. Act
@@ -53,7 +53,7 @@ func TestResolveOAuthCredentials_WithMissingSecret_ReturnsError(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. Arrange
-	authPolicy := createAuthPolicyWithOAuth("default", "non-existent-secret", "client-id", "client-secret", true)
+	authPolicy := createAuthPolicyWithOAuth("non-existent-secret", true)
 	k8sClient := createFakeClientForOauthCredentials()
 
 	// 2. Act
@@ -81,7 +81,7 @@ func TestResolveOAuthCredentials_WithEmptyClientID_ReturnsError(t *testing.T) {
 		},
 	}
 
-	authPolicy := createAuthPolicyWithOAuth("default", "oauth-secret", "client-id", "client-secret", true)
+	authPolicy := createAuthPolicyWithOAuth("oauth-secret", true)
 	k8sClient := createFakeClientForOauthCredentials(secret)
 
 	// 2. Act
@@ -109,7 +109,7 @@ func TestResolveOAuthCredentials_WithEmptyClientSecret_ReturnsError(t *testing.T
 		},
 	}
 
-	authPolicy := createAuthPolicyWithOAuth("default", "oauth-secret", "client-id", "client-secret", true)
+	authPolicy := createAuthPolicyWithOAuth("oauth-secret", true)
 	k8sClient := createFakeClientForOauthCredentials(secret)
 
 	// 2. Act
@@ -122,11 +122,67 @@ func TestResolveOAuthCredentials_WithEmptyClientSecret_ReturnsError(t *testing.T
 	assert.Contains(t, err.Error(), "default/oauth-secret")
 }
 
+func TestResolveOAuthCredentials_WithMissingClientIDKey_ReturnsError(t *testing.T) {
+	ctx := context.Background()
+
+	// 1. Arrange
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oauth-secret",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			// client-id key is missing
+			"client-secret": []byte("my-client-secret"),
+		},
+	}
+
+	authPolicy := createAuthPolicyWithOAuth("oauth-secret", true)
+	k8sClient := createFakeClientForOauthCredentials(secret)
+
+	// 2. Act
+	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+
+	// 3. Assert
+	require.Error(t, err, "ResolveOAuthCredentials should return an error when client ID key is missing")
+	assert.Nil(t, result, "Result should be nil on error")
+	assert.Contains(t, err.Error(), "client id with key: client-id was nil or empty")
+	assert.Contains(t, err.Error(), "default/oauth-secret")
+}
+
+func TestResolveOAuthCredentials_WithMissingClientSecretKey_ReturnsError(t *testing.T) {
+	ctx := context.Background()
+
+	// 1. Arrange
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oauth-secret",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"client-id": []byte("my-client-id"),
+			// client-secret key is missing
+		},
+	}
+
+	authPolicy := createAuthPolicyWithOAuth("oauth-secret", true)
+	k8sClient := createFakeClientForOauthCredentials(secret)
+
+	// 2. Act
+	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+
+	// 3. Assert
+	require.Error(t, err, "ResolveOAuthCredentials should return an error when client secret key is missing")
+	assert.Nil(t, result, "Result should be nil on error")
+	assert.Contains(t, err.Error(), "client secret with key: client-secret was nil or empty")
+	assert.Contains(t, err.Error(), "default/oauth-secret")
+}
+
 func TestResolveOAuthCredentials_WithNilAutoLogin_ReturnsEmptyCredentials(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. Arrange
-	authPolicy := createAuthPolicyWithNilAutoLogin("default", "oauth-secret", "client-id", "client-secret")
+	authPolicy := createAuthPolicyWithNilAutoLogin("default", "oauth-secret")
 	k8sClient := createFakeClientForOauthCredentials()
 
 	// 2. Act
@@ -157,7 +213,7 @@ func TestResolveOAuthCredentials_WithValidSecret_ReturnsCredentials(t *testing.T
 		},
 	}
 
-	authPolicy := createAuthPolicyWithOAuth("default", "oauth-secret", "client-id", "client-secret", true)
+	authPolicy := createAuthPolicyWithOAuth("oauth-secret", true)
 	k8sClient := createFakeClientForOauthCredentials(secret)
 
 	// 2. Act
@@ -172,53 +228,14 @@ func TestResolveOAuthCredentials_WithValidSecret_ReturnsCredentials(t *testing.T
 	assert.Equal(t, expectedClientSecret, *result.ClientSecret, "ClientSecret should match expected value")
 }
 
-func TestResolveOAuthCredentials_WithCustomKeys_ReturnsCredentials(t *testing.T) {
-	ctx := context.Background()
-
-	// 1. Arrange
-	expectedClientID := "custom-client-id"
-	expectedClientSecret := "custom-client-secret"
-
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "oauth-secret",
-			Namespace: "test-namespace",
-		},
-		Data: map[string][]byte{
-			"custom-id-key":     []byte(expectedClientID),
-			"custom-secret-key": []byte(expectedClientSecret),
-		},
-	}
-
-	authPolicy := createAuthPolicyWithOAuth(
-		"test-namespace",
-		"oauth-secret",
-		"custom-id-key",
-		"custom-secret-key",
-		true,
-	)
-	k8sClient := createFakeClientForOauthCredentials(secret)
-
-	// 2. Act
-	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
-
-	// 3. Assert
-	require.NoError(t, err, "ResolveOAuthCredentials should not return an error with custom keys")
-	require.NotNil(t, result, "Result should not be nil")
-	require.NotNil(t, result.ClientID, "ClientID should not be nil")
-	require.NotNil(t, result.ClientSecret, "ClientSecret should not be nil")
-	assert.Equal(t, expectedClientID, *result.ClientID, "ClientID should match expected value")
-	assert.Equal(t, expectedClientSecret, *result.ClientSecret, "ClientSecret should match expected value")
-}
-
 func createAuthPolicyWithOAuth(
-	namespace, secretRef, clientIDKey, clientSecretKey string,
+	secretRef string,
 	autoLoginEnabled bool,
 ) *ztoperatorv1alpha1.AuthPolicy {
 	return &ztoperatorv1alpha1.AuthPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-policy",
-			Namespace: namespace,
+			Namespace: "default",
 		},
 		Spec: ztoperatorv1alpha1.AuthPolicySpec{
 			WellKnownURI: "http://test-idp.example.com/.well-known/openid-configuration",
@@ -227,8 +244,8 @@ func createAuthPolicyWithOAuth(
 			},
 			OAuthCredentials: &ztoperatorv1alpha1.OAuthCredentials{
 				SecretRef:       secretRef,
-				ClientIDKey:     clientIDKey,
-				ClientSecretKey: clientSecretKey,
+				ClientIDKey:     "client-id",
+				ClientSecretKey: "client-secret",
 			},
 		},
 	}
@@ -251,7 +268,7 @@ func createAuthPolicyWithoutOAuth(namespace string, autoLoginEnabled bool) *ztop
 }
 
 func createAuthPolicyWithNilAutoLogin(
-	namespace, secretRef, clientIDKey, clientSecretKey string,
+	namespace, secretRef string,
 ) *ztoperatorv1alpha1.AuthPolicy {
 	return &ztoperatorv1alpha1.AuthPolicy{
 		ObjectMeta: metav1.ObjectMeta{
@@ -263,8 +280,8 @@ func createAuthPolicyWithNilAutoLogin(
 			AutoLogin:    nil,
 			OAuthCredentials: &ztoperatorv1alpha1.OAuthCredentials{
 				SecretRef:       secretRef,
-				ClientIDKey:     clientIDKey,
-				ClientSecretKey: clientSecretKey,
+				ClientIDKey:     "client-id",
+				ClientSecretKey: "client-secret",
 			},
 		},
 	}
