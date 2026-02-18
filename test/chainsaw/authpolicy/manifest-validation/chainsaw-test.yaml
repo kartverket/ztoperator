@@ -54,3 +54,13 @@ spec:
                 "claims must be a non-empty list"
         - delete:
             file: baseline_auth/authpolicy.yaml
+
+        - create:
+            file: autologin/authpolicy.yaml
+        - script: # AutoLogin
+            content: |
+              ./../../../../scripts/patch-invalid-spec.sh \
+                autologin/patch-empty-oauthcredentials.yaml \
+                "oAuthCredentials must be set when autoLogin is enabled"
+        - delete:
+            file: autologin/authpolicy.yaml
