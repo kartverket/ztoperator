@@ -69,6 +69,14 @@ func BuildAuthPolicyCondition(
 		condition.Message = "Descendants of AuthPolicy reconciled successfully."
 	}
 
+	// Preserve LastTransitionTime if the condition is unchanged
+	for _, existing := range existingConditions {
+		if isLogicallyEqualCondition(existing, condition) {
+			condition.LastTransitionTime = existing.LastTransitionTime
+			break
+		}
+	}
+
 	return condition
 }
 
@@ -99,6 +107,13 @@ func BuildDescendantConditions(
 			condition.Reason = "Unknown"
 			condition.Message = "No status message set"
 		}
+
+		// Preserve LastTransitionTime if the condition is unchanged
+		for _, existing := range existingConditions {
+			if isLogicallyEqualCondition(existing, condition) {
+				condition.LastTransitionTime = existing.LastTransitionTime
+				break
+			}
 		}
 
 		conditions = append(conditions, condition)
@@ -137,6 +152,13 @@ func BuildMissingResourceConditions(
 					LastTransitionTime: metav1.Now(),
 				}
 
+				// Preserve LastTransitionTime if the condition is unchanged
+				for _, existing := range existingConditions {
+					if isLogicallyEqualCondition(existing, condition) {
+						condition.LastTransitionTime = existing.LastTransitionTime
+						break
+					}
+				}
 
 				conditions = append(conditions, condition)
 			}
@@ -144,4 +166,11 @@ func BuildMissingResourceConditions(
 	}
 
 	return conditions
+}
+
+func isLogicallyEqualCondition(existing metav1.Condition, cond metav1.Condition) bool {
+	return existing.Type == cond.Type &&
+		existing.Status == cond.Status &&
+		existing.Reason == cond.Reason &&
+		existing.Message == cond.Message
 }

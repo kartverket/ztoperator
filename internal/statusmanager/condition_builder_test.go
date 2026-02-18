@@ -93,6 +93,86 @@ func TestBuildAuthPolicyCondition_WithReadyState_ReturnsTrueCondition(t *testing
 	assert.False(t, condition.LastTransitionTime.IsZero())
 }
 
+func TestBuildAuthPolicyCondition_WithNoExistingConditions_SetsNewLastTransitionTime(t *testing.T) {
+	// 1. Arrange
+	authPolicy := createTestAuthPolicy()
+
+	// 2. Act
+	condition := statusmanager.BuildAuthPolicyCondition(
+		authPolicy,
+		statusmanager.StateReady,
+		helperfunctions.Ptr("ignored"),
+		[]metav1.Condition{},
+	)
+
+	// 3. Assert
+	assert.Equal(t, "AuthPolicy-test-policy", condition.Type)
+	assert.Equal(t, metav1.ConditionTrue, condition.Status)
+	assert.False(t, condition.LastTransitionTime.IsZero(), "LastTransitionTime should be set")
+}
+
+func TestBuildAuthPolicyCondition_WithIdenticalExistingCondition_PreservesLastTransitionTime(t *testing.T) {
+	// 1. Arrange
+	authPolicy := createTestAuthPolicy()
+	existingCondition := statusmanager.BuildAuthPolicyCondition(
+		authPolicy,
+		statusmanager.StateReady,
+		helperfunctions.Ptr("ignored"),
+		[]metav1.Condition{},
+	)
+
+	// 2. Act
+	condition := statusmanager.BuildAuthPolicyCondition(
+		authPolicy,
+		statusmanager.StateReady,
+		helperfunctions.Ptr("ignored"),
+		[]metav1.Condition{existingCondition},
+	)
+
+	// 3. Assert
+	assert.Equal(t, "AuthPolicy-test-policy", condition.Type)
+	assert.Equal(t, metav1.ConditionTrue, condition.Status)
+	assert.Equal(t, "ReconciliationSuccess", condition.Reason)
+	assert.Equal(
+		t,
+		existingCondition.LastTransitionTime,
+		condition.LastTransitionTime,
+		"LastTransitionTime should be preserved from existing condition",
+	)
+}
+
+func TestBuildAuthPolicyCondition_WithDifferentExistingCondition_UpdatesLastTransitionTime(t *testing.T) {
+	// 1. Arrange
+	authPolicy := createTestAuthPolicy()
+	existingCondition := statusmanager.BuildAuthPolicyCondition(
+		authPolicy,
+		statusmanager.StateReady,
+		helperfunctions.Ptr("ignored"),
+		[]metav1.Condition{},
+	)
+	existingCondition.Message = "Different message to force condition change"
+
+	// 2. Act
+	condition := statusmanager.BuildAuthPolicyCondition(
+		authPolicy,
+		statusmanager.StateReady,
+		helperfunctions.Ptr("ignored"),
+		[]metav1.Condition{existingCondition},
+	)
+
+	// 3. Assert
+	assert.Equal(t, "AuthPolicy-test-policy", condition.Type)
+	assert.Equal(t, metav1.ConditionTrue, condition.Status)
+	assert.Equal(t, "ReconciliationSuccess", condition.Reason)
+	assert.NotEqual(
+		t,
+		existingCondition.LastTransitionTime,
+		condition.LastTransitionTime,
+		"LastTransitionTime should be updated when condition changes",
+	)
+	assert.False(t, condition.LastTransitionTime.IsZero())
+}
+
 func TestBuildDescendantConditions_WithNoDescendants_ReturnsEmptySlice(t *testing.T) {
 	// 1. Arrange
 	descendants := []state.Descendant[client.Object]{}
@@ -202,6 +282,87 @@ func TestBuildDescendantConditions_WithMultipleDescendants_ReturnsAllConditions(
 	assert.Equal(t, metav1.ConditionUnknown, conditions[2].Status)
 }
 
+func TestBuildDescendantConditions_WithNoExistingConditions_SetsNewLastTransitionTime(t *testing.T) {
+	// 1. Arrange
+	successMsg := "Created successfully"
+	descendants := []state.Descendant[client.Object]{
+		{
+			ID:             "Secret-my-secret",
+			Object:         &v1.Secret{},
+			SuccessMessage: &successMsg,
+		},
+	}
+
+	// 2. Act
+	conditions := statusmanager.BuildDescendantConditions(descendants, []metav1.Condition{})
+
+	// 3. Assert
+	require.Len(t, conditions, 1)
+	assert.Equal(t, "Secret-my-secret", conditions[0].Type)
+	assert.False(t, conditions[0].LastTransitionTime.IsZero(), "LastTransitionTime should be set")
+}
+
+func TestBuildDescendantConditions_WithIdenticalExistingCondition_PreservesLastTransitionTime(t *testing.T) {
+	// 1. Arrange
+	successMsg := "Created successfully"
+	descendants := []state.Descendant[client.Object]{
+		{
+			ID:             "Secret-my-secret",
+			Object:         &v1.Secret{},
+			SuccessMessage: &successMsg,
+		},
+	}
+
+	existingConditions := statusmanager.BuildDescendantConditions(descendants, []metav1.Condition{})
+	require.Len(t, existingConditions, 1)
+
+	// 2. Act
+	conditions := statusmanager.BuildDescendantConditions(descendants, existingConditions)
+
+	// 3. Assert
+	require.Len(t, conditions, 1)
+	assert.Equal(t, "Secret-my-secret", conditions[0].Type)
+	assert.Equal(t, metav1.ConditionTrue, conditions[0].Status)
+	assert.Equal(
+		t,
+		existingConditions[0].LastTransitionTime,
+		conditions[0].LastTransitionTime,
+		"LastTransitionTime should be preserved from existing condition",
+	)
+	assert.False(t, conditions[0].LastTransitionTime.IsZero(), "LastTransitionTime should be set")
+}
+
+func TestBuildDescendantConditions_WithDifferentExistingCondition_UpdatesLastTransitionTime(t *testing.T) {
+	// 1. Arrange
+	successMsg := "Created successfully"
+	descendants := []state.Descendant[client.Object]{
+		{
+			ID:             "Secret-my-secret",
+			Object:         &v1.Secret{},
+			SuccessMessage: &successMsg,
+		},
+	}
+
+	existingConditions := statusmanager.BuildDescendantConditions(descendants, []metav1.Condition{})
+	require.Len(t, existingConditions, 1)
+	existingConditions[0].Message = "Different message to force condition change"
+
+	// 2. Act
+	conditions := statusmanager.BuildDescendantConditions(descendants, existingConditions)
+
+	// 3. Assert
+	require.Len(t, conditions, 1)
+	assert.Equal(t, "Secret-my-secret", conditions[0].Type)
+	assert.Equal(t, metav1.ConditionTrue, conditions[0].Status)
+	assert.NotEqual(
+		t,
+		existingConditions[0].LastTransitionTime,
+		conditions[0].LastTransitionTime,
+		"LastTransitionTime should be updated when condition changes",
+	)
+	assert.False(t, conditions[0].LastTransitionTime.IsZero(), "LastTransitionTime should be set")
+}
+
 func TestBuildMissingResourceConditions_WithNoMissingResources_ReturnsEmptySlice(t *testing.T) {
 	// 1. Arrange
 	descendants := []state.Descendant[client.Object]{
@@ -268,6 +429,83 @@ func TestBuildMissingResourceConditions_WithPartiallyMissingResources_ReturnsOnl
 	require.Len(t, conditions, 2)
 	assert.Equal(t, "ConfigMap-missing-config", conditions[0].Type)
 	assert.Equal(t, "Secret-missing-secret", conditions[1].Type)
+}
+
+func TestBuildMissingResourceConditions_WithNoExistingConditions_SetsNewLastTransitionTime(t *testing.T) {
+	// 1. Arrange
+	var descendants []state.Descendant[client.Object]
+	reconcileFuncs := []reconciliation.ReconcileAction{
+		createMockReconcileAction("Secret", "expected-secret", false),
+	}
+
+	// 2. Act
+	conditions := statusmanager.BuildMissingResourceConditions(descendants, reconcileFuncs, []metav1.Condition{})
+
+	// 3. Assert
+	require.Len(t, conditions, 1)
+	assert.Equal(t, "Secret-expected-secret", conditions[0].Type)
+	assert.False(t, conditions[0].LastTransitionTime.IsZero(), "LastTransitionTime should be set")
+}
+
+func TestBuildMissingResourceConditions_WithIdenticalExistingCondition_PreservesLastTransitionTime(t *testing.T) {
+	// 1. Arrange
+	var descendants []state.Descendant[client.Object]
+	reconcileFuncs := []reconciliation.ReconcileAction{
+		createMockReconcileAction("Secret", "expected-secret", false),
+	}
+
+	existingConditions := statusmanager.BuildMissingResourceConditions(
+		descendants,
+		reconcileFuncs,
+		[]metav1.Condition{},
+	)
+	require.Len(t, existingConditions, 1)
+
+	// 2. Act - rebuild with same data
+	conditions := statusmanager.BuildMissingResourceConditions(descendants, reconcileFuncs, existingConditions)
+
+	// 3. Assert
+	require.Len(t, conditions, 1)
+	assert.Equal(t, "Secret-expected-secret", conditions[0].Type)
+	assert.Equal(t, metav1.ConditionFalse, conditions[0].Status)
+	assert.Equal(
+		t,
+		existingConditions[0].LastTransitionTime,
+		conditions[0].LastTransitionTime,
+		"LastTransitionTime should be preserved from existing condition",
+	)
+	assert.False(t, conditions[0].LastTransitionTime.IsZero(), "LastTransitionTime should be set")
+}
+
+func TestBuildMissingResourceConditions_WithDifferentExistingCondition_UpdatesLastTransitionTime(t *testing.T) {
+	// 1. Arrange
+	var descendants []state.Descendant[client.Object]
+	reconcileFuncs := []reconciliation.ReconcileAction{
+		createMockReconcileAction("Secret", "expected-secret", false),
+	}
+
+	existingConditions := statusmanager.BuildMissingResourceConditions(
+		descendants,
+		reconcileFuncs,
+		[]metav1.Condition{},
+	)
+	require.Len(t, existingConditions, 1)
+	existingConditions[0].Message = "Different message to force condition change"
+
+	// 2. Act - rebuild with different data
+	conditions := statusmanager.BuildMissingResourceConditions(descendants, reconcileFuncs, existingConditions)
+
+	// 3. Assert
+	require.Len(t, conditions, 1)
+	assert.Equal(t, "Secret-expected-secret", conditions[0].Type)
+	assert.Equal(t, metav1.ConditionFalse, conditions[0].Status)
+	assert.NotEqual(
+		t,
+		existingConditions[0].LastTransitionTime,
+		conditions[0].LastTransitionTime,
+		"LastTransitionTime should be updated when condition changes",
+	)
+	assert.False(t, conditions[0].LastTransitionTime.IsZero(), "LastTransitionTime should be set")
 }
 
 func TestBuildConditions_IncludesAllConditionTypes(t *testing.T) {
