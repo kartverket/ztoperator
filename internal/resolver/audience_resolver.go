@@ -27,6 +27,9 @@ func ResolveAudiences(
 			return nil, errors.New("cannot define an audience as both string and ConfigMap/Secret ref")
 		}
 		if audience.Value != nil {
+			if *audience.Value == "" {
+				return nil, errors.New("audience value cannot be empty")
+			}
 			resolvedAudiences = append(resolvedAudiences, *audience.Value)
 		} else if audience.ValueFrom != nil {
 			resolvedAudienceRef, resolvedAudienceRefErr := resolveAudienceRef(
@@ -36,7 +39,7 @@ func ResolveAudiences(
 				*audience.ValueFrom,
 			)
 			if resolvedAudienceRefErr != nil {
-				return nil, errors.New("")
+				return nil, fmt.Errorf("failed to resolve audience reference: %w", resolvedAudienceRefErr)
 			}
 			resolvedAudiences = append(resolvedAudiences, *resolvedAudienceRef)
 		}
@@ -63,7 +66,17 @@ func resolveAudienceRef(
 			return nil, fmt.Errorf("configmap %s/%s was not found", namespace, valueFrom.ConfigMapKeyRef.Name)
 		}
 
-		return helperfunctions.Ptr(configMap.Data[valueFrom.ConfigMapKeyRef.Key]), nil
+		value := configMap.Data[valueFrom.ConfigMapKeyRef.Key]
+		if value == "" {
+			return nil, fmt.Errorf(
+				"audience value from configmap %s/%s key %s is empty or missing",
+				namespace,
+				valueFrom.ConfigMapKeyRef.Name,
+				valueFrom.ConfigMapKeyRef.Key,
+			)
+		}
+
+		return helperfunctions.Ptr(value), nil
 	}
 	if valueFrom.SecretKeyRef == nil {
 		return nil, errors.New("both configMapKeyRef and secretKeyRef cannot be nil")
@@ -78,5 +91,15 @@ func resolveAudienceRef(
 		return nil, fmt.Errorf("secret %s/%s was not found", namespace, valueFrom.SecretKeyRef.Name)
 	}
 
-	return helperfunctions.Ptr(string(secret.Data[valueFrom.SecretKeyRef.Key])), nil
+	value := string(secret.Data[valueFrom.SecretKeyRef.Key])
+	if value == "" {
+		return nil, fmt.Errorf(
+			"audience value from secret %s/%s key %s is empty or missing",
+			namespace,
+			valueFrom.SecretKeyRef.Name,
+			valueFrom.SecretKeyRef.Key,
+		)
+	}
+
+	return helperfunctions.Ptr(value), nil
 }

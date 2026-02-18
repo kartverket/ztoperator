@@ -131,6 +131,8 @@ spec:
                   - message: one audience cannot be defined from both 'value' and
                       'valueFrom'
                     rule: '!(has(self.value) && has(self.valueFrom))'
+                  - message: field 'value' cannot be empty string
+                    rule: '!has(self.value) || size(self.value) > 0'
                 type: array
               audience:
                 description: |-
