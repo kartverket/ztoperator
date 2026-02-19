@@ -1,0 +1,16 @@
+resources:
+- deployment.yaml
+- leader-election-role.yaml
+- leader-election-rolebinding.yaml
+- netpol.yaml
+- pdb.yaml
+- serviceaccount.yaml
+- clusterrolebinding.yaml
+- service-entry.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+- name: ztoperator
+- name: controller
+  newName: ztoperator
+  newTag: latest
