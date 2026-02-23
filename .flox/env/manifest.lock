@@ -14,6 +14,9 @@
       "gum": {
         "pkg-path": "gum"
       },
+      "hurl": {
+        "pkg-path": "hurl"
+      },
       "k9s": {
         "pkg-path": "k9s"
       },
@@ -410,6 +413,126 @@
       ],
       "outputs": {
         "out": "/nix/store/xrp3rs1p0r7qd5q0ii2zn895f24q7s4m-gum-0.17.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "hurl",
+      "broken": false,
+      "derivation": "/nix/store/6yn6lvp10dpvs2gayssxzr2q3r40bggf-hurl-7.0.0.drv",
+      "description": "Command line tool that performs HTTP requests defined in a simple plain text format",
+      "install_id": "hurl",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=544961dfcce86422ba200ed9a0b00dd4b1486ec5",
+      "name": "hurl-7.0.0",
+      "pname": "hurl",
+      "rev": "544961dfcce86422ba200ed9a0b00dd4b1486ec5",
+      "rev_count": 878042,
+      "rev_date": "2025-10-15T10:27:37Z",
+      "scrape_date": "2025-10-17T03:45:20.503993Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "7.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/cxdq4xdd20260kpzfk43dxpraqfp23rs-hurl-7.0.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "hurl",
+      "broken": false,
+      "derivation": "/nix/store/kya50fkm8n4l8gg61r21xr6a706lbsx9-hurl-7.0.0.drv",
+      "description": "Command line tool that performs HTTP requests defined in a simple plain text format",
+      "install_id": "hurl",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=544961dfcce86422ba200ed9a0b00dd4b1486ec5",
+      "name": "hurl-7.0.0",
+      "pname": "hurl",
+      "rev": "544961dfcce86422ba200ed9a0b00dd4b1486ec5",
+      "rev_count": 878042,
+      "rev_date": "2025-10-15T10:27:37Z",
+      "scrape_date": "2025-10-17T04:19:14.219474Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "7.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/8hfaq4fwbhrxm2vp9yxn3mqhdhclplvi-hurl-7.0.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "hurl",
+      "broken": false,
+      "derivation": "/nix/store/kvpd2lw06jrccx4450lj9xwh3vpj0i2q-hurl-7.0.0.drv",
+      "description": "Command line tool that performs HTTP requests defined in a simple plain text format",
+      "install_id": "hurl",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=544961dfcce86422ba200ed9a0b00dd4b1486ec5",
+      "name": "hurl-7.0.0",
+      "pname": "hurl",
+      "rev": "544961dfcce86422ba200ed9a0b00dd4b1486ec5",
+      "rev_count": 878042,
+      "rev_date": "2025-10-15T10:27:37Z",
+      "scrape_date": "2025-10-17T04:52:00.556935Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "7.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/p8w1vy2iqgwxlp2s6id1sj1xyg415w66-hurl-7.0.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "hurl",
+      "broken": false,
+      "derivation": "/nix/store/9g1ym3r1vqnhfw52yrx2nnxx9mk9nakk-hurl-7.0.0.drv",
+      "description": "Command line tool that performs HTTP requests defined in a simple plain text format",
+      "install_id": "hurl",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=544961dfcce86422ba200ed9a0b00dd4b1486ec5",
+      "name": "hurl-7.0.0",
+      "pname": "hurl",
+      "rev": "544961dfcce86422ba200ed9a0b00dd4b1486ec5",
+      "rev_count": 878042,
+      "rev_date": "2025-10-15T10:27:37Z",
+      "scrape_date": "2025-10-17T05:27:35.257708Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "7.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/alj3z38v9iwm8vyzl02idz67a4j2lxdn-hurl-7.0.0"
       },
       "system": "x86_64-linux",
       "group": "toplevel",

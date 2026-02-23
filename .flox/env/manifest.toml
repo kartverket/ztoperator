@@ -27,6 +27,7 @@ docker.version = "28.4.0"
 cloud-provider-kind.pkg-path = "cloud-provider-kind"
 cloud-provider-kind.version = "0.6.0"
 kubefwd.pkg-path = "kubefwd"
+hurl.pkg-path = "hurl"
 
 
 ## Environment Variables ---------------------------------------------
