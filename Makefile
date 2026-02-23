@@ -414,11 +414,11 @@ expose-ingress: ## Expose istio ingress gateway on localhost:8443
 
 .PHONY: isingressready
 isingressready: ## Check if venv is activated and Istio ingress gateway is exposed on localhost:8443
-	@if [ -z "$$VIRTUAL_ENV" ]; then \
-		echo "❌ Python venv is not activated. Please activate your virtual environment with 'make virtualenv'."; \
+	@if [ ! -d "$(VENV)" ]; then \
+		echo "❌ Python venv does not exist. Please create it with 'make virtualenv'."; \
 		exit 1; \
 	else \
-		echo "✅ Python venv is activated."; \
+		echo "✅ Python venv exists."; \
 	fi
 	@if nc -z localhost 8443; then \
 		echo "✅ Istio ingress gateway is exposed on localhost:8443."; \
