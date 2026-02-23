@@ -43,8 +43,11 @@ INTRO_MESSAGE = "Ztoperator environment activated"
 on-activate = """
   set -e  # Exit on any error
 
-  # Setup local cluster with dependencies
-  make clean local
+  # Check if kind-ztoperator cluster exists
+  if ! kind get clusters | grep -q '^ztoperator$'; then
+    # Setup local cluster with dependencies
+    make clean local
+  fi
 """
 
 
