@@ -1,0 +1,24 @@
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: ztoperator-egress
+  namespace: ztoperator-system
+spec:
+  exportTo:
+    - .
+    - istio-system
+    - istio-gateways
+  hosts:
+    - login.microsoftonline.com
+    - idporten.no
+    - test.idporten.no
+    - maskinporten.no
+    - test.maskinporten.no
+    - mock-oauth2.atgcp1-sandbox.kartverket.cloud
+    - test.ansattporten.no
+    - ansattporten.no
+  ports:
+    - name: https
+      number: 443
+      protocol: HTTPS
+  resolution: DNS

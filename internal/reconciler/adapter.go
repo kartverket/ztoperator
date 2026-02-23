@@ -109,7 +109,7 @@ func reconcileResource[T client.Object](
 	rLog.Debug(fmt.Sprintf("%s %s/%s exists", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()))
 	rLog.Debug(
 		fmt.Sprintf(
-			"Determing if %s %s/%s should be updated",
+			"Determining if %s %s/%s should be updated",
 			kind,
 			deReferencedDesired.GetNamespace(),
 			deReferencedDesired.GetName(),
@@ -140,7 +140,14 @@ func reconcileResource[T client.Object](
 			return ctrl.Result{}, updateErr
 		}
 	} else {
-		rLog.Debug(fmt.Sprintf("Current %s %s/%s == desired. No update needed.", kind, deReferencedDesired.GetNamespace(), deReferencedDesired.GetName()))
+		rLog.Debug(
+			fmt.Sprintf(
+				"Current %s %s/%s == desired. No update needed.",
+				kind,
+				deReferencedDesired.GetNamespace(),
+				deReferencedDesired.GetName(),
+			),
+		)
 	}
 
 	successMessage := fmt.Sprintf("Successfully generated %s %s/%s", kind, current.GetNamespace(), current.GetName())

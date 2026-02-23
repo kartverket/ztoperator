@@ -143,7 +143,7 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:  scheme,
 		Metrics: metricsServerOptions,
-		//WebhookServer:          webhookServer,
+		// WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "78810f72.kartverket.no",
@@ -172,7 +172,7 @@ func main() {
 	if err = (&controller.AuthPolicyReconciler{
 		Client:                    mgr.GetClient(),
 		Scheme:                    mgr.GetScheme(),
-		Recorder:                  mgr.GetEventRecorderFor("authpolicy-controller"),
+		Recorder:                  mgr.GetEventRecorder("authpolicy-controller"),
 		DiscoveryDocumentResolver: rest.NewDefaultDiscoveryDocumentResolver(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthPolicy")
@@ -197,7 +197,11 @@ func main() {
 	ctx := ctrl.SetupSignalHandler()
 	go func() {
 		setupLog.Info("starting periodic custom metrics collector")
-		if startingCustomMetricsCollector := metrics.StartAuthPolicyCollector(mgr.GetClient(), mgr.GetCache(), mgr.Elected()); startingCustomMetricsCollector != nil {
+		if startingCustomMetricsCollector := metrics.StartAuthPolicyCollector(
+			mgr.GetClient(),
+			mgr.GetCache(),
+			mgr.Elected(),
+		); startingCustomMetricsCollector != nil {
 			setupLog.Error(startingCustomMetricsCollector, "problem starting custom metrics collector")
 			os.Exit(1)
 		}

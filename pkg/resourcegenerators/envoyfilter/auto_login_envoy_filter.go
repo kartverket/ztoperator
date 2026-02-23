@@ -22,7 +22,8 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 	idpAsParsedURL, err := helperfunctions.GetParsedURL(scope.IdentityProviderUris.TokenURI)
 	if err != nil {
 		panic(
-			"failed to get issuer hostname from issuer URI " + scope.IdentityProviderUris.IssuerURI + " due to the following error: " + err.Error(),
+			"failed to get issuer hostname from issuer URI " + scope.IdentityProviderUris.IssuerURI +
+				" due to the following error: " + err.Error(),
 		)
 	}
 	var oAuthClusterConfigPatchValue map[string]interface{}
@@ -65,7 +66,8 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 		)
 	}
 
-	var configPatches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
+	// Pre-allocating the slice with a length of 3 since we know there will be exactly 3 patches.
+	configPatches := make([]*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch, 0, 3)
 
 	configPatches = append(configPatches, &v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: v1alpha3.EnvoyFilter_HTTP_FILTER,

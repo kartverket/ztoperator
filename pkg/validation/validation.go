@@ -83,7 +83,8 @@ func (t authPolicyValidatorType) String() string {
 
 func podAnnotationErrorMessageSuffix() string {
 	return fmt.Sprintf(
-		"see https://github.com/kartverket/ztoperator/blob/%s/README.md#-mounting-oauth-credentials-in-the-istio-sidecar on how to do it correctly",
+		"see https://github.com/kartverket/ztoperator/blob/%s/README.md#-mounting-oauth-credentials-in-the-istio-sidecar "+
+			"on how to do it correctly",
 		config.Get().GitRef,
 	)
 }
@@ -216,9 +217,6 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 		)
 	}
 
-	var envoySecretVolumeMounts []istioUserVolumeMount
-	var userVolumes []istioUserVolume
-
 	youngestPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			CreationTimestamp: metav1.Time{},
@@ -235,7 +233,8 @@ func validatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 	if collectIstioMountsErr != nil {
 		return collectIstioMountsErr
 	}
-	userVolumes = append(userVolumes, volumes...)
+	userVolumes := volumes
+	envoySecretVolumeMounts := make([]istioUserVolumeMount, 0, len(volumeMounts))
 	for _, volumeMount := range volumeMounts {
 		if volumeMount.MountPath == configpatch.IstioCredentialsDirectory {
 			envoySecretVolumeMounts = append(envoySecretVolumeMounts, volumeMount)

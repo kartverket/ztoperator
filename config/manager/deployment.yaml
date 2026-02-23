@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ztoperator
+  name: ztoperator
+  namespace: ztoperator-system
+spec:
+  replicas: 2
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app: ztoperator
+  template:
+    metadata:
+      labels:
+        app: ztoperator
+    spec:
+      automountServiceAccountToken: true
+      containers:
+        - args:
+            - -d
+            - -leader-elect
+            - -metrics-bind-address=0.0.0.0:8181
+            - -metrics-secure=false
+          envFrom:
+            - secretRef:
+                name: ztoperator-env
+          image: ztoperator:latest
+          imagePullPolicy: Never
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: probes
+          name: ztoperator
+          ports:
+            - containerPort: 8181
+              name: metrics
+            - containerPort: 8081
+              name: probes
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: probes
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 10m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              add:
+                - NET_BIND_SERVICE
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 65532
+            runAsNonRoot: true
+            runAsUser: 65532
+            seccompProfile:
+              type: RuntimeDefault
+      imagePullSecrets:
+        - name: github-auth
+      priorityClassName: skip-critical
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: ztoperator

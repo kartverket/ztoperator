@@ -27,7 +27,8 @@ var (
 			Name:      "info",
 			Namespace: "ztoperator",
 			Subsystem: "authpolicy",
-			Help:      "AuthPolicy info: 1 per policy with labels name, namespace, state, owner, issuer, enabled, auto_login_enabled, protected_pod",
+			Help: "AuthPolicy info: 1 per policy with labels name, namespace, " +
+				"state, owner, issuer, enabled, auto_login_enabled, protected_pod",
 		},
 		[]string{
 			"name",

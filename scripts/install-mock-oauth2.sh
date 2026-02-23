@@ -1,6 +1,8 @@
 #!/bin/bash
 
+KUBECONTEXT=${KUBECONTEXT:-"kind-ztoperator"}
 MOCK_OAUTH2_SERVER_VERSION=${MOCK_OAUTH2_SERVER_VERSION:-"2.2.1"}
+KUBECTL_BIN="${KUBECTL_BIN:-./bin/kubectl}"
 
 echo -e "🤞 Retrieving content from mock-oauth2-config.json..."
 JSON_CONTENT=$(cat "$MOCK_OAUTH2_CONFIG")
@@ -58,10 +60,10 @@ spec:
 EOF
 )"
 
-kubectl apply -f <(echo "$DEPLOYMENT") --context "$KUBECONTEXT"
+"${KUBECTL_BIN}" apply -f <(echo "$DEPLOYMENT") --context "$KUBECONTEXT"
 
 while true; do
-  SUMMARY_STATUS=$(kubectl get application.skiperator.kartverket.no/mock-oauth2 -n auth -o jsonpath='{.status.summary.status}')
+  SUMMARY_STATUS=$("${KUBECTL_BIN}" get application.skiperator.kartverket.no/mock-oauth2 -n auth -o jsonpath='{.status.summary.status}')
 
   if [[ "$SUMMARY_STATUS" == "Synced" ]]; then
     echo "✅ Application summary status is Synced."
@@ -76,7 +78,7 @@ while true; do
   fi
 done
 
-kubectl wait --for=condition=InternalRulesValid=True application.skiperator.kartverket.no/mock-oauth2 -n auth --timeout=30s || (echo -e "❌  Error: accessPolicies for 'mock-oauth2' remain in InvalidConfig state." && exit 1)
+"${KUBECTL_BIN}" wait --for=condition=InternalRulesValid=True application.skiperator.kartverket.no/mock-oauth2 -n auth --timeout=30s || (echo -e "❌  Error: accessPolicies for 'mock-oauth2' remain in InvalidConfig state." && exit 1)
 
-kubectl wait pod --for=create --timeout=30s -n auth -l app=mock-oauth2 || (echo -e "❌  Error deploying 'mock-oauth2'." && exit 1)
-kubectl wait pod --for=condition=Ready --timeout=30s -n auth -l app=mock-oauth2 || (echo -e "❌  Error deploying 'mock-oauth2'." && exit 1)
+"${KUBECTL_BIN}" wait pod --for=create --timeout=30s -n auth -l app=mock-oauth2 || (echo -e "❌  Error deploying 'mock-oauth2'." && exit 1)
+"${KUBECTL_BIN}" wait pod --for=condition=Ready --timeout=30s -n auth -l app=mock-oauth2 || (echo -e "❌  Error deploying 'mock-oauth2'." && exit 1)

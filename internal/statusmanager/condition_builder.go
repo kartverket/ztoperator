@@ -85,7 +85,7 @@ func BuildDescendantConditions(
 	descendants []state.Descendant[client.Object],
 	existingConditions []metav1.Condition,
 ) []metav1.Condition {
-	var conditions []metav1.Condition
+	conditions := make([]metav1.Condition, 0, len(descendants))
 
 	for _, d := range descendants {
 		condition := metav1.Condition{

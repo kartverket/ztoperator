@@ -15,6 +15,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const forceConditionChangeMessage = "Different message to force condition change"
+const createdSuccessfullyMessage = "Created successfully"
+
 func TestBuildAuthPolicyCondition_WithInvalidState_ReturnsFalseCondition_WithErrorMessage(t *testing.T) {
 	// 1. Arrange
 	authPolicy := createTestAuthPolicy()
@@ -150,7 +153,7 @@ func TestBuildAuthPolicyCondition_WithDifferentExistingCondition_UpdatesLastTran
 		helperfunctions.Ptr("ignored"),
 		[]metav1.Condition{},
 	)
-	existingCondition.Message = "Different message to force condition change"
+	existingCondition.Message = forceConditionChangeMessage
 
 	// 2. Act
 	condition := statusmanager.BuildAuthPolicyCondition(
@@ -284,7 +287,7 @@ func TestBuildDescendantConditions_WithMultipleDescendants_ReturnsAllConditions(
 
 func TestBuildDescendantConditions_WithNoExistingConditions_SetsNewLastTransitionTime(t *testing.T) {
 	// 1. Arrange
-	successMsg := "Created successfully"
+	successMsg := createdSuccessfullyMessage
 	descendants := []state.Descendant[client.Object]{
 		{
 			ID:             "Secret-my-secret",
@@ -304,7 +307,7 @@ func TestBuildDescendantConditions_WithNoExistingConditions_SetsNewLastTransitio
 
 func TestBuildDescendantConditions_WithIdenticalExistingCondition_PreservesLastTransitionTime(t *testing.T) {
 	// 1. Arrange
-	successMsg := "Created successfully"
+	successMsg := createdSuccessfullyMessage
 	descendants := []state.Descendant[client.Object]{
 		{
 			ID:             "Secret-my-secret",
@@ -334,7 +337,7 @@ func TestBuildDescendantConditions_WithIdenticalExistingCondition_PreservesLastT
 
 func TestBuildDescendantConditions_WithDifferentExistingCondition_UpdatesLastTransitionTime(t *testing.T) {
 	// 1. Arrange
-	successMsg := "Created successfully"
+	successMsg := createdSuccessfullyMessage
 	descendants := []state.Descendant[client.Object]{
 		{
 			ID:             "Secret-my-secret",
@@ -345,7 +348,7 @@ func TestBuildDescendantConditions_WithDifferentExistingCondition_UpdatesLastTra
 
 	existingConditions := statusmanager.BuildDescendantConditions(descendants, []metav1.Condition{})
 	require.Len(t, existingConditions, 1)
-	existingConditions[0].Message = "Different message to force condition change"
+	existingConditions[0].Message = forceConditionChangeMessage
 
 	// 2. Act
 	conditions := statusmanager.BuildDescendantConditions(descendants, existingConditions)
@@ -490,7 +493,7 @@ func TestBuildMissingResourceConditions_WithDifferentExistingCondition_UpdatesLa
 		[]metav1.Condition{},
 	)
 	require.Len(t, existingConditions, 1)
-	existingConditions[0].Message = "Different message to force condition change"
+	existingConditions[0].Message = forceConditionChangeMessage
 
 	// 2. Act - rebuild with different data
 	conditions := statusmanager.BuildMissingResourceConditions(descendants, reconcileFuncs, existingConditions)
@@ -513,7 +516,7 @@ func TestBuildConditions_IncludesAllConditionTypes(t *testing.T) {
 	authPolicy := createTestAuthPolicy()
 	reconciliationState := statusmanager.StateReady
 
-	successMsg := "Created successfully"
+	successMsg := createdSuccessfullyMessage
 	descendants := []state.Descendant[client.Object]{
 		{
 			ID:             "Secret-oauth-secret",

@@ -23,7 +23,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sErrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -33,7 +33,7 @@ import (
 type AuthPolicyReconciler struct {
 	client.Client
 	Scheme                    *runtime.Scheme
-	Recorder                  record.EventRecorder
+	Recorder                  events.EventRecorder
 	DiscoveryDocumentResolver rest.DiscoveryDocumentResolver
 }
 
@@ -64,40 +64,42 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	authPolicy := new(ztoperatorv1alpha1.AuthPolicy)
 
-	rLog.Info(fmt.Sprintf("Received reconcile request for AuthPolicy with name %s", req.NamespacedName.String()))
+	rLog.Info(fmt.Sprintf("Received reconcile request for AuthPolicy with name %s", req.String()))
 
-	if err := r.Client.Get(ctx, req.NamespacedName, authPolicy); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, authPolicy); err != nil {
 		if apierrors.IsNotFound(err) {
 			rLog.Debug(
-				fmt.Sprintf("AuthPolicy with name %s not found. Probably a delete.", req.NamespacedName.String()),
+				fmt.Sprintf("AuthPolicy with name %s not found. Probably a delete.", req.String()),
 			)
 			metrics.DeleteAuthPolicyInfo(req.NamespacedName)
 			return reconcile.Result{}, nil
 		}
-		rLog.Error(err, fmt.Sprintf("Failed to get AuthPolicy with name %s", req.NamespacedName.String()))
+		rLog.Error(err, fmt.Sprintf("Failed to get AuthPolicy with name %s", req.String()))
 		return reconcile.Result{}, err
 	}
 
 	r.Recorder.Eventf(
 		authPolicy,
+		nil,
 		"Normal",
 		"ReconcileStarted",
-		fmt.Sprintf("AuthPolicy with name %s started.", req.NamespacedName.String()),
+		"Reconcile",
+		"AuthPolicy with name %s started.", req.String(),
 	)
-	rLog.Debug(fmt.Sprintf("AuthPolicy with name %s found", req.NamespacedName.String()))
+	rLog.Debug(fmt.Sprintf("AuthPolicy with name %s found", req.String()))
 
 	authPolicy.InitializeStatus()
 	originalAuthPolicy := authPolicy.DeepCopy()
 
 	if !authPolicy.DeletionTimestamp.IsZero() {
-		rLog.Info(fmt.Sprintf("Deleting AuthPolicy with name %s", req.NamespacedName.String()))
+		rLog.Info(fmt.Sprintf("Deleting AuthPolicy with name %s", req.String()))
 		metrics.DeleteAuthPolicyInfo(req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 
 	scope, err := resolveAuthPolicy(ctx, r.Client, authPolicy, r.DiscoveryDocumentResolver)
 	if err != nil {
-		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.NamespacedName.String()))
+		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))
 		authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
 		authPolicy.Status.Message = err.Error()
 		updateStatusOnResolveFailedErr := statusmanager.UpdateStatus(ctx, r.Client, *authPolicy)
@@ -130,17 +132,22 @@ func (r *AuthPolicyReconciler) doReconcile(
 		if err != nil {
 			r.Recorder.Eventf(
 				&scope.AuthPolicy,
+				nil,
 				"Warning",
 				fmt.Sprintf("%sReconcileFailed", rf.GetResourceKind()),
-				fmt.Sprintf(
-					"%s with name %s failed during reconciliation.",
-					rf.GetResourceKind(),
-					rf.GetResourceName(),
-				),
+				"Reconcile",
+				"%s with name %s failed during reconciliation.", rf.GetResourceKind(), rf.GetResourceName(),
 			)
 			errs = append(errs, err)
 		} else {
-			r.Recorder.Eventf(&scope.AuthPolicy, "Normal", fmt.Sprintf("%sReconciledSuccessfully", rf.GetResourceKind()), fmt.Sprintf("%s with name %s reconciled successfully.", rf.GetResourceKind(), rf.GetResourceName()))
+			r.Recorder.Eventf(
+				&scope.AuthPolicy,
+				nil,
+				"Normal",
+				fmt.Sprintf("%sReconciledSuccessfully", rf.GetResourceKind()),
+				"Reconcile",
+				"%s with name %s reconciled successfully.", rf.GetResourceKind(), rf.GetResourceName(),
+			)
 		}
 		if len(errs) > 0 {
 			continue
@@ -149,10 +156,24 @@ func (r *AuthPolicyReconciler) doReconcile(
 	}
 
 	if len(errs) > 0 {
-		r.Recorder.Eventf(&scope.AuthPolicy, "Warning", "ReconcileFailed", "AuthPolicy failed during reconciliation")
+		r.Recorder.Eventf(
+			&scope.AuthPolicy,
+			nil,
+			"Warning",
+			"ReconcileFailed",
+			"Reconcile",
+			"AuthPolicy failed during reconciliation",
+		)
 		return ctrl.Result{}, k8sErrors.NewAggregate(errs)
 	}
-	r.Recorder.Eventf(&scope.AuthPolicy, "Normal", "ReconcileSuccess", "AuthPolicy reconciled successfully")
+	r.Recorder.Eventf(
+		&scope.AuthPolicy,
+		nil,
+		"Normal",
+		"ReconcileSuccess",
+		"Reconcile",
+		"AuthPolicy reconciled successfully",
+	)
 	return result, nil
 }
 

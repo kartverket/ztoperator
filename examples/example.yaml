@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test
+  labels:
+    istio.io/rev: default
+---
+apiVersion: skiperator.kartverket.no/v1alpha1
+kind: Application
+metadata:
+  name: app
+  namespace: test
+spec:
+  podSettings:
+    annotations:
+      sidecar.istio.io/logLevel: 'debug'
+      sidecar.istio.io/userVolume: '[
+        {
+          "name": "secret",
+          "secret": {
+            "secretName": "auth-policy-envoy-secret"
+          }
+        }        
+      ]'
+      sidecar.istio.io/userVolumeMount: '[
+        {
+          "name": "secret",
+          "mountPath": "/etc/istio/config",
+          "readonly": true
+        }        
+      ]'
+  image: hashicorp/http-echo:latest
+  port: 5678
+  replicas: 1
+  ingresses:
+    - demo.localdev
+  accessPolicy:
+    outbound:
+      rules:
+        - application: mock-oauth2
+          namespace: auth
+---
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+  namespace: test
+spec:
+  selector:
+    matchLabels:
+      app: app
+  enabled: true
+  wellKnownURI: http://mock-oauth2:8080/ztoperator/.well-known/openid-configuration
+  autoLogin:
+    enabled: true
+    scopes:
+      - openid
+  oAuthCredentials:
+    clientIDKey: CLIENT_ID
+    clientSecretKey: CLIENT_SECRET
+    secretRef: oauth-secret
+---
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: oauth-secret
+  namespace: test
+data:
+  CLIENT_ID: ZW50cmFpZF9zZXJ2ZXI=
+  CLIENT_SECRET: ZHVtbXlfc2VjcmV0

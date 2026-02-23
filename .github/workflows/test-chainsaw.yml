@@ -1,0 +1,27 @@
+name: Run Chainsaw Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Setup Hurl
+        uses: gacts/install-hurl@8c80c69c281b4b618858de1e1a9ce931e9e61c97
+
+      - name: Setup local cluster, deploy Ztoperator, make virtualenv, expose ingress and run chainsaw tests
+        run: |
+          make local deploy virtualenv expose-ingress chainsaw-test-remote

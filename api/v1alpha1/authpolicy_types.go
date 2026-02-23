@@ -41,7 +41,7 @@ type AuthPolicySpec struct {
 	// AllowedAudiences defines the allowed audience (`aud`) values in the JWT.
 	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
 	//
-	// The normative behaviour for an OAuth / OIDC-compliant identity provider is to validate the presense of one or more client IDs as allowed audiences.
+	// The normative behaviour for an OAuth / OIDC-compliant identity provider is to validate the presence of one or more client IDs as allowed audiences.
 	//
 	// +kubebuilder:validation:Optional
 	AllowedAudiences []AllowedAudience `json:"allowedAudiences,omitempty"`
@@ -404,7 +404,7 @@ func (ap *AuthPolicy) InitializeStatus() {
 	if ap.Status.Conditions == nil {
 		ap.Status.Conditions = []metav1.Condition{}
 	}
-	ap.Status.ObservedGeneration = ap.ObjectMeta.GetGeneration()
+	ap.Status.ObservedGeneration = ap.GetGeneration()
 	ap.Status.Ready = false
 	ap.Status.Phase = PhasePending
 }
@@ -426,7 +426,8 @@ func (ap *AuthPolicy) GetIgnoreAuthRequestMatchers() []RequestMatcher {
 }
 
 func (ap *AuthPolicy) GetAuthorizedPaths() []string {
-	var authorizedPaths []string
+	matchers := ap.GetRequireAuthRequestMatchers()
+	authorizedPaths := make([]string, 0, len(matchers))
 	for _, requestMatcher := range ap.GetRequireAuthRequestMatchers() {
 		authorizedPaths = append(authorizedPaths, requestMatcher.Paths...)
 	}

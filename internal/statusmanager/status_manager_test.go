@@ -14,7 +14,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -182,7 +182,7 @@ func TestUpdateAuthPolicyStatus_WithNoStatusChange_DoesNotUpdate(t *testing.T) {
 		WithStatusSubresource(authPolicy).
 		Build()
 
-	fakeRecorder := record.NewFakeRecorder(10)
+	fakeRecorder := events.NewFakeRecorder(10)
 
 	scope := &state.Scope{
 		AuthPolicy:    *authPolicy,
@@ -195,17 +195,17 @@ func TestUpdateAuthPolicyStatus_WithNoStatusChange_DoesNotUpdate(t *testing.T) {
 	statusmanager.UpdateAuthPolicyStatus(ctx, k8sClient, fakeRecorder, scope, originalAuthPolicy, reconcileActions)
 
 	// 3. Assert
-	// Verify no status update events were recorded (only StatusUpdateStarted)
+	// Verify no status update recordedEvents were recorded (only StatusUpdateStarted)
 	close(fakeRecorder.Events)
-	var events []string
+	recordedEvents := make([]string, 0, len(fakeRecorder.Events))
 	for event := range fakeRecorder.Events {
-		events = append(events, event)
+		recordedEvents = append(recordedEvents, event)
 	}
 
 	// Should only have StatusUpdateStarted event, no StatusUpdateSuccess
-	assert.Len(t, events, 1)
-	assert.Contains(t, events[0], "StatusUpdateStarted")
-	assert.NotContains(t, events[0], "StatusUpdateSuccess")
+	assert.Len(t, recordedEvents, 1)
+	assert.Contains(t, recordedEvents[0], "StatusUpdateStarted")
+	assert.NotContains(t, recordedEvents[0], "StatusUpdateSuccess")
 }
 
 func TestUpdateAuthPolicyStatus_WithSuccessfulStatusChange_RecordsNormalEvent(t *testing.T) {
@@ -224,7 +224,7 @@ func TestUpdateAuthPolicyStatus_WithSuccessfulStatusChange_RecordsNormalEvent(t 
 		WithStatusSubresource(authPolicy).
 		Build()
 
-	fakeRecorder := record.NewFakeRecorder(10)
+	fakeRecorder := events.NewFakeRecorder(10)
 
 	// Create scope that will result in Ready state
 	successMsg := "Created"
@@ -248,15 +248,15 @@ func TestUpdateAuthPolicyStatus_WithSuccessfulStatusChange_RecordsNormalEvent(t 
 
 	// 3. Assert
 	close(fakeRecorder.Events)
-	var events []string
+	recordedEvents := make([]string, 0, len(fakeRecorder.Events))
 	for event := range fakeRecorder.Events {
-		events = append(events, event)
+		recordedEvents = append(recordedEvents, event)
 	}
 
 	// Should have StatusUpdateStarted and StatusUpdateSuccess
-	assert.Len(t, events, 2)
-	assert.Contains(t, events[0], "Normal StatusUpdateStarted")
-	assert.Contains(t, events[1], "Normal StatusUpdateSuccess")
+	assert.Len(t, recordedEvents, 2)
+	assert.Contains(t, recordedEvents[0], "Normal StatusUpdateStarted")
+	assert.Contains(t, recordedEvents[1], "Normal StatusUpdateSuccess")
 
 	// Verify status was actually updated
 	updated := &ztoperatorv1alpha1.AuthPolicy{}
@@ -280,7 +280,7 @@ func TestUpdateAuthPolicyStatus_WithFailedStatusUpdate_RecordsWarningEvent(t *te
 		WithScheme(scheme).
 		Build()
 
-	fakeRecorder := record.NewFakeRecorder(10)
+	fakeRecorder := events.NewFakeRecorder(10)
 
 	scope := &state.Scope{
 		AuthPolicy:    *authPolicy,
@@ -294,15 +294,15 @@ func TestUpdateAuthPolicyStatus_WithFailedStatusUpdate_RecordsWarningEvent(t *te
 
 	// 3. Assert
 	close(fakeRecorder.Events)
-	var events []string
+	recordedEvents := make([]string, 0, len(fakeRecorder.Events))
 	for event := range fakeRecorder.Events {
-		events = append(events, event)
+		recordedEvents = append(recordedEvents, event)
 	}
 
 	// Should have StatusUpdateStarted and StatusUpdateFailed
-	assert.Len(t, events, 2)
-	assert.Contains(t, events[0], "Normal StatusUpdateStarted")
-	assert.Contains(t, events[1], "Warning StatusUpdateFailed")
+	assert.Len(t, recordedEvents, 2)
+	assert.Contains(t, recordedEvents[0], "Normal StatusUpdateStarted")
+	assert.Contains(t, recordedEvents[1], "Warning StatusUpdateFailed")
 }
 
 func createTestAuthPolicyForStatusManager() *ztoperatorv1alpha1.AuthPolicy {

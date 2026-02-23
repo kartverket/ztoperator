@@ -9,7 +9,7 @@ import (
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -27,7 +27,7 @@ const (
 func UpdateAuthPolicyStatus(
 	ctx context.Context,
 	k8sClient client.Client,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	scope *state.Scope,
 	originalAuthPolicy *ztoperatorv1alpha1.AuthPolicy,
 	reconcileActions []reconciliation.ReconcileAction,
@@ -35,7 +35,13 @@ func UpdateAuthPolicyStatus(
 	ap := &scope.AuthPolicy
 	rLog := log.GetLogger(ctx)
 	rLog.Debug(fmt.Sprintf("Updating AuthPolicy status for %s/%s", ap.Namespace, ap.Name))
-	recorder.Eventf(ap, "Normal", "StatusUpdateStarted", "Status update of AuthPolicy started.")
+	recorder.Eventf(
+		ap,
+		nil,
+		"Normal",
+		"StatusUpdateStarted",
+		"Reconcile",
+		"Status update of AuthPolicy started.")
 
 	reconciliationState := DetermineReconciliationState(scope, reconcileActions)
 
@@ -59,9 +65,9 @@ func UpdateAuthPolicyStatus(
 				err,
 				fmt.Sprintf("Failed to update AuthPolicy status with name %s/%s", ap.Namespace, ap.Name),
 			)
-			recorder.Eventf(ap, "Warning", "StatusUpdateFailed", "Status update of AuthPolicy failed.")
+			recorder.Eventf(ap, nil, "Warning", "StatusUpdateFailed", "Reconcile", "Status update of AuthPolicy failed.")
 		} else {
-			recorder.Eventf(ap, "Normal", "StatusUpdateSuccess", "Status update of AuthPolicy updated successfully.")
+			recorder.Eventf(ap, nil, "Normal", "StatusUpdateSuccess", "Reconcile", "Status update of AuthPolicy updated successfully.")
 		}
 	}
 }
@@ -82,8 +88,8 @@ func DetermineReconciliationState(
 	}
 }
 
-func determinePhase(state ReconciliationState) ztoperatorv1alpha1.Phase {
-	switch state {
+func determinePhase(reconciliationState ReconciliationState) ztoperatorv1alpha1.Phase {
+	switch reconciliationState {
 	case StateInvalid:
 		return ztoperatorv1alpha1.PhaseInvalid
 	case StatePending:
@@ -96,8 +102,8 @@ func determinePhase(state ReconciliationState) ztoperatorv1alpha1.Phase {
 	panic("could not determine phase")
 }
 
-func determineReadiness(state ReconciliationState) bool {
-	switch state {
+func determineReadiness(reconciliationState ReconciliationState) bool {
+	switch reconciliationState {
 	case StateInvalid, StatePending, StateFailed:
 		return false
 	case StateReady:
@@ -106,8 +112,8 @@ func determineReadiness(state ReconciliationState) bool {
 	panic("could not determine readiness")
 }
 
-func statusMessage(state ReconciliationState, validationErrorMessage *string) string {
-	switch state {
+func statusMessage(reconciliationState ReconciliationState, validationErrorMessage *string) string {
+	switch reconciliationState {
 	case StateInvalid:
 		return *validationErrorMessage
 	case StatePending:

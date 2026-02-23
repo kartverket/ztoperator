@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app: ztoperator
+  name: ztoperator
+  namespace: ztoperator-system
+spec:
+  minAvailable: 50%
+  selector:
+    matchLabels:
+      app: ztoperator
