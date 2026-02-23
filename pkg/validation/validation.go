@@ -83,7 +83,8 @@ func (t authPolicyValidatorType) String() string {
 
 func podAnnotationErrorMessageSuffix() string {
 	return fmt.Sprintf(
-		"see https://github.com/kartverket/ztoperator/blob/%s/README.md#-mounting-oauth-credentials-in-the-istio-sidecar on how to do it correctly",
+		"see https://github.com/kartverket/ztoperator/blob/%s/README.md#-mounting-oauth-credentials-in-the-istio-sidecar "+
+			"on how to do it correctly",
 		config.Get().GitRef,
 	)
 }

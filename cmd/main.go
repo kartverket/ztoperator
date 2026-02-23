@@ -197,7 +197,11 @@ func main() {
 	ctx := ctrl.SetupSignalHandler()
 	go func() {
 		setupLog.Info("starting periodic custom metrics collector")
-		if startingCustomMetricsCollector := metrics.StartAuthPolicyCollector(mgr.GetClient(), mgr.GetCache(), mgr.Elected()); startingCustomMetricsCollector != nil {
+		if startingCustomMetricsCollector := metrics.StartAuthPolicyCollector(
+			mgr.GetClient(),
+			mgr.GetCache(),
+			mgr.Elected(),
+		); startingCustomMetricsCollector != nil {
 			setupLog.Error(startingCustomMetricsCollector, "problem starting custom metrics collector")
 			os.Exit(1)
 		}
