@@ -20,6 +20,7 @@ COPY internal/eventhandler/ internal/eventhandler/
 COPY internal/state/ internal/state/
 COPY internal/reconciler/ internal/reconciler/
 COPY internal/resolver/ internal/resolver/
+COPY internal/statusmanager/ internal/statusmanager/
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command

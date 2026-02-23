@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/eventhandler/pod"
 	"github.com/kartverket/ztoperator/internal/reconciler"
 	"github.com/kartverket/ztoperator/internal/resolver"
 	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/internal/statusmanager"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/metrics"
@@ -20,14 +20,10 @@ import (
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	k8sErrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -104,7 +100,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))
 		authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
 		authPolicy.Status.Message = err.Error()
-		updateStatusOnResolveFailedErr := r.updateStatusWithRetriesOnConflict(ctx, *authPolicy)
+		updateStatusOnResolveFailedErr := statusmanager.UpdateStatus(ctx, r.Client, *authPolicy)
 		if updateStatusOnResolveFailedErr != nil {
 			return ctrl.Result{}, updateStatusOnResolveFailedErr
 		}
@@ -116,7 +112,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	reconcileActions := reconciler.ReconcileActions(scope)
 
 	defer func() {
-		r.updateStatus(ctx, scope, originalAuthPolicy, reconcileActions)
+		statusmanager.UpdateAuthPolicyStatus(ctx, r.Client, r.Recorder, scope, originalAuthPolicy, reconcileActions)
 	}()
 
 	return r.doReconcile(ctx, reconcileActions, scope)
@@ -163,148 +159,6 @@ func (r *AuthPolicyReconciler) doReconcile(
 	}
 	r.Recorder.Eventf(&scope.AuthPolicy, "Normal", "ReconcileSuccess", "AuthPolicy reconciled successfully")
 	return result, nil
-}
-
-func (r *AuthPolicyReconciler) updateStatus(
-	ctx context.Context,
-	scope *state.Scope,
-	original *ztoperatorv1alpha1.AuthPolicy,
-	reconcileFuncs []reconciliation.ReconcileAction,
-) {
-	ap := scope.AuthPolicy
-	rLog := log.GetLogger(ctx)
-	rLog.Debug(fmt.Sprintf("Updating AuthPolicy status for %s/%s", ap.Namespace, ap.Name))
-	r.Recorder.Eventf(&ap, "Normal", "StatusUpdateStarted", "Status update of AuthPolicy started.")
-
-	ap.Status.ObservedGeneration = ap.GetGeneration()
-	authPolicyCondition := metav1.Condition{
-		Type:               state.GetID(strings.TrimPrefix(ap.Kind, "*"), ap.Name),
-		LastTransitionTime: metav1.Now(),
-	}
-
-	switch {
-	case scope.InvalidConfig:
-		ap.Status.Phase = ztoperatorv1alpha1.PhaseInvalid
-		ap.Status.Ready = false
-		ap.Status.Message = *scope.ValidationErrorMessage
-		authPolicyCondition.Status = metav1.ConditionFalse
-		authPolicyCondition.Reason = "InvalidConfiguration"
-		authPolicyCondition.Message = *scope.ValidationErrorMessage
-
-	case len(scope.Descendants) != reconciliation.CountReconciledResources(reconcileFuncs):
-		ap.Status.Phase = ztoperatorv1alpha1.PhasePending
-		ap.Status.Ready = false
-		ap.Status.Message = "AuthPolicy pending due to missing Descendants."
-		authPolicyCondition.Status = metav1.ConditionUnknown
-		authPolicyCondition.Reason = "ReconciliationPending"
-		authPolicyCondition.Message = "Descendants of AuthPolicy are not yet reconciled."
-
-	case len(scope.GetErrors()) > 0:
-		ap.Status.Phase = ztoperatorv1alpha1.PhaseFailed
-		ap.Status.Ready = false
-		ap.Status.Message = "AuthPolicy failed."
-		authPolicyCondition.Status = metav1.ConditionFalse
-		authPolicyCondition.Reason = "ReconciliationFailed"
-		authPolicyCondition.Message = "Descendants of AuthPolicy failed during reconciliation."
-
-	default:
-		ap.Status.Phase = ztoperatorv1alpha1.PhaseReady
-		ap.Status.Ready = true
-		ap.Status.Message = "AuthPolicy ready."
-		authPolicyCondition.Status = metav1.ConditionTrue
-		authPolicyCondition.Reason = "ReconciliationSuccess"
-		authPolicyCondition.Message = "Descendants of AuthPolicy reconciled successfully."
-	}
-
-	var conditions []metav1.Condition
-	descendantIDs := map[string]bool{}
-
-	for _, d := range scope.Descendants {
-		descendantIDs[d.ID] = true
-		cond := metav1.Condition{
-			Type:               d.ID,
-			LastTransitionTime: metav1.Now(),
-		}
-		switch {
-		case d.ErrorMessage != nil:
-			cond.Status = metav1.ConditionFalse
-			cond.Reason = "Error"
-			cond.Message = *d.ErrorMessage
-		case d.SuccessMessage != nil:
-			cond.Status = metav1.ConditionTrue
-			cond.Reason = "Success"
-			cond.Message = *d.SuccessMessage
-		default:
-			cond.Status = metav1.ConditionUnknown
-			cond.Reason = "Unknown"
-			cond.Message = "No status message set"
-		}
-		conditions = append(conditions, cond)
-	}
-	for _, rf := range reconcileFuncs {
-		if !rf.IsResourceNil() {
-			expectedID := state.GetID(rf.GetResourceKind(), rf.GetResourceName())
-			if !descendantIDs[expectedID] {
-				conditions = append(conditions, metav1.Condition{
-					Type:   expectedID,
-					Status: metav1.ConditionFalse,
-					Reason: "NotFound",
-					Message: fmt.Sprintf(
-						"Expected resource %s of kind %s was not created",
-						rf.GetResourceName(),
-						rf.GetResourceKind(),
-					),
-					LastTransitionTime: metav1.Now(),
-				})
-			}
-		}
-	}
-
-	ap.Status.Conditions = append([]metav1.Condition{authPolicyCondition}, conditions...)
-
-	if !equality.Semantic.DeepEqual(original.Status, ap.Status) {
-		rLog.Debug(fmt.Sprintf("Updating AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
-		if updateStatusWithRetriesErr := r.updateStatusWithRetriesOnConflict(
-			ctx,
-			ap,
-		); updateStatusWithRetriesErr != nil {
-			rLog.Error(
-				updateStatusWithRetriesErr,
-				fmt.Sprintf(
-					"Failed to update AuthPolicy status with name %s/%s",
-					ap.Namespace,
-					ap.Name,
-				),
-			)
-			r.Recorder.Eventf(&ap, "Warning", "StatusUpdateFailed", "Status update of AuthPolicy failed.")
-		} else {
-			r.Recorder.Eventf(&ap, "Normal", "StatusUpdateSuccess", "Status update of AuthPolicy updated successfully.")
-		}
-	}
-}
-
-func (r *AuthPolicyReconciler) updateStatusWithRetriesOnConflict(
-	ctx context.Context,
-	authPolicy ztoperatorv1alpha1.AuthPolicy,
-) error {
-	metrics.DeleteAuthPolicyInfo(
-		types.NamespacedName{
-			Name:      authPolicy.Name,
-			Namespace: authPolicy.Namespace,
-		},
-	)
-	refreshAuthPolicyCustomMetricsErr := metrics.RefreshAuthPolicyInfo(ctx, r.Client, authPolicy)
-	if refreshAuthPolicyCustomMetricsErr != nil {
-		return refreshAuthPolicyCustomMetricsErr
-	}
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		latest := &ztoperatorv1alpha1.AuthPolicy{}
-		if err := r.Get(ctx, client.ObjectKeyFromObject(&authPolicy), latest); err != nil {
-			return err
-		}
-		latest.Status = authPolicy.Status
-		return r.Status().Update(ctx, latest)
-	})
 }
 
 func resolveAuthPolicy(
