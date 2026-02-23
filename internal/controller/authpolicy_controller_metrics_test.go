@@ -20,13 +20,14 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
+const metricsURL = "http://localhost:8181/metrics"
+
 var _ = Describe("AuthPolicy Controller", func() {
 
 	const (
 		authPolicyName      = "metrics-test-auth-policy"
 		authPolicyNamespace = "metrics-test-ns"
 		wellKnownURI        = "https://login.example.com/.well-known/openid-configuration"
-		metricsURL          = "http://localhost:8181/metrics"
 	)
 
 	var (
@@ -68,7 +69,7 @@ var _ = Describe("AuthPolicy Controller", func() {
 
 		By("waiting for metrics endpoint to be ready")
 		Eventually(func() error {
-			_, err := getMetrics(metricsURL)
+			_, err := getMetrics()
 			if err != nil {
 				return err
 			}
@@ -104,7 +105,7 @@ var _ = Describe("AuthPolicy Controller", func() {
 		Expect(metrics.RefreshAuthPolicyInfo(ctx, k8sClient, *authPolicy)).To(Succeed())
 
 		By("fetching metrics from :8181/metrics")
-		metricsBody, err := getMetrics(metricsURL)
+		metricsBody, err := getMetrics()
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying ztoperator_authpolicy_info metric is present with correct labels")
@@ -162,7 +163,7 @@ var _ = Describe("AuthPolicy Controller", func() {
 		Expect(metrics.RefreshAuthPolicyInfo(ctx, k8sClient, *authPolicy)).To(Succeed())
 
 		By("fetching metrics from :8181/metrics")
-		metricsBody, err := getMetrics(metricsURL)
+		metricsBody, err := getMetrics()
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying the protected_pod label is set to the pod name")
@@ -196,7 +197,7 @@ var _ = Describe("AuthPolicy Controller", func() {
 		Expect(metrics.RefreshAuthPolicyInfo(ctx, k8sClient, *authPolicy)).To(Succeed())
 
 		By("fetching metrics from :8181/metrics")
-		metricsBody, err := getMetrics(metricsURL)
+		metricsBody, err := getMetrics()
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(metricsBody).To(ContainSubstring(fmt.Sprintf(`name="%s-del"`, authPolicyName)))
@@ -205,7 +206,7 @@ var _ = Describe("AuthPolicy Controller", func() {
 		metrics.DeleteAuthPolicyInfo(client.ObjectKeyFromObject(authPolicy))
 
 		By("verifying metric is removed from :8181/metrics")
-		metricsBody, err = getMetrics(metricsURL)
+		metricsBody, err = getMetrics()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(metricsBody).NotTo(ContainSubstring(fmt.Sprintf(`name="%s-del"`, authPolicyName)))
 
@@ -214,8 +215,8 @@ var _ = Describe("AuthPolicy Controller", func() {
 	})
 })
 
-func getMetrics(url string) (string, error) {
-	resp, err := http.Get(url)
+func getMetrics() (string, error) {
+	resp, err := http.Get(metricsURL)
 	if err != nil {
 		return "", err
 	}
