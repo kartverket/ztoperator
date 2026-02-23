@@ -444,7 +444,7 @@ chainsaw-test-remote: chainsaw isnotrunning ensureztoperatordeployed isingressre
 	' || (echo "Test(s) failed." && exit 1)
 
 .PHONY: chainsaw-test-remote-single
-chainsaw-test-remote-single: chainsaw isnotrunning ensureztoperatordeployed isingressready
+chainsaw-test-remote-single: chainsaw isnotrunning ensureztoperatordeployed isingressready ## Run a specific chainsaw test against local kind cluster with ztoperator running in the cluster. Example usage: chainsaw-test-remote-single dir=<CHAINSAW_TEST_DIR>
 	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
     	echo "✅ Test succeeded" || (echo "❌ Test failed" && exit 1)
 
