@@ -48,7 +48,7 @@ func TestConstructAcceptedResourcesWithAudienceAndAcceptedResources(t *testing.T
 		"https://audience3.com",
 	}
 
-	var expectedValues []string
+	expectedValues := make([]string, 0, len(expectedAudiences)+len(expectedAcceptedResources))
 	expectedValues = append(expectedValues, expectedAudiences...)
 	expectedValues = append(expectedValues, expectedAcceptedResources...)
 

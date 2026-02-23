@@ -132,9 +132,9 @@ func buildLuaParams(params map[string]string) string {
 }
 
 func convertToRE2Regex(requestMatchers []v1alpha1.RequestMatcher) []v1alpha1.RequestMatcher {
-	var result []v1alpha1.RequestMatcher
+	result := make([]v1alpha1.RequestMatcher, 0, len(requestMatchers))
 	for _, matcher := range requestMatchers {
-		var pathAsRE2Regex []string
+		pathAsRE2Regex := make([]string, 0, len(matcher.Paths))
 		for _, path := range matcher.Paths {
 			pathAsRE2Regex = append(pathAsRE2Regex, "^"+convertRequestMatcherPathToRegex(path))
 		}

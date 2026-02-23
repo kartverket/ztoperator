@@ -425,7 +425,8 @@ func (ap *AuthPolicy) GetIgnoreAuthRequestMatchers() []RequestMatcher {
 }
 
 func (ap *AuthPolicy) GetAuthorizedPaths() []string {
-	var authorizedPaths []string
+	matchers := ap.GetRequireAuthRequestMatchers()
+	authorizedPaths := make([]string, 0, len(matchers))
 	for _, requestMatcher := range ap.GetRequireAuthRequestMatchers() {
 		authorizedPaths = append(authorizedPaths, requestMatcher.Paths...)
 	}

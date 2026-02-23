@@ -122,12 +122,13 @@ func constructUnspecifiedPathsAllowRule(
 	scope *state.Scope,
 	audienceAndIssuerConditions []*v1beta1.Condition,
 ) *v1beta1.Rule {
-	var unspecifiedPathsRuleList []*v1beta1.Rule_To
-
 	allRequestMatchers := append(
 		scope.AuthPolicy.GetRequireAuthRequestMatchers(),
 		scope.AuthPolicy.GetIgnoreAuthRequestMatchers()...,
 	)
+
+	// +1 for the rule that allows all paths and methods not defined in any matcher
+	unspecifiedPathsRuleList := make([]*v1beta1.Rule_To, 0, len(allRequestMatchers)+1)
 
 	// For all request matchers, create to-rules for all methods not defined in the matcher
 	for _, matcher := range allRequestMatchers {
@@ -144,7 +145,7 @@ func constructUnspecifiedPathsAllowRule(
 	}
 
 	// For all request matchers, create to-rules for all paths not defined in a matcher
-	var mentionedPaths []string
+	mentionedPaths := make([]string, 0, len(allRequestMatchers))
 	for _, matcher := range allRequestMatchers {
 		mentionedPaths = append(mentionedPaths, matcher.Paths...)
 	}
