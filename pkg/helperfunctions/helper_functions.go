@@ -50,22 +50,22 @@ func Ptr[T any](v T) *T {
 	return &v
 }
 
-func GetSecret(ctx context.Context, client client.Client, namespacedName types.NamespacedName) (v1.Secret, error) {
+func GetSecret(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (v1.Secret, error) {
 	secret := v1.Secret{}
 
-	err := client.Get(ctx, namespacedName, &secret)
+	err := k8sClient.Get(ctx, namespacedName, &secret)
 
 	return secret, err
 }
 
 func GetConfigMap(
 	ctx context.Context,
-	client client.Client,
+	k8sClient client.Client,
 	namespacedName types.NamespacedName,
 ) (v1.ConfigMap, error) {
 	configMap := v1.ConfigMap{}
 
-	err := client.Get(ctx, namespacedName, &configMap)
+	err := k8sClient.Get(ctx, namespacedName, &configMap)
 
 	return configMap, err
 }
