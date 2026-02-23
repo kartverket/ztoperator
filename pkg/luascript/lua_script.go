@@ -125,7 +125,7 @@ func buildLuaParams(params map[string]string) string {
 			sb.WriteString(",")
 		}
 		first = false
-		sb.WriteString(fmt.Sprintf(`["%s"]="%s"`, k, v))
+		fmt.Fprintf(&sb, `["%s"]="%s"`, k, v)
 	}
 	sb.WriteString("}")
 	return sb.String()

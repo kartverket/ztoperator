@@ -68,17 +68,17 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	authPolicy := new(ztoperatorv1alpha1.AuthPolicy)
 
-	rLog.Info(fmt.Sprintf("Received reconcile request for AuthPolicy with name %s", req.NamespacedName.String()))
+	rLog.Info(fmt.Sprintf("Received reconcile request for AuthPolicy with name %s", req.String()))
 
-	if err := r.Client.Get(ctx, req.NamespacedName, authPolicy); err != nil {
+	if err := r.Get(ctx, req.NamespacedName, authPolicy); err != nil {
 		if apierrors.IsNotFound(err) {
 			rLog.Debug(
-				fmt.Sprintf("AuthPolicy with name %s not found. Probably a delete.", req.NamespacedName.String()),
+				fmt.Sprintf("AuthPolicy with name %s not found. Probably a delete.", req.String()),
 			)
 			metrics.DeleteAuthPolicyInfo(req.NamespacedName)
 			return reconcile.Result{}, nil
 		}
-		rLog.Error(err, fmt.Sprintf("Failed to get AuthPolicy with name %s", req.NamespacedName.String()))
+		rLog.Error(err, fmt.Sprintf("Failed to get AuthPolicy with name %s", req.String()))
 		return reconcile.Result{}, err
 	}
 
@@ -86,22 +86,22 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		authPolicy,
 		"Normal",
 		"ReconcileStarted",
-		fmt.Sprintf("AuthPolicy with name %s started.", req.NamespacedName.String()),
+		fmt.Sprintf("AuthPolicy with name %s started.", req.String()),
 	)
-	rLog.Debug(fmt.Sprintf("AuthPolicy with name %s found", req.NamespacedName.String()))
+	rLog.Debug(fmt.Sprintf("AuthPolicy with name %s found", req.String()))
 
 	authPolicy.InitializeStatus()
 	originalAuthPolicy := authPolicy.DeepCopy()
 
 	if !authPolicy.DeletionTimestamp.IsZero() {
-		rLog.Info(fmt.Sprintf("Deleting AuthPolicy with name %s", req.NamespacedName.String()))
+		rLog.Info(fmt.Sprintf("Deleting AuthPolicy with name %s", req.String()))
 		metrics.DeleteAuthPolicyInfo(req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 
 	scope, err := resolveAuthPolicy(ctx, r.Client, authPolicy, r.DiscoveryDocumentResolver)
 	if err != nil {
-		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.NamespacedName.String()))
+		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))
 		authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
 		authPolicy.Status.Message = err.Error()
 		updateStatusOnResolveFailedErr := r.updateStatusWithRetriesOnConflict(ctx, *authPolicy)
@@ -144,7 +144,12 @@ func (r *AuthPolicyReconciler) doReconcile(
 			)
 			errs = append(errs, err)
 		} else {
-			r.Recorder.Eventf(&scope.AuthPolicy, "Normal", fmt.Sprintf("%sReconciledSuccessfully", rf.GetResourceKind()), fmt.Sprintf("%s with name %s reconciled successfully.", rf.GetResourceKind(), rf.GetResourceName()))
+			r.Recorder.Eventf(
+				&scope.AuthPolicy,
+				"Normal",
+				fmt.Sprintf("%sReconciledSuccessfully", rf.GetResourceKind()),
+				fmt.Sprintf("%s with name %s reconciled successfully.", rf.GetResourceKind(), rf.GetResourceName()),
+			)
 		}
 		if len(errs) > 0 {
 			continue
@@ -259,7 +264,10 @@ func (r *AuthPolicyReconciler) updateStatus(
 
 	if !equality.Semantic.DeepEqual(original.Status, ap.Status) {
 		rLog.Debug(fmt.Sprintf("Updating AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))
-		if updateStatusWithRetriesErr := r.updateStatusWithRetriesOnConflict(ctx, ap); updateStatusWithRetriesErr != nil {
+		if updateStatusWithRetriesErr := r.updateStatusWithRetriesOnConflict(
+			ctx,
+			ap,
+		); updateStatusWithRetriesErr != nil {
 			rLog.Error(
 				updateStatusWithRetriesErr,
 				fmt.Sprintf(
@@ -291,7 +299,7 @@ func (r *AuthPolicyReconciler) updateStatusWithRetriesOnConflict(
 	}
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		latest := &ztoperatorv1alpha1.AuthPolicy{}
-		if err := r.Client.Get(ctx, client.ObjectKeyFromObject(&authPolicy), latest); err != nil {
+		if err := r.Get(ctx, client.ObjectKeyFromObject(&authPolicy), latest); err != nil {
 			return err
 		}
 		latest.Status = authPolicy.Status
