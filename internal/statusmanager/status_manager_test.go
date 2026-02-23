@@ -197,7 +197,7 @@ func TestUpdateAuthPolicyStatus_WithNoStatusChange_DoesNotUpdate(t *testing.T) {
 	// 3. Assert
 	// Verify no status update events were recorded (only StatusUpdateStarted)
 	close(fakeRecorder.Events)
-	var events []string
+	events := make([]string, 0, len(fakeRecorder.Events))
 	for event := range fakeRecorder.Events {
 		events = append(events, event)
 	}
@@ -248,7 +248,7 @@ func TestUpdateAuthPolicyStatus_WithSuccessfulStatusChange_RecordsNormalEvent(t 
 
 	// 3. Assert
 	close(fakeRecorder.Events)
-	var events []string
+	events := make([]string, 0, len(fakeRecorder.Events))
 	for event := range fakeRecorder.Events {
 		events = append(events, event)
 	}
@@ -294,7 +294,7 @@ func TestUpdateAuthPolicyStatus_WithFailedStatusUpdate_RecordsWarningEvent(t *te
 
 	// 3. Assert
 	close(fakeRecorder.Events)
-	var events []string
+	events := make([]string, 0, len(fakeRecorder.Events))
 	for event := range fakeRecorder.Events {
 		events = append(events, event)
 	}
