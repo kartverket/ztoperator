@@ -40,7 +40,7 @@ type AuthPolicySpec struct {
 	// AllowedAudiences defines the allowed audience (`aud`) values in the JWT.
 	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
 	//
-	// The normative behaviour for an OAuth / OIDC-compliant identity provider is to validate the presense of one or more client IDs as allowed audiences.
+	// The normative behaviour for an OAuth / OIDC-compliant identity provider is to validate the presence of one or more client IDs as allowed audiences.
 	//
 	// +kubebuilder:validation:Optional
 	AllowedAudiences []AllowedAudience `json:"allowedAudiences,omitempty"`
