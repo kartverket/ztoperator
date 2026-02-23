@@ -40,7 +40,7 @@
       "INTRO_MESSAGE": "Ztoperator environment activated"
     },
     "hook": {
-      "on-activate": "  set -e  # Exit on any error\n\n  # Check if kind-ztoperator cluster exists\n  if ! kind get clusters | grep -q '^ztoperator$'; then\n    # Setup local cluster with dependencies\n    make clean local\n  fi\n"
+      "on-activate": "  set -e  # Exit on any error\n\n  # Ensure local setup is ready, otherwise clean and rebuild\n  if ! make ensurelocal; then\n    make clean local\n  fi\n"
     },
     "profile": {
       "common": "gum style \\\n    --foreground 46 --border-foreground 46 --border double \\\n    --align center --width 50 --margin \"1 2\" --padding \"2 4\" \\\n    $INTRO_MESSAGE\n# "
