@@ -19,10 +19,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Setup Kind cluster and deploy ztoperator
+      - name: Setup local cluster, deploy Ztoperator, make virtualenv, expose ingress and run chainsaw tests
         run: |
-          make local deploy virtualenv expose-ingress
-
-      - name: Run Chainsaw tests
-        run: |
-          make chainsaw-test-remote
+          make local deploy virtualenv expose-ingress chainsaw-test-remote
