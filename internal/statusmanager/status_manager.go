@@ -82,8 +82,8 @@ func DetermineReconciliationState(
 	}
 }
 
-func determinePhase(state ReconciliationState) ztoperatorv1alpha1.Phase {
-	switch state {
+func determinePhase(reconciliationState ReconciliationState) ztoperatorv1alpha1.Phase {
+	switch reconciliationState {
 	case StateInvalid:
 		return ztoperatorv1alpha1.PhaseInvalid
 	case StatePending:
@@ -96,8 +96,8 @@ func determinePhase(state ReconciliationState) ztoperatorv1alpha1.Phase {
 	panic("could not determine phase")
 }
 
-func determineReadiness(state ReconciliationState) bool {
-	switch state {
+func determineReadiness(reconciliationState ReconciliationState) bool {
+	switch reconciliationState {
 	case StateInvalid, StatePending, StateFailed:
 		return false
 	case StateReady:
@@ -106,8 +106,8 @@ func determineReadiness(state ReconciliationState) bool {
 	panic("could not determine readiness")
 }
 
-func statusMessage(state ReconciliationState, validationErrorMessage *string) string {
-	switch state {
+func statusMessage(reconciliationState ReconciliationState, validationErrorMessage *string) string {
+	switch reconciliationState {
 	case StateInvalid:
 		return *validationErrorMessage
 	case StatePending:
