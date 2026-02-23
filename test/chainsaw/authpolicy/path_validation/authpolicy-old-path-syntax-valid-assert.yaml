@@ -1,16 +1,73 @@
+# RequestAuthentication
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: auth-policy-valid-old-syntax
+spec:
+  jwtRules:
+    - audiences:
+        - entraid_server
+      forwardOriginalToken: true
+      issuer: http://mock-oauth2.auth:8080/entraid
+      jwksUri: http://mock-oauth2.auth:8080/entraid/jwks
+  selector:
+    matchLabels:
+      app: application
 ---
-# AuthorizationPolicy (deny-auth-rules)
+# AuthorizationPolicy (ignore-auth)
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
-  name: auth-policy-valid-old-syntax-deny-auth-rules
+  name: auth-policy-valid-old-syntax-ignore-auth
 spec:
-  action: DENY
   rules:
     - to:
         - operation:
             paths:
+              - /prefix/*
+              - /anotherprefix*
+              - /*
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (require-auth)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-valid-old-syntax-require-auth
+spec:
+  rules:
+    - to:
+        - operation:
+            notMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - HEAD
+              - OPTIONS
+              - TRACE
+              - CONNECT
+            paths:
+              - /prefix/*
+              - /anotherprefix*
+              - /*
+        - operation:
+            notPaths:
+              - /prefix/*
+              - /anotherprefix*
+              - /*
+            paths:
               - '*'
+      when:
+        - key: request.auth.claims[iss]
+          values:
+            - http://mock-oauth2.auth:8080/entraid
+        - key: request.auth.claims[aud]
+          values:
+            - entraid_server
   selector:
     matchLabels:
       app: application

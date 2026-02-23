@@ -17,8 +17,8 @@ func ValidatePaths(paths []string) error {
 			continue
 		}
 		if strings.Count(path, "*") > 1 ||
-			(strings.Contains(path, "*") && (path != "*" && !strings.HasPrefix(path, "*") && !strings.HasSuffix(path, "*"))) {
-			return fmt.Errorf("invalid path: %s; '*' must appear only once, be at the start, end, or be '*'", path)
+			(strings.Contains(path, "*") && (path != "*" && !strings.HasSuffix(path, "*"))) {
+			return fmt.Errorf("invalid path: %s; '*' must appear only once, be at the end, or be '*'", path)
 		}
 	}
 	return nil
