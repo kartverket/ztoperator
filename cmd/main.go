@@ -172,7 +172,7 @@ func main() {
 	if err = (&controller.AuthPolicyReconciler{
 		Client:                    mgr.GetClient(),
 		Scheme:                    mgr.GetScheme(),
-		Recorder:                  mgr.GetEventRecorderFor("authpolicy-controller"),
+		Recorder:                  mgr.GetEventRecorder("authpolicy-controller"),
 		DiscoveryDocumentResolver: rest.NewDefaultDiscoveryDocumentResolver(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthPolicy")
