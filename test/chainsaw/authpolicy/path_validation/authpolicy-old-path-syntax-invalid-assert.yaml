@@ -15,4 +15,36 @@ spec:
     matchLabels:
       app: application
 ---
+# AuthorizationPolicy (deny-auth-rules)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: only-asterix-deny-auth-rules
+spec:
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            paths:
+              - '*'
+  selector:
+    matchLabels:
+      app: application
+---
+# AuthorizationPolicy (deny-auth-rules)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: leading-asterix-deny-auth-rules
+spec:
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            paths:
+              - '*'
+  selector:
+    matchLabels:
+      app: application
+---
 

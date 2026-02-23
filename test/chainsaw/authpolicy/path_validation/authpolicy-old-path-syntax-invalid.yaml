@@ -13,3 +13,35 @@ spec:
   selector:
     matchLabels:
       app: application
+---
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: only-asterix
+spec:
+  enabled: true
+  ignoreAuthRules:
+    - paths:
+        - '*'
+  audience:
+    - entraid_server
+  wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
+  selector:
+    matchLabels:
+      app: application
+---
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: leading-asterix
+spec:
+  enabled: true
+  ignoreAuthRules:
+    - paths:
+        - '/*/suffix'
+  audience:
+    - entraid_server
+  wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
+  selector:
+    matchLabels:
+      app: application
