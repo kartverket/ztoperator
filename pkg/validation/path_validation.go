@@ -10,7 +10,7 @@ func ValidatePaths(paths []string) error {
 		if !strings.HasPrefix(path, "/") {
 			return fmt.Errorf("invalid path: %s; must start with '/'", path)
 		}
-		if strings.Contains(path, "{") {
+		if strings.Contains(path, "{") || strings.Contains(path, "}") {
 			if err := validateNewPathSyntax(paths); err != nil {
 				return err
 			}
