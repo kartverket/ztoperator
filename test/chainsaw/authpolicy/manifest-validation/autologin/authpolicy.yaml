@@ -1,0 +1,19 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+spec:
+  enabled: true
+  wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
+  autoLogin:
+    enabled: true
+    scopes:
+      - scope1
+      - scope2
+  oAuthCredentials:
+    secretRef: oauth-secret
+    clientIDKey: client-id
+    clientSecretKey: client-secret
+  selector:
+    matchLabels:
+      app: application
