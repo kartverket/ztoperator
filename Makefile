@@ -432,23 +432,28 @@ test: generate fmt vet setup-envtest ## Run go tests.
 	KUBEBUILDER_ASSETS="$(shell "$(ENVTEST)" use $(ENVTEST_K8S_VERSION) --bin-dir "$(LOCALBIN)" -p path)" go test $$(go list ./...) -coverprofile cover.out
 
 .PHONY: chainsaw-test-remote
-chainsaw-test-remote: chainsaw ensureztoperatordeployed isingressready ## Run chainsaw tests against local kind cluster with ztoperator running in the cluster
+chainsaw-test-remote: chainsaw isnotrunning ensureztoperatordeployed isingressready ## Run chainsaw tests against local kind cluster with ztoperator running in the cluster
 	@bash -ec ' \
 			for dir in test/chainsaw/authpolicy/*/ ; do \
 				echo "Running test in $$dir"; \
-				if ! $(MAKE) test-single dir=$$dir; then \
+				if ! $(MAKE) chainsaw-test-remote-single dir=$$dir; then \
 					echo "Test in $$dir failed."; \
 					exit 1; \
 				fi; \
 			done; \
 	' || (echo "Test(s) failed." && exit 1)
 
+.PHONY: chainsaw-test-remote-single
+chainsaw-test-remote-single: chainsaw isnotrunning ensureztoperatordeployed isingressready
+	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
+    	echo "✅ Test succeeded" || (echo "❌ Test failed" && exit 1)
+
 .PHONY: chainsaw-test-host
 chainsaw-test-host: chainsaw install ensurelocal ensureztoperatornotdeployed isrunning isingressready ## Run chainsaw tests against local kind cluster with ztoperator running on host
 	@bash -ec ' \
     		for dir in test/chainsaw/authpolicy/*/ ; do \
     			echo "Running test in $$dir"; \
-    			if ! $(MAKE) test-single dir=$$dir; then \
+    			if ! $(MAKE) chainsaw-test-host-single dir=$$dir; then \
     				echo "Test in $$dir failed."; \
     				exit 1; \
     			fi; \
@@ -456,7 +461,7 @@ chainsaw-test-host: chainsaw install ensurelocal ensureztoperatornotdeployed isr
 	' || (echo "Test(s) failed." && exit 1)
 
 .PHONY: chainsaw-test-host-single
-chainsaw-test-host-single: chainsaw install ensurelocal ensureztoperatornotdeployed isrunning ## Run a specific chainsaw test against local kind cluster with ztoperator running on host. Example usage: chainsaw-test-host-single dir=<CHAINSAW_TEST_DIR>
+chainsaw-test-host-single: chainsaw install ensurelocal ensureztoperatornotdeployed isrunning isingressready ## Run a specific chainsaw test against local kind cluster with ztoperator running on host. Example usage: chainsaw-test-host-single dir=<CHAINSAW_TEST_DIR>
 	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
     	echo "✅ Test succeeded" || (echo "❌ Test failed" && exit 1)
 
