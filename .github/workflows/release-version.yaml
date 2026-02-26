@@ -80,14 +80,3 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
-      - name: Generate CRD and ClusterRole
-        run: make manifests
-
-      - name: Upload CRD and ClusterRole
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: |
-            ${{ env.RBAC_FILE_PATH }}
-            ${{ env.CRD_AUTHPOLICY_FILE_PATH }}
