@@ -6,6 +6,7 @@ import (
 
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy"
+	"github.com/kartverket/ztoperator/pkg/validation"
 	"istio.io/api/security/v1beta1"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,7 +65,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 				To: []*v1beta1.Rule_To{
 					{
 						Operation: &v1beta1.Operation{
-							Paths:   rule.Paths,
+							Paths:   validation.TransformPathsForIstio(rule.Paths),
 							Methods: rule.Methods,
 						},
 					},
