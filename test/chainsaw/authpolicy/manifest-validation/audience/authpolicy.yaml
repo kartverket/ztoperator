@@ -4,8 +4,6 @@ metadata:
   name: auth-policy
 spec:
   enabled: true
-  audience:
-    - audience-inline-deprecated
   allowedAudiences:
     - value: audience-inline
     - valueFrom:
