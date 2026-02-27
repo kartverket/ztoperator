@@ -66,28 +66,3 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  generate:
-    name: CRD and ClusterRole
-    needs: [ goreleaser ]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-
-      - name: Generate CRD and ClusterRole
-        run: make manifests
-
-      - name: Upload CRD and ClusterRole
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.ARTIFACT_NAME }}
-          path: |
-            ${{ env.RBAC_FILE_PATH }}
-            ${{ env.CRD_AUTHPOLICY_FILE_PATH }}
