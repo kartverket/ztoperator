@@ -24,9 +24,21 @@ spec:
     - to:
         - operation:
             paths:
-              - /foo/{*}
-              - /foo/{**}
-              - /foo/{*}/bar/{**}
+            - /
+            - /{*}
+            - /{**}
+            - /foo
+            - /foo-bar
+            - /foo%20bar
+            - /foo/bar
+            - /foo/bar/
+            - /foo/{*}
+            - /foo/{**}
+            - /foo/{*}/bar/{*}
+            - /foo/{*}/bar%20baz/{*}
+            - /foo/{*}/bar/{**}
+            - /foo*
+            - /foo/bar*
   selector:
     matchLabels:
       app: application
@@ -51,14 +63,38 @@ spec:
               - TRACE
               - CONNECT
             paths:
-              - /foo/{*}
-              - /foo/{**}
-              - /foo/{*}/bar/{**}
+            - /
+            - /{*}
+            - /{**}
+            - /foo
+            - /foo-bar
+            - /foo%20bar
+            - /foo/bar
+            - /foo/bar/
+            - /foo/{*}
+            - /foo/{**}
+            - /foo/{*}/bar/{*}
+            - /foo/{*}/bar%20baz/{*}
+            - /foo/{*}/bar/{**}
+            - /foo*
+            - /foo/bar*
         - operation:
             notPaths:
-              - /foo/{*}
-              - /foo/{**}
-              - /foo/{*}/bar/{**}
+            - /
+            - /{*}
+            - /{**}
+            - /foo
+            - /foo-bar
+            - /foo%20bar
+            - /foo/bar
+            - /foo/bar/
+            - /foo/{*}
+            - /foo/{**}
+            - /foo/{*}/bar/{*}
+            - /foo/{*}/bar%20baz/{*}
+            - /foo/{*}/bar/{**}
+            - /foo*
+            - /foo/bar*
             paths:
               - '*'
       when:
