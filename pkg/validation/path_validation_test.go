@@ -146,6 +146,7 @@ func TestValidatePaths_IllegalStringLiteralsNotAllowed(t *testing.T) {
 		"/api/array[0]/*",
 		"/api/path\\segment/*",
 
+		// With trailing multi-segment template
 		"/api space{**}",
 		"/api#fragment{**}",
 		"/api?query{**}",
@@ -157,6 +158,7 @@ func TestValidatePaths_IllegalStringLiteralsNotAllowed(t *testing.T) {
 		"/api`quote{**}",
 		"/api\"quote{**}",
 
+		// With single-segment template
 		"/api/{*}/user profile",
 		"/api/{*}/test#fragment",
 		"/api/{*}/query?param",
@@ -170,7 +172,7 @@ func TestValidatePaths_IllegalStringLiteralsNotAllowed(t *testing.T) {
 		"/api/{*}/test\nline",
 		"/api/{*}/test\ttab",
 
-		// Plain paths should also be validated
+		// Plain
 		"/api/user profile",
 		"/api/test#fragment",
 		"/api/query?param",
