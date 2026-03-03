@@ -138,6 +138,27 @@ func TestValidatePaths_IllegalStringLiteralsNotAllowed(t *testing.T) {
 	errMsg := "invalid string literal"
 
 	invalidPaths := []string{
+		// Legacy star syntax
+		"/api space/*",
+		"/api#fragment/*",
+		"/api?query/*",
+		"/api/<script>/*",
+		"/api/array[0]/*",
+		"/api/path\\segment/*",
+
+		// With trailing multi-segment template
+		"/api space{**}",
+		"/api#fragment{**}",
+		"/api?query{**}",
+		"/api<script{**}",
+		"/api[0]{**}",
+		"/api\\segment{**}",
+		"/api|pipe{**}",
+		"/api^symbol{**}",
+		"/api`quote{**}",
+		"/api\"quote{**}",
+
+		// With single-segment template
 		"/api/{*}/user profile",
 		"/api/{*}/test#fragment",
 		"/api/{*}/query?param",
@@ -150,6 +171,20 @@ func TestValidatePaths_IllegalStringLiteralsNotAllowed(t *testing.T) {
 		"/api/{*}/test\"quote",
 		"/api/{*}/test\nline",
 		"/api/{*}/test\ttab",
+
+		// Plain
+		"/api/user profile",
+		"/api/test#fragment",
+		"/api/query?param",
+		"/api/<script>",
+		"/api/array[0]",
+		"/api/path\\segment",
+		"/api/test|pipe",
+		"/api/test^symbol",
+		"/api/test`quote",
+		"/api/test\"quote",
+		"/api/test\nline",
+		"/api/test\ttab",
 	}
 
 	tests := make([]pathValidationTestCase, 0, len(invalidPaths))
@@ -159,6 +194,62 @@ func TestValidatePaths_IllegalStringLiteralsNotAllowed(t *testing.T) {
 			paths:   []string{path},
 			wantErr: true,
 			errMsg:  errMsg,
+		})
+	}
+
+	performTests(t, tests)
+}
+
+func TestValidatePaths_MultiPathSegmentWithPrefixAsLastOperatorWithOtherOperatorsNotAllowed(t *testing.T) {
+	invalidPaths := []string{
+		"/api/{*}/test{**}",
+		"/api/{**}/test{**}",
+	}
+
+	tests := make([]pathValidationTestCase, 0, len(invalidPaths))
+	for _, path := range invalidPaths {
+		tests = append(tests, pathValidationTestCase{
+			name:    "invalid multi-path segment with prefix and other operators: " + path,
+			paths:   []string{path},
+			wantErr: true,
+			errMsg:  "{**} is not the last operator",
+		})
+	}
+
+	performTests(t, tests)
+}
+
+func TestValidatePaths_MultiPathSegmentWithPrefixAsNonLastOperatorNotAllowed(t *testing.T) {
+	invalidPaths := []string{
+		"/api{**}/test",
+		"/api/v{**}/test",
+	}
+
+	tests := make([]pathValidationTestCase, 0, len(invalidPaths))
+	for _, path := range invalidPaths {
+		tests = append(tests, pathValidationTestCase{
+			name:    "invalid multi-path segment with prefix and other operators: " + path,
+			paths:   []string{path},
+			wantErr: true,
+			errMsg:  "{**} is not the last operator",
+		})
+	}
+
+	performTests(t, tests)
+}
+
+func TestValidatePaths_MultiPathSegmentWithPrefixAllowedAsLastOperatorWithoutOtherOperators(t *testing.T) {
+	validPaths := []string{
+		"/api{**}",
+		"/api/test{**}",
+	}
+
+	tests := make([]pathValidationTestCase, 0, len(validPaths))
+	for _, path := range validPaths {
+		tests = append(tests, pathValidationTestCase{
+			name:    "valid path: " + path,
+			paths:   []string{path},
+			wantErr: false,
 		})
 	}
 
@@ -194,6 +285,9 @@ func TestValidatePaths_ValidPaths(t *testing.T) {
 		// Multi-segment wildcard at end
 		"/api/{**}",
 		"/api/v1/{**}",
+
+		// Multi-segment wildcard with suffix
+		"/api/{**}/users",
 
 		// Single and multi-segment templates
 		"/api/{*}/data/{**}",
@@ -235,19 +329,6 @@ func TestValidatePaths_ValidPaths(t *testing.T) {
 		"/api/test:value",   // :
 		"/api/user@domain",  // @
 		"/api/key=value",    // =
-
-		"/api/user profile",
-		"/api/test#fragment",
-		"/api/query?param",
-		"/api/<script>",
-		"/api/array[0]",
-		"/api/path\\segment",
-		"/api/test|pipe",
-		"/api/test^symbol",
-		"/api/test`quote",
-		"/api/test\"quote",
-		"/api/test\nline",
-		"/api/test\ttab",
 	}
 
 	tests := make([]pathValidationTestCase, 0, len(validPaths))

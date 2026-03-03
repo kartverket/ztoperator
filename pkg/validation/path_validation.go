@@ -5,58 +5,126 @@ import (
 	"strings"
 )
 
+const (
+	errBracketsBeyondTemplateFmt = "invalid or unsupported path %s. Contains '{' or '}' beyond a supported path template"
+	errMatchAnyNotLastFmt        = "invalid or unsupported path %s. {**} is not the last operator"
+	errInvalidLiteralFmt         = "invalid or unsupported path %s. Contains segment %s with invalid string literal"
+)
+
 func ValidatePaths(paths []string) error {
 	for _, path := range paths {
-		if !strings.HasPrefix(path, "/") {
-			return fmt.Errorf("invalid path: %s; must start with '/'", path)
-		}
-		if strings.Contains(path, "{") || strings.Contains(path, "}") {
-			if err := validateNewPathSyntax(path); err != nil {
-				return err
-			}
-			continue
-		}
-		if strings.Count(path, "*") > 1 ||
-			(strings.Contains(path, "*") && (path != "*" && !strings.HasSuffix(path, "*"))) {
-			return fmt.Errorf("invalid path: %s; '*' must appear only once, be at the end, or be '*'", path)
+		if err := validatePath(path); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func validateNewPathSyntax(path string) error {
-	containsPathTemplate := strings.Contains(path, matchOneTemplate) || strings.Contains(path, matchAnyTemplate)
-	foundMatchAnyTemplate := false
-	// Strip leading and trailing slashes if they exist
-	path = strings.Trim(path, "/")
-	globs := strings.Split(path, "/")
-	for _, glob := range globs {
-		// If glob is a supported path template, skip the check
-		// If glob is {**}, it must be the last operator in the template
-		switch {
-		case glob == matchOneTemplate && !foundMatchAnyTemplate:
-			continue
-		case glob == matchAnyTemplate && !foundMatchAnyTemplate:
-			foundMatchAnyTemplate = true
-			continue
-		case (glob == matchAnyTemplate || glob == matchOneTemplate) && foundMatchAnyTemplate:
-			return fmt.Errorf("invalid or unsupported path %s. "+
-				"{**} is not the last operator", path)
-		}
+func validatePath(path string) error {
+	if !strings.HasPrefix(path, "/") {
+		return fmt.Errorf("invalid path: %s; must start with '/'", path)
+	}
 
-		// If glob is not a supported path template and contains `{`, or `}` it is invalid.
-		// Path is invalid if it contains `{` or `}` beyond a supported path template.
-		if strings.ContainsAny(glob, "{}") {
-			return fmt.Errorf("invalid or unsupported path %s. "+
-				"Contains '{' or '}' beyond a supported path template", path)
-		}
+	kind, err := classifyPath(path)
+	if err != nil {
+		return err
+	}
 
-		// Validate glob is valid string literal
-		// Meets Envoy's valid pchar requirements from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
-		if containsPathTemplate && !validLiteral.MatchString(glob) {
-			return fmt.Errorf("invalid or unsupported path %s. "+
-				"Contains segment %s with invalid string literal", path, glob)
+	switch kind {
+	case pathKindLegacyStar:
+		plainPartOfPath := strings.TrimSuffix(path, "*")
+		return validatePlainPathLiterals(plainPartOfPath)
+	case pathKindTemplate:
+		return validateTemplatePath(path)
+	case pathKindPlain:
+		return validatePlainPathLiterals(path)
+	default:
+		return fmt.Errorf("unsupported path kind for path %s", path)
+	}
+}
+
+func validatePlainPathLiterals(path string) error {
+	for _, seg := range toPathSegments(path) {
+		if seg == "" {
+			continue
+		}
+		if !validLiteral.MatchString(seg) {
+			return fmt.Errorf(errInvalidLiteralFmt, path, seg)
 		}
 	}
 	return nil
+}
+
+type templateState struct {
+	seenMatchOne   bool
+	seenMatchMulti bool
+}
+
+func validateTemplatePath(path string) error {
+	segments := toPathSegments(path)
+	state := templateState{}
+
+	for i, segment := range segments {
+		isLastSeg := i == len(segments)-1
+		if err := validateTemplatePathSegment(path, segment, isLastSeg, &state); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateTemplatePathSegment(path, segment string, isLastSegment bool, state *templateState) error {
+	switch {
+	case segment == matchOneTemplate:
+		// standalone {*} segment - not allowed after {**}
+		if state.seenMatchMulti {
+			return fmt.Errorf(errMatchAnyNotLastFmt, path)
+		}
+		state.seenMatchOne = true
+
+	case segment == matchAnyTemplate:
+		// standalone {**} segment - not allowed after {**}
+		if state.seenMatchMulti {
+			return fmt.Errorf(errMatchAnyNotLastFmt, path)
+		}
+		state.seenMatchMulti = true
+
+	case strings.HasSuffix(segment, matchAnyTemplate):
+		// prefix{**} — a literal prefix followed by {**}, e.g. "api{**}".
+		// Not allowed after any other template operator, and must be the last segment.
+		prefix := strings.TrimSuffix(segment, matchAnyTemplate)
+		if strings.ContainsAny(prefix, "{}") {
+			return fmt.Errorf(errBracketsBeyondTemplateFmt, path)
+		}
+		if !validLiteral.MatchString(prefix) {
+			return fmt.Errorf(errInvalidLiteralFmt, path, segment)
+		}
+		if !isLastSegment {
+			return fmt.Errorf(errMatchAnyNotLastFmt, path)
+		}
+		if state.seenMatchMulti || state.seenMatchOne {
+			return fmt.Errorf(errMatchAnyNotLastFmt, path)
+		}
+		state.seenMatchMulti = true
+
+	case strings.ContainsAny(segment, "{}"):
+		// Any other use of braces is not supported.
+		return fmt.Errorf(errBracketsBeyondTemplateFmt, path)
+
+	default:
+		// Plain literal segment — validate that it contains only allowed characters.
+		if !validLiteral.MatchString(segment) {
+			return fmt.Errorf(errInvalidLiteralFmt, path, segment)
+		}
+	}
+	return nil
+}
+
+func toPathSegments(path string) []string {
+	trimmed := strings.Trim(path, "/")
+	if trimmed == "" {
+		return []string{}
+	}
+	return strings.Split(trimmed, "/")
 }

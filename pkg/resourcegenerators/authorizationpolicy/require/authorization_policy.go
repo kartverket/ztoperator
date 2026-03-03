@@ -7,6 +7,7 @@ import (
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy"
+	"github.com/kartverket/ztoperator/pkg/validation"
 	"istio.io/api/security/v1beta1"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -102,7 +103,7 @@ func constructSpecifiedPathsAllowRules(
 				To: []*v1beta1.Rule_To{
 					{
 						Operation: &v1beta1.Operation{
-							Paths:   authRule.Paths,
+							Paths:   validation.TransformPathsForIstio(authRule.Paths),
 							Methods: authRule.Methods,
 						},
 					},
@@ -138,7 +139,7 @@ func constructUnspecifiedPathsAllowRule(
 		}
 		unspecifiedPathsRuleList = append(unspecifiedPathsRuleList, &v1beta1.Rule_To{
 			Operation: &v1beta1.Operation{
-				Paths:      matcher.Paths,
+				Paths:      validation.TransformPathsForIstio(matcher.Paths),
 				NotMethods: methods, // NB: NotMethods used to create to-rules for all methods not defined in a matcher
 			},
 		})
@@ -147,7 +148,7 @@ func constructUnspecifiedPathsAllowRule(
 	// For all request matchers, create to-rules for all paths not defined in a matcher
 	mentionedPaths := make([]string, 0, len(allRequestMatchers))
 	for _, matcher := range allRequestMatchers {
-		mentionedPaths = append(mentionedPaths, matcher.Paths...)
+		mentionedPaths = append(mentionedPaths, validation.TransformPathsForIstio(matcher.Paths)...)
 	}
 	unspecifiedPathsRuleList = append(unspecifiedPathsRuleList, &v1beta1.Rule_To{
 		Operation: &v1beta1.Operation{
