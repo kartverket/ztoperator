@@ -15,7 +15,7 @@ const (
 )
 
 //go:embed ztoperator.lua
-var luaScript string
+var luaScriptTemplate string
 
 func GenerateLuaScript(
 	authPolicy *v1alpha1.AuthPolicy,
@@ -41,7 +41,7 @@ func GenerateLuaScript(
 	}
 
 	return fmt.Sprintf(
-		luaScript,
+		luaScriptTemplate,
 		ignoreRulesLua,
 		requireRulesLua,
 		denyRedirectRulesLua,
