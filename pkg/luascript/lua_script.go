@@ -26,14 +26,9 @@ func GetLuaScript(
 	requireAuthRequestMatchers := requireAuthMatchers(authPolicy.Spec.AuthRules, autoLoginConfig)
 	denyRedirectRequestMatchers := denyRedirectMatchers(authPolicy.Spec.AuthRules)
 
-	ignoreAuthAsLuaPatterns := convertToLuaPatterns(ignoreAuthRequestMatchers)
-	requireAuthAsLuaPatterns := convertToLuaPatterns(requireAuthRequestMatchers)
-	denyRedirectAsLuaPatterns := convertToLuaPatterns(denyRedirectRequestMatchers)
-
-	// Produce equivalent Lua tables that the generated script can iterate over.
-	ignoreRulesLua := BuildLuaRules(ignoreAuthAsLuaPatterns)
-	requireRulesLua := BuildLuaRules(requireAuthAsLuaPatterns)
-	denyRedirectRulesLua := BuildLuaRules(denyRedirectAsLuaPatterns)
+	ignoreRulesLua := BuildLuaRulesFromMatchers(ignoreAuthRequestMatchers)
+	requireRulesLua := BuildLuaRulesFromMatchers(requireAuthRequestMatchers)
+	denyRedirectRulesLua := BuildLuaRulesFromMatchers(denyRedirectRequestMatchers)
 
 	loginParamsAsLua := BuildLuaParams(autoLoginConfig.LoginParams)
 
@@ -90,18 +85,4 @@ func requireAuthMatchers(authRules *[]v1alpha1.RequestAuthRule, autoLoginConfig 
 		Methods: []string{},
 	})
 	return matchers
-}
-func convertToLuaPatterns(requestMatchers []v1alpha1.RequestMatcher) []v1alpha1.RequestMatcher {
-	result := make([]v1alpha1.RequestMatcher, 0, len(requestMatchers))
-	for _, matcher := range requestMatchers {
-		pathAsLuaPattern := make([]string, 0, len(matcher.Paths))
-		for _, path := range matcher.Paths {
-			pathAsLuaPattern = append(pathAsLuaPattern, ConvertRequestMatcherPathToRegex(path))
-		}
-		result = append(result, v1alpha1.RequestMatcher{
-			Paths:   pathAsLuaPattern,
-			Methods: matcher.Methods,
-		})
-	}
-	return result
 }
