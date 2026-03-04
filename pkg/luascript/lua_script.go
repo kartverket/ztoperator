@@ -22,46 +22,9 @@ func GetLuaScript(
 	autoLoginConfig state.AutoLoginConfig,
 	identityProviderUris state.IdentityProviderUris,
 ) string {
-	ignoreAuthRequestMatchers := func(ignoreAuthRules *[]v1alpha1.RequestMatcher) []v1alpha1.RequestMatcher {
-		if ignoreAuthRules != nil {
-			return *ignoreAuthRules
-		}
-		return []v1alpha1.RequestMatcher{}
-	}(authPolicy.Spec.IgnoreAuthRules)
-
-	denyRedirectRequestMatchers := func(authRules *[]v1alpha1.RequestAuthRule) []v1alpha1.RequestMatcher {
-		var result []v1alpha1.RequestMatcher
-		if authRules != nil {
-			for _, authRule := range *authRules {
-				if authRule.DenyRedirect != nil && *authRule.DenyRedirect {
-					result = append(result, authRule.RequestMatcher)
-				}
-			}
-		}
-		return result
-	}(authPolicy.Spec.AuthRules)
-
-	requireAuthRequestMatchers := func(
-		requireAuth []v1alpha1.RequestMatcher,
-		autoLoginConfig state.AutoLoginConfig,
-	) []v1alpha1.RequestMatcher {
-		var autoLoginPaths []string
-		autoLoginPaths = append(autoLoginPaths, autoLoginConfig.RedirectPath)
-		autoLoginPaths = append(autoLoginPaths, autoLoginConfig.LogoutPath)
-		if autoLoginConfig.LoginPath != nil {
-			autoLoginPaths = append(autoLoginPaths, *autoLoginConfig.LoginPath)
-		}
-		requireAuth = append(requireAuth, v1alpha1.RequestMatcher{
-			Paths:   autoLoginPaths,
-			Methods: []string{},
-		})
-		return requireAuth
-	}(
-		v1alpha1.GetRequestMatchers(
-			authPolicy.Spec.AuthRules,
-		),
-		autoLoginConfig,
-	)
+	ignoreAuthRequestMatchers := ignoreAuthMatchers(authPolicy.Spec.IgnoreAuthRules)
+	requireAuthRequestMatchers := requireAuthMatchers(authPolicy.Spec.AuthRules, autoLoginConfig)
+	denyRedirectRequestMatchers := denyRedirectMatchers(authPolicy.Spec.AuthRules)
 
 	ignoreAuthAsLuaPatterns := convertToLuaPatterns(ignoreAuthRequestMatchers)
 	requireAuthAsLuaPatterns := convertToLuaPatterns(requireAuthRequestMatchers)
@@ -96,6 +59,38 @@ func GetLuaScript(
 	)
 }
 
+func ignoreAuthMatchers(ignoreAuthRules *[]v1alpha1.RequestMatcher) []v1alpha1.RequestMatcher {
+	if ignoreAuthRules != nil {
+		return *ignoreAuthRules
+	}
+	return []v1alpha1.RequestMatcher{}
+}
+
+func denyRedirectMatchers(authRules *[]v1alpha1.RequestAuthRule) []v1alpha1.RequestMatcher {
+	var result []v1alpha1.RequestMatcher
+	if authRules != nil {
+		for _, authRule := range *authRules {
+			if authRule.DenyRedirect != nil && *authRule.DenyRedirect {
+				result = append(result, authRule.RequestMatcher)
+			}
+		}
+	}
+	return result
+}
+
+func requireAuthMatchers(authRules *[]v1alpha1.RequestAuthRule, autoLoginConfig state.AutoLoginConfig) []v1alpha1.RequestMatcher {
+	matchers := v1alpha1.GetRequestMatchers(authRules)
+
+	autoLoginPaths := []string{autoLoginConfig.RedirectPath, autoLoginConfig.LogoutPath}
+	if autoLoginConfig.LoginPath != nil {
+		autoLoginPaths = append(autoLoginPaths, *autoLoginConfig.LoginPath)
+	}
+	matchers = append(matchers, v1alpha1.RequestMatcher{
+		Paths:   autoLoginPaths,
+		Methods: []string{},
+	})
+	return matchers
+}
 func convertToLuaPatterns(requestMatchers []v1alpha1.RequestMatcher) []v1alpha1.RequestMatcher {
 	result := make([]v1alpha1.RequestMatcher, 0, len(requestMatchers))
 	for _, matcher := range requestMatchers {
