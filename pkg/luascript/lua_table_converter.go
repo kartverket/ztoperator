@@ -13,7 +13,7 @@ func convertToLuaPatterns(requestMatchers []v1alpha1.RequestMatcher) []v1alpha1.
 	for _, matcher := range requestMatchers {
 		pathAsLuaPattern := make([]string, 0, len(matcher.Paths))
 		for _, path := range matcher.Paths {
-			pathAsLuaPattern = append(pathAsLuaPattern, ConvertRequestMatcherPathToRegex(path))
+			pathAsLuaPattern = append(pathAsLuaPattern, ConvertRequestMatcherPathToLuaPattern(path))
 		}
 		result = append(result, v1alpha1.RequestMatcher{
 			Paths:   pathAsLuaPattern,

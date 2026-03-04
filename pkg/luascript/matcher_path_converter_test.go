@@ -93,11 +93,31 @@ func TestConvertRequestMatcherPathToRegex(t *testing.T) {
 			expected: "^/api/[^/]+/moreapi/.*$",
 			reason:   "Multi-segment middle wildcard matches multiple path segments",
 		},
+
+		// Escaping correctness
+		{
+			name:     "all lua-pattern special characters in a single path are each escaped",
+			input:    "/%^$%().[]+-?",
+			expected: "^/%%%^%$%%%(%)%.%[%]%+%-%?$",
+			reason:   "Every Lua magic character must be individually escaped",
+		},
+		{
+			name:     "percent is escaped before other characters to avoid double-escaping",
+			input:    "/%.%",
+			expected: "^/%%%.%%$",
+			reason:   "If % were not escaped first, a %X sequence would incorrectly become %%X instead of %%%X",
+		},
+		{
+			name:     "path with single-segment wildcard, suffix multi-segment wildcard, and special characters",
+			input:    "/api.v1/{*}/items+(v2){**}",
+			expected: "^/api%.v1/[^/]+/items%+%(v2%).*$",
+			reason:   "Special characters in literal segments must be escaped while wildcards expand correctly",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := luascript.ConvertRequestMatcherPathToRegex(tt.input)
+			result := luascript.ConvertRequestMatcherPathToLuaPattern(tt.input)
 			assert.Equal(t, tt.expected, result, "Reason: %s", tt.reason)
 		})
 	}
