@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"fmt"
 	"net/url"
-	"sort"
 	"strings"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
@@ -65,14 +64,14 @@ func GetLuaScript(
 		autoLoginConfig,
 	)
 
-	ignoreAuthAsRE2Regex := convertToRE2Regex(ignoreAuthRequestMatchers)
-	requireAuthAsRE2Regex := convertToRE2Regex(requireAuthRequestMatchers)
-	denyRedirectAsRE2Regex := convertToRE2Regex(denyRedirectRequestMatchers)
+	ignoreAuthAsLuaPatterns := convertToLuaPatterns(ignoreAuthRequestMatchers)
+	requireAuthAsLuaPatterns := convertToLuaPatterns(requireAuthRequestMatchers)
+	denyRedirectAsLuaPatterns := convertToLuaPatterns(denyRedirectRequestMatchers)
 
 	// Produce equivalent Lua tables that the generated script can iterate over.
-	ignoreRulesLua := buildLuaRules(ignoreAuthAsRE2Regex)
-	requireRulesLua := buildLuaRules(requireAuthAsRE2Regex)
-	denyRedirectRulesLua := buildLuaRules(denyRedirectAsRE2Regex)
+	ignoreRulesLua := BuildLuaRules(ignoreAuthAsLuaPatterns)
+	requireRulesLua := BuildLuaRules(requireAuthAsLuaPatterns)
+	denyRedirectRulesLua := BuildLuaRules(denyRedirectAsLuaPatterns)
 
 	loginParamsAsLua := BuildLuaParams(autoLoginConfig.LoginParams)
 
@@ -98,15 +97,15 @@ func GetLuaScript(
 	)
 }
 
-func convertToRE2Regex(requestMatchers []v1alpha1.RequestMatcher) []v1alpha1.RequestMatcher {
+func convertToLuaPatterns(requestMatchers []v1alpha1.RequestMatcher) []v1alpha1.RequestMatcher {
 	result := make([]v1alpha1.RequestMatcher, 0, len(requestMatchers))
 	for _, matcher := range requestMatchers {
-		pathAsRE2Regex := make([]string, 0, len(matcher.Paths))
+		pathAsLuaPattern := make([]string, 0, len(matcher.Paths))
 		for _, path := range matcher.Paths {
-			pathAsRE2Regex = append(pathAsRE2Regex, "^"+convertRequestMatcherPathToRegex(path))
+			pathAsLuaPattern = append(pathAsLuaPattern, convertRequestMatcherPathToRegex(path))
 		}
 		result = append(result, v1alpha1.RequestMatcher{
-			Paths:   pathAsRE2Regex,
+			Paths:   pathAsLuaPattern,
 			Methods: matcher.Methods,
 		})
 	}
@@ -117,9 +116,9 @@ func convertRequestMatcherPathToRegex(path string) string {
 	path = strings.ReplaceAll(path, "-", "%-")
 	if strings.Contains(path, "*") || strings.Contains(path, "{") {
 		path = convertToEnvoyWildcards(path)
-		return envoyWildcardsToRE2Regex(path)
+		return "^" + envoyWildcardsToLuaPattern(path) + "$"
 	}
-	return path + "$"
+	return "^" + EscapeLuaPatternChars(path) + "$"
 }
 
 func convertToEnvoyWildcards(pathWithIstioWildcards string) string {
@@ -132,54 +131,13 @@ func convertToEnvoyWildcards(pathWithIstioWildcards string) string {
 	return strings.ReplaceAll(pathWithIstioWildcards, "*", "**")
 }
 
-func envoyWildcardsToRE2Regex(path string) string {
 	const doubleStarPlaceholder = "<<DOUBLE_STAR>>"
 	path = strings.ReplaceAll(path, "**", doubleStarPlaceholder)
 	path = strings.ReplaceAll(path, "*", "[^/]+")
 	path = strings.ReplaceAll(path, ".", "%.")
 	return strings.ReplaceAll(path, doubleStarPlaceholder, ".*")
 }
+func envoyWildcardsToLuaPattern(path string) string {
 
-// escapeLuaString ensures any back‑slashes or quotes in the regex are safe for Lua source.
-func escapeLuaString(s string) string {
-	if s == "/" {
-		return "^/$"
-	}
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `"`, `\"`)
-	return s
-}
 
-// buildLuaRules converts a slice of RequestMatcher into a Lua literal table.
-// Each entry becomes {regex="<path‑regex>", methods={["GET"]=true, ...}}.
-func buildLuaRules(requestMatchers []v1alpha1.RequestMatcher) string {
-	var sb strings.Builder
-	sb.WriteString("{")
-	first := true
-	for _, matcher := range requestMatchers {
-		for _, path := range matcher.Paths {
-			if !first {
-				sb.WriteString(",")
-			}
-			first = false
-
-			sb.WriteString(`{regex="`)
-			sb.WriteString(escapeLuaString(path))
-			sb.WriteString(`",methods={`)
-
-			if len(matcher.Methods) > 0 {
-				for idx, method := range matcher.Methods {
-					if idx > 0 {
-						sb.WriteString(",")
-					}
-					sb.WriteString(`["`)
-					sb.WriteString(method)
-					sb.WriteString(`"]=true`)
-				}
-			}
-			sb.WriteString("}}")
-		}
-	}
-	sb.WriteString("}")
-	return sb.String()
 }
