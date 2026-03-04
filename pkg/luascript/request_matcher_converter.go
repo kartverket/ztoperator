@@ -18,14 +18,13 @@ func ConvertRequestMatchersToLuaTableString(requestMatchers []v1alpha1.RequestMa
 	first := true
 	for _, matcher := range requestMatchers {
 		for _, path := range matcher.Paths {
-			convertedPath := ConvertRequestMatcherPathToLuaPattern(path)
 			if !first {
 				sb.WriteString(",")
 			}
 			first = false
 
 			sb.WriteString(`{regex="`)
-			sb.WriteString(escapeLuaString(convertedPath))
+			sb.WriteString(ConvertRequestMatcherPathToLuaPattern(path))
 			sb.WriteString(`",methods={`)
 
 			if len(matcher.Methods) > 0 {
@@ -43,14 +42,4 @@ func ConvertRequestMatchersToLuaTableString(requestMatchers []v1alpha1.RequestMa
 	}
 	sb.WriteString("}")
 	return sb.String()
-}
-
-// escapeLuaString ensures any back‑slashes or quotes in the regex are safe for Lua source.
-func escapeLuaString(s string) string {
-	if s == "/" {
-		return "^/$"
-	}
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `"`, `\"`)
-	return s
 }
