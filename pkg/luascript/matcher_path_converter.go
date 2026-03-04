@@ -7,6 +7,16 @@ const (
 	doubleStarPlaceholder = "<<DOUBLESTAR>>"
 )
 
+// ConvertRequestMatcherPathToLuaPattern converts a raw request matcher path
+// into a fully anchored Lua pattern string for use in string.match calls inside
+// the generated EnvoyFilter Lua script.
+//
+// Examples:
+//
+//	ConvertRequestMatcherPathToLuaPattern("/api/v1.0/items")  // → "^/api/v1%.0/items$"
+//	ConvertRequestMatcherPathToLuaPattern("/api/{*}/items")   // → "^/api/[^/]+/items$"
+//	ConvertRequestMatcherPathToLuaPattern("/api/{**}")        // → "^/api/.*$"
+//	ConvertRequestMatcherPathToLuaPattern("/api/*")           // → "^/api/.*$"
 func ConvertRequestMatcherPathToLuaPattern(path string) string {
 	return "^" + toLuaPattern(path) + "$"
 }

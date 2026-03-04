@@ -26,9 +26,9 @@ func GetLuaScript(
 	requireAuthRequestMatchers := requireAuthMatchers(authPolicy.Spec.AuthRules, autoLoginConfig)
 	denyRedirectRequestMatchers := denyRedirectMatchers(authPolicy.Spec.AuthRules)
 
-	ignoreRulesLua := BuildLuaRulesFromMatchers(ignoreAuthRequestMatchers)
-	requireRulesLua := BuildLuaRulesFromMatchers(requireAuthRequestMatchers)
-	denyRedirectRulesLua := BuildLuaRulesFromMatchers(denyRedirectRequestMatchers)
+	ignoreRulesLua := ConvertRequestMatchersToLuaTableString(ignoreAuthRequestMatchers)
+	requireRulesLua := ConvertRequestMatchersToLuaTableString(requireAuthRequestMatchers)
+	denyRedirectRulesLua := ConvertRequestMatchersToLuaTableString(denyRedirectRequestMatchers)
 
 	loginParamsAsLua := ConvertLoginParamsToLuaParams(autoLoginConfig.LoginParams)
 

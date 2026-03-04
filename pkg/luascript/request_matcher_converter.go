@@ -6,28 +6,26 @@ import (
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 )
 
-// BuildLuaRules converts a slice of RequestMatcher into a Lua literal table
-// string, where each path/methods pair becomes one entry of the form:
+// ConvertRequestMatchersToLuaTableString converts RequestMatchers into a Lua table string.
+// Each path/methods pair becomes one entry of the form:
 //
 //	{regex="^/some%-path$",methods={["GET"]=true, ...}}
 //
-// Paths are expected to already be valid Lua patterns anchored with "^...$",
-// as produced by convertToLuaPatterns.
-//
 // An empty methods slice means all HTTP methods are permitted.
-func BuildLuaRules(requestMatchers []v1alpha1.RequestMatcher) string {
+func ConvertRequestMatchersToLuaTableString(requestMatchers []v1alpha1.RequestMatcher) string {
 	var sb strings.Builder
 	sb.WriteString("{")
 	first := true
 	for _, matcher := range requestMatchers {
 		for _, path := range matcher.Paths {
+			convertedPath := ConvertRequestMatcherPathToLuaPattern(path)
 			if !first {
 				sb.WriteString(",")
 			}
 			first = false
 
 			sb.WriteString(`{regex="`)
-			sb.WriteString(escapeLuaString(path))
+			sb.WriteString(escapeLuaString(convertedPath))
 			sb.WriteString(`",methods={`)
 
 			if len(matcher.Methods) > 0 {
