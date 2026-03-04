@@ -30,7 +30,7 @@ func GetLuaScript(
 	requireRulesLua := BuildLuaRulesFromMatchers(requireAuthRequestMatchers)
 	denyRedirectRulesLua := BuildLuaRulesFromMatchers(denyRedirectRequestMatchers)
 
-	loginParamsAsLua := BuildLuaParams(autoLoginConfig.LoginParams)
+	loginParamsAsLua := ConvertLoginParamsToLuaParams(autoLoginConfig.LoginParams)
 
 	var queryEscapedPostLogoutRedirectURI string
 	if autoLoginConfig.PostLogoutRedirectURI != nil {

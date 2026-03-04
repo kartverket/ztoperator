@@ -7,7 +7,21 @@ import (
 	"strings"
 )
 
-func BuildLuaParams(rawLoginParams map[string]string) string {
+// ConvertLoginParamsToLuaParams encodes a map of OAuth login parameters into a
+// Lua table literal string suitable for embedding in the generated EnvoyFilter
+// Lua script. Keys are emitted in sorted order for deterministic output. Values
+// are URL-encoded with [url.QueryEscape] before embedding.
+//
+// An empty or nil map returns an empty Lua table.
+//
+// Example:
+//
+//	ConvertLoginParamsToLuaParams(map[string]string{
+//	    "acr_values": "idporten-loa-high",
+//	    "ui_locales": "nb",
+//	})
+//	// → {["acr_values"]="idporten-loa-high",["ui_locales"]="nb"}
+func ConvertLoginParamsToLuaParams(rawLoginParams map[string]string) string {
 	params := encodeLoginParams(rawLoginParams)
 
 	if len(params) == 0 {
