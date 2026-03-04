@@ -20,7 +20,7 @@ import (
 //	    "acr_values": "idporten-loa-high",
 //	    "ui_locales": "nb",
 //	})
-//	// → {["acr_values"]="idporten-loa-high",["ui_locales"]="nb"}
+//	→ {["acr_values"]="idporten-loa-high",["ui_locales"]="nb"}
 func ConvertLoginParamsToLuaParams(rawLoginParams map[string]string) string {
 	params := encodeLoginParams(rawLoginParams)
 

@@ -17,6 +17,33 @@ const (
 //go:embed ztoperator.lua
 var luaScriptTemplate string
 
+// GenerateLuaScript produces the Lua source code that is embedded as an inline
+// Envoy Lua filter inside the generated EnvoyFilter resource.
+//
+// The Lua filter runs inside the Envoy sidecar on every inbound HTTP request
+// and response, and acts as a pre-processing layer for the Envoy OAuth2 filter
+// that sits immediately after it in the filter chain:
+//
+//   - On request: the script evaluates the request path and method against the
+//     configured ignore, require, and deny-redirect rules, then sets two
+//     synthetic headers that the OAuth2 filter reads to decide how to handle
+//     the request:
+//
+//   - x-bypass-login: "true"  — the OAuth2 filter lets the request through
+//     without requiring authentication (used for public paths).
+//
+//   - x-deny-redirect: "true" — the OAuth2 filter returns a 401 instead of
+//     redirecting to the IdP (used for API paths where a browser redirect
+//     would be inappropriate).
+//
+//   - On response: the script intercepts 302 redirects produced by the OAuth2
+//     filter and rewrites the Location header:
+//
+//   - Redirects to the authorize endpoint have any configured loginParams
+//     (e.g. acr_values, ui_locales) merged into the query string.
+//
+//   - Redirects to the end-session endpoint have the postLogoutRedirectUri
+//     appended as a query parameter when one is configured.
 func GenerateLuaScript(
 	authPolicy *v1alpha1.AuthPolicy,
 	autoLoginConfig state.AutoLoginConfig,

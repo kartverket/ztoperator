@@ -13,10 +13,10 @@ const (
 //
 // Examples:
 //
-//	ConvertRequestMatcherPathToLuaPattern("/api/v1.0/items")  // → "^/api/v1%.0/items$"
-//	ConvertRequestMatcherPathToLuaPattern("/api/{*}/items")   // → "^/api/[^/]+/items$"
-//	ConvertRequestMatcherPathToLuaPattern("/api/{**}")        // → "^/api/.*$"
-//	ConvertRequestMatcherPathToLuaPattern("/api/*")           // → "^/api/.*$"
+//	ConvertRequestMatcherPathToLuaPattern("/api/v1.0/items")  → "^/api/v1%.0/items$"
+//	ConvertRequestMatcherPathToLuaPattern("/api/{*}/items")   → "^/api/[^/]+/items$"
+//	ConvertRequestMatcherPathToLuaPattern("/api/{**}")        → "^/api/.*$"
+//	ConvertRequestMatcherPathToLuaPattern("/api/*")           → "^/api/.*$"
 func ConvertRequestMatcherPathToLuaPattern(path string) string {
 	return "^" + toLuaPattern(path) + "$"
 }
