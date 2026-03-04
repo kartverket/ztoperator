@@ -113,8 +113,7 @@ func convertToLuaPatterns(requestMatchers []v1alpha1.RequestMatcher) []v1alpha1.
 }
 
 func convertRequestMatcherPathToRegex(path string) string {
-	path = strings.ReplaceAll(path, "-", "%-")
-	if strings.Contains(path, "*") || strings.Contains(path, "{") {
+	if strings.ContainsAny(path, "*{}") {
 		path = convertToEnvoyWildcards(path)
 		return "^" + envoyWildcardsToLuaPattern(path) + "$"
 	}
@@ -131,13 +130,19 @@ func convertToEnvoyWildcards(pathWithIstioWildcards string) string {
 	return strings.ReplaceAll(pathWithIstioWildcards, "*", "**")
 }
 
-	const doubleStarPlaceholder = "<<DOUBLE_STAR>>"
-	path = strings.ReplaceAll(path, "**", doubleStarPlaceholder)
-	path = strings.ReplaceAll(path, "*", "[^/]+")
-	path = strings.ReplaceAll(path, ".", "%.")
-	return strings.ReplaceAll(path, doubleStarPlaceholder, ".*")
-}
 func envoyWildcardsToLuaPattern(path string) string {
+	const (
+		singleStarPlaceholder = "<<SINGLESTAR>>"
+		doubleStarPlaceholder = "<<DOUBLESTAR>>"
+	)
 
+	path = strings.ReplaceAll(path, "**", doubleStarPlaceholder) // replace double start first
+	path = strings.ReplaceAll(path, "*", singleStarPlaceholder)  // replace single star second
 
+	path = EscapeLuaPatternChars(path)
+
+	path = strings.ReplaceAll(path, singleStarPlaceholder, "[^/]+")
+	path = strings.ReplaceAll(path, doubleStarPlaceholder, ".*")
+
+	return path
 }
