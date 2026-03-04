@@ -31,7 +31,7 @@ func ResolveAutoLoginConfig(
 	autoLoginConfig.SetSaneDefaults(*authPolicy.Spec.AutoLogin)
 
 	autoLoginConfig.LuaScriptConfig = state.LuaScriptConfig{
-		LuaScript: luascript.GetLuaScript(
+		LuaScript: luascript.GenerateLuaScript(
 			authPolicy,
 			autoLoginConfig,
 			identityProviderUris,

@@ -17,14 +17,14 @@ const (
 //go:embed ztoperator.lua
 var luaScript string
 
-func GetLuaScript(
+func GenerateLuaScript(
 	authPolicy *v1alpha1.AuthPolicy,
 	autoLoginConfig state.AutoLoginConfig,
 	identityProviderUris state.IdentityProviderUris,
 ) string {
-	ignoreAuthRequestMatchers := ignoreAuthMatchers(authPolicy.Spec.IgnoreAuthRules)
-	requireAuthRequestMatchers := requireAuthMatchers(authPolicy.Spec.AuthRules, autoLoginConfig)
-	denyRedirectRequestMatchers := denyRedirectMatchers(authPolicy.Spec.AuthRules)
+	ignoreAuthRequestMatchers := IgnoreAuthMatchers(authPolicy.Spec.IgnoreAuthRules)
+	requireAuthRequestMatchers := RequireAuthMatchers(authPolicy.Spec.AuthRules, autoLoginConfig)
+	denyRedirectRequestMatchers := DenyRedirectMatchers(authPolicy.Spec.AuthRules)
 
 	ignoreRulesLua := ConvertRequestMatchersToLuaTableString(ignoreAuthRequestMatchers)
 	requireRulesLua := ConvertRequestMatchersToLuaTableString(requireAuthRequestMatchers)
@@ -54,14 +54,14 @@ func GetLuaScript(
 	)
 }
 
-func ignoreAuthMatchers(ignoreAuthRules *[]v1alpha1.RequestMatcher) []v1alpha1.RequestMatcher {
+func IgnoreAuthMatchers(ignoreAuthRules *[]v1alpha1.RequestMatcher) []v1alpha1.RequestMatcher {
 	if ignoreAuthRules != nil {
 		return *ignoreAuthRules
 	}
 	return []v1alpha1.RequestMatcher{}
 }
 
-func denyRedirectMatchers(authRules *[]v1alpha1.RequestAuthRule) []v1alpha1.RequestMatcher {
+func DenyRedirectMatchers(authRules *[]v1alpha1.RequestAuthRule) []v1alpha1.RequestMatcher {
 	var result []v1alpha1.RequestMatcher
 	if authRules != nil {
 		for _, authRule := range *authRules {
@@ -73,7 +73,7 @@ func denyRedirectMatchers(authRules *[]v1alpha1.RequestAuthRule) []v1alpha1.Requ
 	return result
 }
 
-func requireAuthMatchers(authRules *[]v1alpha1.RequestAuthRule, autoLoginConfig state.AutoLoginConfig) []v1alpha1.RequestMatcher {
+func RequireAuthMatchers(authRules *[]v1alpha1.RequestAuthRule, autoLoginConfig state.AutoLoginConfig) []v1alpha1.RequestMatcher {
 	matchers := v1alpha1.GetRequestMatchers(authRules)
 
 	autoLoginPaths := []string{autoLoginConfig.RedirectPath, autoLoginConfig.LogoutPath}
