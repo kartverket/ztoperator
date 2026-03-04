@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"fmt"
 	"net/url"
-	"strings"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/state"
@@ -102,7 +101,7 @@ func convertToLuaPatterns(requestMatchers []v1alpha1.RequestMatcher) []v1alpha1.
 	for _, matcher := range requestMatchers {
 		pathAsLuaPattern := make([]string, 0, len(matcher.Paths))
 		for _, path := range matcher.Paths {
-			pathAsLuaPattern = append(pathAsLuaPattern, convertRequestMatcherPathToRegex(path))
+			pathAsLuaPattern = append(pathAsLuaPattern, ConvertRequestMatcherPathToRegex(path))
 		}
 		result = append(result, v1alpha1.RequestMatcher{
 			Paths:   pathAsLuaPattern,
@@ -110,39 +109,4 @@ func convertToLuaPatterns(requestMatchers []v1alpha1.RequestMatcher) []v1alpha1.
 		})
 	}
 	return result
-}
-
-func convertRequestMatcherPathToRegex(path string) string {
-	if strings.ContainsAny(path, "*{}") {
-		path = convertToEnvoyWildcards(path)
-		return "^" + envoyWildcardsToLuaPattern(path) + "$"
-	}
-	return "^" + EscapeLuaPatternChars(path) + "$"
-}
-
-func convertToEnvoyWildcards(pathWithIstioWildcards string) string {
-	if strings.Contains(pathWithIstioWildcards, "{") {
-		// New path wildcard syntax
-		removedStartBracket := strings.ReplaceAll(pathWithIstioWildcards, "{", "")
-		return strings.ReplaceAll(removedStartBracket, "}", "")
-	}
-	// Old wildcard syntax
-	return strings.ReplaceAll(pathWithIstioWildcards, "*", "**")
-}
-
-func envoyWildcardsToLuaPattern(path string) string {
-	const (
-		singleStarPlaceholder = "<<SINGLESTAR>>"
-		doubleStarPlaceholder = "<<DOUBLESTAR>>"
-	)
-
-	path = strings.ReplaceAll(path, "**", doubleStarPlaceholder) // replace double start first
-	path = strings.ReplaceAll(path, "*", singleStarPlaceholder)  // replace single star second
-
-	path = EscapeLuaPatternChars(path)
-
-	path = strings.ReplaceAll(path, singleStarPlaceholder, "[^/]+")
-	path = strings.ReplaceAll(path, doubleStarPlaceholder, ".*")
-
-	return path
 }
