@@ -125,7 +125,7 @@ type Scope struct {
 - **Import shadowing**: Disallowed (`revive` rule `import-shadowing`).
 - **Comment spacing**: Enforced (`revive` rule `comment-spacings`).
 - **Line length**: `lll` linter enabled (relaxed for `api/` and `internal/` paths).
-- Use `fmt.Sprintf` for log messages, not structured key-value logging (current codebase convention).
+- Use structured key-value pairs for log messages: `rLog.Info("msg", "key1", value, "key2", value, ...)`. The `Logger` type in `pkg/log/` accepts `keysAndValues ...interface{}` for all levels.
 - Use `helperfunctions.Ptr(value)` to create pointers from literal values.
 - Use `helperfunctions.BuildObjectMeta(name, namespace)` to create ObjectMeta for child resources.
 
