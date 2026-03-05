@@ -41,7 +41,7 @@ def lua_rules_from_matchers(matchers):
             regex = regex.replace("-", "%-")
             # If the path has a wildcard, convert "*" to ".*" and anchor at start.
             if "*" in regex:
-                regex = "^" + regex.replace("*", ".*")
+                regex = "^" + regex.replace("*", ".*") + "$"
             else:
                 # no wildcard: exact match
                 if not regex.startswith("^"):
