@@ -14,7 +14,9 @@ func TestConvertRequestMatchersToLuaTableString(t *testing.T) {
 		methods := []string{}
 		expected := "{}"
 
-		result := luascript.ConvertRequestMatchersToLuaTableString([]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}})
+		result := luascript.ConvertRequestMatchersToLuaTableString(
+			[]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}},
+		)
 		assert.Equal(t, expected, result)
 	})
 
@@ -23,7 +25,9 @@ func TestConvertRequestMatchersToLuaTableString(t *testing.T) {
 		methods := []string{}
 		expected := `{{regex="^/$",methods={}}}`
 
-		result := luascript.ConvertRequestMatchersToLuaTableString([]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}})
+		result := luascript.ConvertRequestMatchersToLuaTableString(
+			[]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}},
+		)
 		assert.Equal(t, expected, result)
 	})
 
@@ -32,7 +36,9 @@ func TestConvertRequestMatchersToLuaTableString(t *testing.T) {
 		methods := []string{}
 		expected := `{{regex="^/api$",methods={}}}`
 
-		result := luascript.ConvertRequestMatchersToLuaTableString([]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}})
+		result := luascript.ConvertRequestMatchersToLuaTableString(
+			[]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}},
+		)
 		assert.Equal(t, expected, result)
 	})
 
@@ -41,7 +47,9 @@ func TestConvertRequestMatchersToLuaTableString(t *testing.T) {
 		methods := []string{"GET"}
 		expected := `{{regex="^/api$",methods={["GET"]=true}}}`
 
-		result := luascript.ConvertRequestMatchersToLuaTableString([]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}})
+		result := luascript.ConvertRequestMatchersToLuaTableString(
+			[]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}},
+		)
 		assert.Equal(t, expected, result)
 	})
 
@@ -50,7 +58,9 @@ func TestConvertRequestMatchersToLuaTableString(t *testing.T) {
 		methods := []string{"GET", "POST"}
 		expected := `{{regex="^/api$",methods={["GET"]=true,["POST"]=true}}}`
 
-		result := luascript.ConvertRequestMatchersToLuaTableString([]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}})
+		result := luascript.ConvertRequestMatchersToLuaTableString(
+			[]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}},
+		)
 		assert.Equal(t, expected, result)
 	})
 
@@ -59,7 +69,9 @@ func TestConvertRequestMatchersToLuaTableString(t *testing.T) {
 		methods := []string{"GET"}
 		expected := `{{regex="^/api%.v1/some%-resource/c%+%+/%(v1%)/100%%25$",methods={["GET"]=true}}}`
 
-		result := luascript.ConvertRequestMatchersToLuaTableString([]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}})
+		result := luascript.ConvertRequestMatchersToLuaTableString(
+			[]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}},
+		)
 		assert.Equal(t, expected, result)
 	})
 
@@ -68,7 +80,9 @@ func TestConvertRequestMatchersToLuaTableString(t *testing.T) {
 		methods := []string{"GET"}
 		expected := `{{regex="^/api/[^/]+$",methods={["GET"]=true}}}`
 
-		result := luascript.ConvertRequestMatchersToLuaTableString([]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}})
+		result := luascript.ConvertRequestMatchersToLuaTableString(
+			[]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}},
+		)
 		assert.Equal(t, expected, result)
 	})
 
@@ -77,7 +91,9 @@ func TestConvertRequestMatchersToLuaTableString(t *testing.T) {
 		methods := []string{}
 		expected := `{{regex="^/api/.*$",methods={}}}`
 
-		result := luascript.ConvertRequestMatchersToLuaTableString([]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}})
+		result := luascript.ConvertRequestMatchersToLuaTableString(
+			[]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}},
+		)
 		assert.Equal(t, expected, result)
 	})
 
@@ -86,7 +102,9 @@ func TestConvertRequestMatchersToLuaTableString(t *testing.T) {
 		methods := []string{}
 		expected := `{{regex="^/api/.*$",methods={}}}`
 
-		result := luascript.ConvertRequestMatchersToLuaTableString([]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}})
+		result := luascript.ConvertRequestMatchersToLuaTableString(
+			[]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}},
+		)
 		assert.Equal(t, expected, result)
 	})
 }

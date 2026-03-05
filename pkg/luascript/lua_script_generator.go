@@ -100,7 +100,10 @@ func DenyRedirectMatchers(authRules *[]v1alpha1.RequestAuthRule) []v1alpha1.Requ
 	return result
 }
 
-func RequireAuthMatchers(authRules *[]v1alpha1.RequestAuthRule, autoLoginConfig state.AutoLoginConfig) []v1alpha1.RequestMatcher {
+func RequireAuthMatchers(
+	authRules *[]v1alpha1.RequestAuthRule,
+	autoLoginConfig state.AutoLoginConfig,
+) []v1alpha1.RequestMatcher {
 	matchers := v1alpha1.GetRequestMatchers(authRules)
 
 	autoLoginPaths := []string{autoLoginConfig.RedirectPath, autoLoginConfig.LogoutPath}
