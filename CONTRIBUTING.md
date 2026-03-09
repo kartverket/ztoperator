@@ -78,3 +78,10 @@ You can then run the end-to-end tests with
 ```bash
 make chainsaw-test-remote
 ```
+
+## Generating API documentation
+Documentation is generated using
+```
+make docs
+```
+The generated documentation will be a `api-docs.md` file in the root folder of the project.
