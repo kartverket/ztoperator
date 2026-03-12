@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"reflect"
 
+	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
@@ -73,7 +74,7 @@ envoyFilterReconcileAction reconciles an EnvoyFilter resource based on the confi
 behavior for unauthenticated requests when enabled. The EnvoyFilter handles OAuth2 Authorization Code Flow.
 */
 func envoyFilterReconcileAction(scope *state.Scope) AuthPolicyAdapter[*v1alpha4.EnvoyFilter] {
-	autoLoginEnvoyFilterName := scope.AuthPolicy.Name + "-login"
+	autoLoginEnvoyFilterName := names.EnvoyFilter(scope.AuthPolicy.Name)
 	desiredResource := envoyfilter.GetDesired(
 		scope,
 		helperfunctions.BuildObjectMeta(autoLoginEnvoyFilterName, scope.AuthPolicy.Namespace),
@@ -153,7 +154,7 @@ precedence over ALLOW policies.
 func denyAuthorizationPolicyReconcileAction(
 	scope *state.Scope,
 ) AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
-	denyAuthorizationPolicyName := scope.AuthPolicy.Name + "-deny-auth-rules"
+	denyAuthorizationPolicyName := names.DenyPolicy(scope.AuthPolicy.Name)
 	desiredResource := deny.GetDesired(
 		scope,
 		helperfunctions.BuildObjectMeta(denyAuthorizationPolicyName, scope.AuthPolicy.Namespace),
@@ -181,7 +182,7 @@ policy.
 func ignoreAuthorizationPolicyReconcileAction(
 	scope *state.Scope,
 ) AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
-	ignoreAuthAuthorizationPolicyName := scope.AuthPolicy.Name + "-ignore-auth"
+	ignoreAuthAuthorizationPolicyName := names.IgnorePolicy(scope.AuthPolicy.Name)
 	desiredResource := ignore.GetDesired(
 		scope,
 		helperfunctions.BuildObjectMeta(ignoreAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
@@ -209,7 +210,7 @@ unless denied by any DENY policy.
 func requireAuthorizationPolicyReconcileAction(
 	scope *state.Scope,
 ) AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
-	requireAuthAuthorizationPolicyName := scope.AuthPolicy.Name + "-require-auth"
+	requireAuthAuthorizationPolicyName := names.RequirePolicy(scope.AuthPolicy.Name)
 	desiredResource := require.GetDesired(
 		scope,
 		helperfunctions.BuildObjectMeta(requireAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
