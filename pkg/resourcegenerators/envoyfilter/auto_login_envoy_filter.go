@@ -13,6 +13,22 @@ import (
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 )
 
+// GetDesired returns the desired EnvoyFilter resource for the given AuthPolicy scope
+//
+// The generated EnvoyFilter inserts three config patches into the Envoy sidecar filter chain in
+// the following order:
+//
+//  1. A Lua HTTP filter (INSERT_BEFORE jwt_authn) that handles OAuth2 redirect detection, logout
+//     (RP-initiated logout via the IdP's end_session_endpoint), deny-redirect for API endpoints,
+//     and cookie-based session management. On successful login it injects an
+//     "Authorization: Bearer <token>" header for downstream JWT validation.
+//
+//  2. An OAuth2 cluster (ADD) that configures the upstream cluster Envoy uses to communicate with
+//     the identity provider's token endpoint. Internal IdPs (with an explicit port) are configured
+//     as STATIC clusters; external IdPs are configured as STRICT_DNS clusters.
+//
+//  3. An OAuth2 HTTP filter (INSERT_BEFORE jwt_authn) that drives the Authorization Code Flow and
+//     exchanges the authorization code for tokens using the upstream OAuth2 cluster defined above.
 func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFilter {
 	if !scope.AuthPolicy.Spec.Enabled || scope.InvalidConfig || scope.AuthPolicy.Spec.AutoLogin == nil ||
 		!scope.AuthPolicy.Spec.AutoLogin.Enabled {
