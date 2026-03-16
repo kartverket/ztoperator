@@ -2,6 +2,7 @@ package resolver
 
 import (
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/luascript"
 )
@@ -17,7 +18,7 @@ func ResolveAutoLoginConfig(
 		}
 	}
 
-	envoySecretName := authPolicy.Name + "-envoy-secret"
+	envoySecretName := names.EnvoySecret(authPolicy.Name)
 
 	autoLoginConfig := state.AutoLoginConfig{
 		Enabled:               authPolicy.Spec.AutoLogin.Enabled,
