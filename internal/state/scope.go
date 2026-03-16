@@ -2,7 +2,6 @@ package state
 
 import (
 	"fmt"
-	"reflect"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -74,9 +73,11 @@ func (s *Scope) ReplaceDescendant(
 	resourceKind, resourceName string,
 ) {
 	if s != nil {
+		expectedID := GetID(resourceKind, resourceName)
 		for i, d := range s.Descendants {
-			if reflect.TypeOf(d) == reflect.TypeOf(obj) && d.ID == obj.GetName() {
+			if d.ID == expectedID {
 				s.Descendants[i] = Descendant[client.Object]{
+					ID:             expectedID,
 					Object:         obj,
 					ErrorMessage:   errorMessage,
 					SuccessMessage: successMessage,
