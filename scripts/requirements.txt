@@ -1,3 +1,1 @@
 httpx
-pyyaml
-Jinja2

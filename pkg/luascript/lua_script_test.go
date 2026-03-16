@@ -97,8 +97,6 @@ func readHeaders(t *testing.T, L *lua.LState, handle lua.LValue) map[string]stri
 	return result
 }
 
-// --- fixtures ---
-
 func defaultAuthPolicy() *v1alpha1.AuthPolicy {
 	return &v1alpha1.AuthPolicy{
 		Spec: v1alpha1.AuthPolicySpec{
@@ -106,7 +104,7 @@ func defaultAuthPolicy() *v1alpha1.AuthPolicy {
 			WellKnownURI: "https://idp.example.com/.well-known/openid-configuration",
 			Selector:     v1alpha1.WorkloadSelector{MatchLabels: map[string]string{"app": "test"}},
 			IgnoreAuthRules: &[]v1alpha1.RequestMatcher{
-				{Paths: []string{"/public"}, Methods: []string{}},
+				{Paths: []string{"/public"}, Methods: []string{"GET"}},
 			},
 			AuthRules: &[]v1alpha1.RequestAuthRule{
 				{RequestMatcher: v1alpha1.RequestMatcher{Paths: []string{"/secure"}, Methods: []string{}}},
@@ -138,45 +136,52 @@ func defaultIdpUris() state.IdentityProviderUris {
 	}
 }
 
-// --- tests ---
-
-// TestGeneratedLuaScript_OnRequest_PublicPath verifies the happy case:
-// a request to a public (ignored) path that is not in the require rules
-// results in bypass=true being set on the request header, allowing the
-// Envoy OAuth2 filter to pass the request through without redirecting.
-func TestGeneratedLuaScript_OnRequest_PublicPath(t *testing.T) {
+func TestGeneratedLuaScript_OnRequest_IgnoreAuthRules_BypassAsExpected(t *testing.T) {
 	script := luascript.GenerateLuaScript(defaultAuthPolicy(), defaultAutoLoginConfig(), defaultIdpUris())
 
-	handle := runOnRequest(t, script, map[string]string{
-		":path":   "/public",
-		":method": "GET",
+	ignoredMethodHandle := runOnRequest(t, script, map[string]string{
+		":path":   "/public", // ignored rule in defaultAuthPolicy
+		":method": "GET",     // ignored path in defaultAuthPolicy
 	})
 
-	assert.Equal(t, "true", handle[luascript.BypassOauthLoginHeaderName])
-	assert.Equal(t, "false", handle[luascript.DenyRedirectHeaderName])
+	assert.Equal(t, "true", ignoredMethodHandle[luascript.BypassOauthLoginHeaderName])
+	assert.Equal(t, "false", ignoredMethodHandle[luascript.DenyRedirectHeaderName])
+
+	nonIgnoredMethodHandle := runOnRequest(t, script, map[string]string{
+		":path":   "/public", // ignored path in defaultAuthPolicy
+		":method": "POST",    // not ignored method in defaultAuthPolicy
+	})
+
+	assert.Equal(t, "false", nonIgnoredMethodHandle[luascript.BypassOauthLoginHeaderName])
+	assert.Equal(t, "false", nonIgnoredMethodHandle[luascript.DenyRedirectHeaderName])
 }
 
-// TestGeneratedLuaScript_OnRequest_SecurePath verifies that a request to a
-// path that is in the require rules but not in ignore rules is not bypassed.
-func TestGeneratedLuaScript_OnRequest_SecurePath(t *testing.T) {
+func TestGeneratedLuaScript_OnRequest_AuthRules_DoNotBypass(t *testing.T) {
 	script := luascript.GenerateLuaScript(defaultAuthPolicy(), defaultAutoLoginConfig(), defaultIdpUris())
 
-	handle := runOnRequest(t, script, map[string]string{
+	authRuleHandle := runOnRequest(t, script, map[string]string{
 		":path":   "/secure",
 		":method": "GET",
 	})
 
-	assert.Equal(t, "false", handle[luascript.BypassOauthLoginHeaderName])
-	assert.Equal(t, "false", handle[luascript.DenyRedirectHeaderName])
+	assert.Equal(t, "false", authRuleHandle[luascript.BypassOauthLoginHeaderName])
+	assert.Equal(t, "false", authRuleHandle[luascript.DenyRedirectHeaderName])
+
+	noRuleHandle := runOnRequest(t, script, map[string]string{
+		":path":   "/noRulesHere",
+		":method": "GET",
+	})
+
+	assert.Equal(t, "false", noRuleHandle[luascript.BypassOauthLoginHeaderName])
+	assert.Equal(t, "false", noRuleHandle[luascript.DenyRedirectHeaderName])
 }
 
-// TestGeneratedLuaScript_OnRequest_AutoLoginInfraPaths verifies that the
-// auto-login infrastructure paths (redirect, logout, login) are never bypassed,
-// even if they would otherwise match an ignore rule.
-func TestGeneratedLuaScript_OnRequest_AutoLoginInfraPaths(t *testing.T) {
-	script := luascript.GenerateLuaScript(defaultAuthPolicy(), defaultAutoLoginConfig(), defaultIdpUris())
+func TestGeneratedLuaScript_OnRequest_AutoLoginPaths_DoNotBypass(t *testing.T) {
+	autoLoginConfig := defaultAutoLoginConfig()
+	script := luascript.GenerateLuaScript(defaultAuthPolicy(), autoLoginConfig, defaultIdpUris())
 
-	for _, path := range []string{"/oauth2/callback", "/logout", "/login"} {
+	autoLoginPaths := []string{autoLoginConfig.RedirectPath, autoLoginConfig.LogoutPath, *autoLoginConfig.LoginPath}
+	for _, path := range autoLoginPaths {
 		t.Run(path, func(t *testing.T) {
 			handle := runOnRequest(t, script, map[string]string{
 				":path":   path,
@@ -189,24 +194,18 @@ func TestGeneratedLuaScript_OnRequest_AutoLoginInfraPaths(t *testing.T) {
 	}
 }
 
-// TestGeneratedLuaScript_OnRequest_QueryStringStrippedBeforeMatching verifies
-// that query string parameters are stripped from the path before rule matching,
-// so /public?foo=bar still matches the /public ignore rule.
 func TestGeneratedLuaScript_OnRequest_QueryStringStrippedBeforeMatching(t *testing.T) {
 	script := luascript.GenerateLuaScript(defaultAuthPolicy(), defaultAutoLoginConfig(), defaultIdpUris())
 
 	handle := runOnRequest(t, script, map[string]string{
-		":path":   "/public?foo=bar",
-		":method": "GET",
+		":path":   "/public?foo=bar", // ignore rule in defaultAuthPolicy for /public
+		":method": "GET",             // ignored path in defaultAuthPolicy
 	})
 
 	assert.Equal(t, "true", handle[luascript.BypassOauthLoginHeaderName])
 }
 
-// TestGeneratedLuaScript_OnRequest_DenyRedirect verifies that a path configured
-// with denyRedirect=true results in x-deny-redirect: true, which instructs the
-// Envoy OAuth2 filter to return a 401 instead of redirecting to the IdP.
-func TestGeneratedLuaScript_OnRequest_DenyRedirect(t *testing.T) {
+func TestGeneratedLuaScript_OnRequest_DenyRedirectDoesNotRedirect(t *testing.T) {
 	policy := defaultAuthPolicy()
 	policy.Spec.AuthRules = &[]v1alpha1.RequestAuthRule{
 		{
@@ -225,9 +224,7 @@ func TestGeneratedLuaScript_OnRequest_DenyRedirect(t *testing.T) {
 	assert.Equal(t, "true", handle[luascript.DenyRedirectHeaderName])
 }
 
-// TestGeneratedLuaScript_OnResponse_NonRedirectUnchanged verifies that
-// envoy_on_response leaves the location header untouched on non-302 responses.
-func TestGeneratedLuaScript_OnResponse_NonRedirectUnchanged(t *testing.T) {
+func TestGeneratedLuaScript_OnResponse_DoesNotRedirectNon302Responses(t *testing.T) {
 	script := luascript.GenerateLuaScript(defaultAuthPolicy(), defaultAutoLoginConfig(), defaultIdpUris())
 
 	handle := runOnResponse(t, script, map[string]string{
@@ -238,9 +235,6 @@ func TestGeneratedLuaScript_OnResponse_NonRedirectUnchanged(t *testing.T) {
 	assert.Equal(t, "https://idp.example.com/authorize?client_id=x", handle["location"])
 }
 
-// TestGeneratedLuaScript_OnResponse_LoginParamsAppendedToAuthorizeRedirect
-// verifies that login_params are appended to the location header when a 302
-// redirects to the authorize endpoint.
 func TestGeneratedLuaScript_OnResponse_LoginParamsAppendedToAuthorizeRedirect(t *testing.T) {
 	cfg := defaultAutoLoginConfig()
 	cfg.LoginParams = map[string]string{"acr_values": "idporten-loa-high"}
@@ -255,9 +249,6 @@ func TestGeneratedLuaScript_OnResponse_LoginParamsAppendedToAuthorizeRedirect(t 
 	assert.Contains(t, handle["location"], "acr_values=idporten-loa-high")
 }
 
-// TestGeneratedLuaScript_OnResponse_LoginParamsNotAppendedToUnrelatedRedirect
-// verifies that login_params are not injected when the 302 location does not
-// point to the authorize endpoint.
 func TestGeneratedLuaScript_OnResponse_LoginParamsNotAppendedToUnrelatedRedirect(t *testing.T) {
 	cfg := defaultAutoLoginConfig()
 	cfg.LoginParams = map[string]string{"acr_values": "idporten-loa-high"}
@@ -272,9 +263,6 @@ func TestGeneratedLuaScript_OnResponse_LoginParamsNotAppendedToUnrelatedRedirect
 	assert.NotContains(t, handle["location"], "acr_values")
 }
 
-// TestGeneratedLuaScript_OnResponse_PostLogoutRedirectUriAppended verifies
-// that the post_logout_redirect_uri is appended to the location header when a
-// 302 redirects to the end_session endpoint and a URI is configured.
 func TestGeneratedLuaScript_OnResponse_PostLogoutRedirectUriAppended(t *testing.T) {
 	cfg := defaultAutoLoginConfig()
 	cfg.PostLogoutRedirectURI = helperfunctions.Ptr("https://example.com/logged-out")
@@ -289,9 +277,6 @@ func TestGeneratedLuaScript_OnResponse_PostLogoutRedirectUriAppended(t *testing.
 	assert.Contains(t, handle["location"], "post_logout_redirect_uri=https%3A%2F%2Fexample.com%2Flogged-out")
 }
 
-// TestGeneratedLuaScript_OnResponse_PostLogoutRedirectUriNotAppendedWhenEmpty
-// verifies that no post_logout_redirect_uri parameter is injected when none is
-// configured.
 func TestGeneratedLuaScript_OnResponse_PostLogoutRedirectUriNotAppendedWhenEmpty(t *testing.T) {
 	script := luascript.GenerateLuaScript(defaultAuthPolicy(), defaultAutoLoginConfig(), defaultIdpUris())
 
@@ -301,4 +286,71 @@ func TestGeneratedLuaScript_OnResponse_PostLogoutRedirectUriNotAppendedWhenEmpty
 	})
 
 	assert.NotContains(t, handle["location"], "post_logout_redirect_uri")
+}
+
+func TestGeneratedLuaScript_OnRequest_SingleSegmentWildcard_MatchesOneSegment(t *testing.T) {
+	policy := defaultAuthPolicy()
+	policy.Spec.IgnoreAuthRules = &[]v1alpha1.RequestMatcher{
+		{Paths: []string{"/api/{*}/items"}, Methods: []string{}},
+	}
+	script := luascript.GenerateLuaScript(policy, defaultAutoLoginConfig(), defaultIdpUris())
+
+	handle := runOnRequest(t, script, map[string]string{":path": "/api/v1/items", ":method": "GET"})
+	assert.Equal(t, "true", handle[luascript.BypassOauthLoginHeaderName], "/api/v1/items should be public")
+
+	invalidPaths := []string{
+		"/api/v1/extra/items",
+		"/api/spe(c)ial-c?haracters/extra/items",
+	}
+	for _, path := range invalidPaths {
+		t.Run(path, func(t *testing.T) {
+			handle = runOnRequest(t, script, map[string]string{":path": path, ":method": "GET"})
+			assert.Equal(t, "false", handle[luascript.BypassOauthLoginHeaderName], "%s should not match {*}", path)
+		})
+	}
+}
+
+func TestGeneratedLuaScript_OnRequest_DoubleStarWildcard_MatchesMultipleSegments(t *testing.T) {
+	policy := defaultAuthPolicy()
+	policy.Spec.IgnoreAuthRules = &[]v1alpha1.RequestMatcher{
+		{Paths: []string{"/api/{**}"}, Methods: []string{}},
+	}
+	script := luascript.GenerateLuaScript(policy, defaultAutoLoginConfig(), defaultIdpUris())
+
+	validPaths := []string{
+		"/api/",
+		"/api/v1",
+		"/api/v1/users",
+		"/api/v1/users/123",
+		"/api/v1/spe(c)ial-c?haracters/123",
+	}
+	for _, path := range validPaths {
+		t.Run(path, func(t *testing.T) {
+			handle := runOnRequest(t, script, map[string]string{":path": path, ":method": "GET"})
+			assert.Equal(t, "true", handle[luascript.BypassOauthLoginHeaderName], "%s should match /api/{**}", path)
+		})
+	}
+}
+
+func TestGeneratedLuaScript_OnRequest_LegacyStarWildcard_MatchesMultipleSegments(t *testing.T) {
+	policy := defaultAuthPolicy()
+	policy.Spec.IgnoreAuthRules = &[]v1alpha1.RequestMatcher{
+		{Paths: []string{"/api*"}, Methods: []string{}},
+	}
+	script := luascript.GenerateLuaScript(policy, defaultAutoLoginConfig(), defaultIdpUris())
+
+	validPaths := []string{
+		"/api",
+		"/api/",
+		"/api/v1",
+		"/api/v1/users",
+		"/api/v1/users/123",
+		"/api/v1/spe(c)ial-c?haracters/123",
+	}
+	for _, path := range validPaths {
+		t.Run(path, func(t *testing.T) {
+			handle := runOnRequest(t, script, map[string]string{":path": path, ":method": "GET"})
+			assert.Equal(t, "true", handle[luascript.BypassOauthLoginHeaderName], "%s should match /api/{**}", path)
+		})
+	}
 }
