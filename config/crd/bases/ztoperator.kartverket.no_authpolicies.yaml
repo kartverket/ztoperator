@@ -166,6 +166,7 @@ spec:
                         - CONNECT
                       items:
                         type: string
+                      maxItems: 9
                       type: array
                       x-kubernetes-list-type: set
                       x-kubernetes-validations:
@@ -348,6 +349,7 @@ spec:
                         - CONNECT
                       items:
                         type: string
+                      maxItems: 9
                       type: array
                       x-kubernetes-list-type: set
                       x-kubernetes-validations:
