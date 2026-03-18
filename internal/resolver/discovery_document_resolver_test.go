@@ -210,3 +210,88 @@ func (m *mockDiscoveryDocumentResolver) GetOAuthDiscoveryDocument(
 ) (*rest.DiscoveryDocument, error) {
 	return m.document, m.err
 }
+
+func TestDiscoveryDocumentURIWithDoubleQuoteIsRejected(t *testing.T) {
+	ctx := context.Background()
+
+	authPolicy := defaultZtoperatorAuthPolicy("http://test-idp.example.com/.well-known/openid-configuration")
+	mockResolver := &mockDiscoveryDocumentResolver{
+		document: &rest.DiscoveryDocument{
+			Issuer:                helperfunctions.Ptr("http://test-idp.example.com"),
+			TokenEndpoint:         helperfunctions.Ptr("http://test-idp.example.com/token"),
+			JwksURI:               helperfunctions.Ptr("http://test-idp.example.com/jwks"),
+			AuthorizationEndpoint: helperfunctions.Ptr(`http://evil.com/authorize?x=1" os.execute("evil")`),
+			EndSessionEndpoint:    helperfunctions.Ptr("http://test-idp.example.com/endsession"),
+		},
+	}
+
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+
+	require.Error(t, err, "URI with double quote should be rejected")
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "unsafe characters")
+}
+
+func TestDiscoveryDocumentURIWithBackslashIsRejected(t *testing.T) {
+	ctx := context.Background()
+
+	authPolicy := defaultZtoperatorAuthPolicy("http://test-idp.example.com/.well-known/openid-configuration")
+	mockResolver := &mockDiscoveryDocumentResolver{
+		document: &rest.DiscoveryDocument{
+			Issuer:                helperfunctions.Ptr("http://test-idp.example.com"),
+			TokenEndpoint:         helperfunctions.Ptr(`http://test-idp.example.com/token\bad`),
+			JwksURI:               helperfunctions.Ptr("http://test-idp.example.com/jwks"),
+			AuthorizationEndpoint: helperfunctions.Ptr("http://test-idp.example.com/authorize"),
+			EndSessionEndpoint:    helperfunctions.Ptr("http://test-idp.example.com/endsession"),
+		},
+	}
+
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+
+	require.Error(t, err, "URI with backslash should be rejected")
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "unsafe characters")
+}
+
+func TestDiscoveryDocumentURIWithNewlineIsRejected(t *testing.T) {
+	ctx := context.Background()
+
+	authPolicy := defaultZtoperatorAuthPolicy("http://test-idp.example.com/.well-known/openid-configuration")
+	mockResolver := &mockDiscoveryDocumentResolver{
+		document: &rest.DiscoveryDocument{
+			Issuer:                helperfunctions.Ptr("http://test-idp.example.com"),
+			TokenEndpoint:         helperfunctions.Ptr("http://test-idp.example.com/token"),
+			JwksURI:               helperfunctions.Ptr("http://test-idp.example.com/jwks\nnewline"),
+			AuthorizationEndpoint: helperfunctions.Ptr("http://test-idp.example.com/authorize"),
+			EndSessionEndpoint:    helperfunctions.Ptr("http://test-idp.example.com/endsession"),
+		},
+	}
+
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+
+	require.Error(t, err, "URI with newline should be rejected")
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "invalid discovery document")
+}
+
+func TestDiscoveryDocumentWithNormalURIsResolvesSuccessfully(t *testing.T) {
+	ctx := context.Background()
+
+	authPolicy := defaultZtoperatorAuthPolicy("http://test-idp.example.com/.well-known/openid-configuration")
+	mockResolver := &mockDiscoveryDocumentResolver{
+		document: &rest.DiscoveryDocument{
+			Issuer:                helperfunctions.Ptr("http://test-idp.example.com"),
+			TokenEndpoint:         helperfunctions.Ptr("http://test-idp.example.com/token"),
+			JwksURI:               helperfunctions.Ptr("http://test-idp.example.com/jwks"),
+			AuthorizationEndpoint: helperfunctions.Ptr("http://test-idp.example.com/authorize"),
+			EndSessionEndpoint:    helperfunctions.Ptr("http://test-idp.example.com/endsession"),
+		},
+	}
+
+	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+
+	require.NoError(t, err, "Normal URIs should resolve successfully")
+	require.NotNil(t, result)
+	assert.Equal(t, "http://test-idp.example.com", result.IssuerURI)
+	assert.Equal(t, "http://test-idp.example.com/authorize", result.AuthorizationURI)
+}
