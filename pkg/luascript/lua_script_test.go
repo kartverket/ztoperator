@@ -368,7 +368,11 @@ func TestGeneratedLuaScript_InjectionInLoginParamKey_ProducesValidLua(t *testing
 	defer L.Close()
 
 	require.NoError(t, L.DoString(mockHandleStub))
-	require.NoError(t, L.DoString(script), "generated Lua script should be syntactically valid despite injection attempt in key")
+	require.NoError(
+		t,
+		L.DoString(script),
+		"generated Lua script should be syntactically valid despite injection attempt in key",
+	)
 }
 
 func TestGeneratedLuaScript_InjectionInLoginParamValue_ProducesValidLua(t *testing.T) {
@@ -383,7 +387,11 @@ func TestGeneratedLuaScript_InjectionInLoginParamValue_ProducesValidLua(t *testi
 	defer L.Close()
 
 	require.NoError(t, L.DoString(mockHandleStub))
-	require.NoError(t, L.DoString(script), "generated Lua script should be syntactically valid despite injection attempt in value")
+	require.NoError(
+		t,
+		L.DoString(script),
+		"generated Lua script should be syntactically valid despite injection attempt in value",
+	)
 }
 
 func TestGeneratedLuaScript_InjectionInAuthorizationURI_ProducesValidLua(t *testing.T) {
@@ -396,7 +404,11 @@ func TestGeneratedLuaScript_InjectionInAuthorizationURI_ProducesValidLua(t *test
 	defer L.Close()
 
 	require.NoError(t, L.DoString(mockHandleStub))
-	require.NoError(t, L.DoString(script), "generated Lua script should be syntactically valid despite injection attempt in authorization URI")
+	require.NoError(
+		t,
+		L.DoString(script),
+		"generated Lua script should be syntactically valid despite injection attempt in authorization URI",
+	)
 }
 
 func TestGeneratedLuaScript_InjectionInEndSessionURI_ProducesValidLua(t *testing.T) {
@@ -409,7 +421,11 @@ func TestGeneratedLuaScript_InjectionInEndSessionURI_ProducesValidLua(t *testing
 	defer L.Close()
 
 	require.NoError(t, L.DoString(mockHandleStub))
-	require.NoError(t, L.DoString(script), "generated Lua script should be syntactically valid despite injection attempt in end-session URI")
+	require.NoError(
+		t,
+		L.DoString(script),
+		"generated Lua script should be syntactically valid despite injection attempt in end-session URI",
+	)
 }
 
 func TestGeneratedLuaScript_InjectionInMethod_ProducesValidLua(t *testing.T) {
@@ -427,7 +443,11 @@ func TestGeneratedLuaScript_InjectionInMethod_ProducesValidLua(t *testing.T) {
 	defer L.Close()
 
 	require.NoError(t, L.DoString(mockHandleStub))
-	require.NoError(t, L.DoString(script), "generated Lua script should be syntactically valid despite injection attempt in HTTP method")
+	require.NoError(
+		t,
+		L.DoString(script),
+		"generated Lua script should be syntactically valid despite injection attempt in HTTP method",
+	)
 }
 
 func TestGeneratedLuaScript_NilEndSessionURI_ProducesValidLua(t *testing.T) {

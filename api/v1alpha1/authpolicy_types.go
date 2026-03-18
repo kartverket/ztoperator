@@ -312,7 +312,8 @@ type RequestMatcher struct {
 	// +listType=set
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:MaxItems=9
-	// +kubebuilder:validation:XValidation:message="methods must only contain valid HTTP methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, TRACE, CONNECT",rule="self.all(m, m in ['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS','TRACE','CONNECT'])"
+	// +kubebuilder:validation:items:MaxLength=7
+	// +kubebuilder:validation:XValidation:message="methods must only contain valid HTTP methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, TRACE, CONNECT",rule="self.all(m, m.matches('^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT)$'))"
 	Methods []string `json:"methods,omitempty"`
 }
 

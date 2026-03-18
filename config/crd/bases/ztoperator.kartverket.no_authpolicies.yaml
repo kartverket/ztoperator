@@ -165,6 +165,7 @@ spec:
                         - TRACE
                         - CONNECT
                       items:
+                        maxLength: 7
                         type: string
                       maxItems: 9
                       type: array
@@ -172,7 +173,7 @@ spec:
                       x-kubernetes-validations:
                       - message: 'methods must only contain valid HTTP methods: GET,
                           POST, PUT, PATCH, DELETE, HEAD, OPTIONS, TRACE, CONNECT'
-                        rule: self.all(m, m in ['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS','TRACE','CONNECT'])
+                        rule: self.all(m, m.matches('^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT)$'))
                     paths:
                       description: |-
                         Paths specify a set of URI paths that this rule applies to.
@@ -348,6 +349,7 @@ spec:
                         - TRACE
                         - CONNECT
                       items:
+                        maxLength: 7
                         type: string
                       maxItems: 9
                       type: array
@@ -355,7 +357,7 @@ spec:
                       x-kubernetes-validations:
                       - message: 'methods must only contain valid HTTP methods: GET,
                           POST, PUT, PATCH, DELETE, HEAD, OPTIONS, TRACE, CONNECT'
-                        rule: self.all(m, m in ['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS','TRACE','CONNECT'])
+                        rule: self.all(m, m.matches('^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT)$'))
                     paths:
                       description: |-
                         Paths specify a set of URI paths that this rule applies to.
