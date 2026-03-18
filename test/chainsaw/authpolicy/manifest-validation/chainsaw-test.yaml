@@ -47,7 +47,7 @@ spec:
 
         - create:
             file: baseline_auth/authpolicy.yaml
-        - script: # Accepted resources
+        - script: # Baseline auth
             content: |
               ./../../../../scripts/patch-invalid-spec.sh \
                 baseline_auth/patch-empty-claims.yaml \
@@ -62,6 +62,10 @@ spec:
               ./../../../../scripts/patch-invalid-spec.sh \
                 autologin/patch-empty-oauthcredentials.yaml \
                 "oAuthCredentials must be set when autoLogin is enabled"
+
+              ./../../../../scripts/patch-invalid-spec.sh \
+                autologin/patch-invalid-login-param-key.yaml \
+                "loginParams keys must match ^[a-zA-Z_][a-zA-Z0-9_]*$"
         - script: # AutoLogin - replace
             content: |
               ./../../../../scripts/replace-invalid-spec.sh \
