@@ -107,4 +107,17 @@ func TestConvertRequestMatchersToLuaTableString(t *testing.T) {
 		)
 		assert.Equal(t, expected, result)
 	})
+
+	t.Run("method with double quote is escaped to prevent Lua injection", func(t *testing.T) {
+		paths := []string{"/api"}
+		methods := []string{`GET"]=true} os.execute("evil") --`}
+
+		result := luascript.ConvertRequestMatchersToLuaTableString(
+			[]v1alpha1.RequestMatcher{{Paths: paths, Methods: methods}},
+		)
+		// The double quote must be escaped so it stays inside the Lua string rather
+		// than terminating it and allowing code execution.
+		assert.Contains(t, result, `\"`)
+		assert.NotContains(t, result, `os.execute("evil")`)
+	})
 }

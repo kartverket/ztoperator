@@ -47,4 +47,32 @@ func TestBuildLuaParams(t *testing.T) {
 		})
 		assert.Equal(t, `{["redirect_uri"]="https%3A%2F%2Fexample.com%2Fcallback%3Ffoo%3Dbar"}`, result)
 	})
+
+	t.Run("key with double quote is escaped to prevent Lua injection", func(t *testing.T) {
+		result := luascript.ConvertLoginParamsToLuaParams(map[string]string{
+			`bad"]=true} os.execute("x") --`: "val",
+		})
+		// The double quotes in the key must be escaped so they remain inside the Lua string
+		// literal rather than terminating it. The text "os.execute" is still present but is
+		// just part of the harmless string key, not executable Lua code.
+		assert.Contains(t, result, `\"`)
+		assert.Contains(t, result, `["bad\"]=true} os.execute(\"x\") --"]="val"`)
+	})
+
+	t.Run("key with backslash is escaped", func(t *testing.T) {
+		result := luascript.ConvertLoginParamsToLuaParams(map[string]string{
+			`key\with\slashes`: "val",
+		})
+		assert.Contains(t, result, `key\\with\\slashes`)
+	})
+
+	t.Run("value with double quote after URL encoding is still safe", func(t *testing.T) {
+		// url.QueryEscape will encode " as %22 which is already safe,
+		// but we verify the defense-in-depth escaping works too
+		result := luascript.ConvertLoginParamsToLuaParams(map[string]string{
+			"key": `value"with"quotes`,
+		})
+		// url.QueryEscape turns " into %22, so no raw " should appear in the value
+		assert.NotContains(t, result, `="value"`)
+	})
 }
