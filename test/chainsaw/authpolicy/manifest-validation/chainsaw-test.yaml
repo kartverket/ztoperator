@@ -69,3 +69,17 @@ spec:
                 "oAuthCredentials must be set when autoLogin is enabled"
         - delete:
             file: autologin/authpolicy.yaml
+
+        - create:
+            file: methods/authpolicy.yaml
+        - script: # Methods
+            content: |
+              ./../../../../scripts/patch-invalid-spec.sh \
+                methods/patch-invalid-auth-rule-method.yaml \
+                "methods must only contain valid HTTP methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, TRACE, CONNECT"
+
+              ./../../../../scripts/patch-invalid-spec.sh \
+                methods/patch-invalid-ignore-auth-rule-method.yaml \
+                "methods must only contain valid HTTP methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, TRACE, CONNECT"
+        - delete:
+            file: methods/authpolicy.yaml

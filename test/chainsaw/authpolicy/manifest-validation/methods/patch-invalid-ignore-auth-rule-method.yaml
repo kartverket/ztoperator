@@ -1,0 +1,6 @@
+spec:
+  ignoreAuthRules:
+    - paths:
+        - /public
+      methods:
+        - INVALID_METHOD

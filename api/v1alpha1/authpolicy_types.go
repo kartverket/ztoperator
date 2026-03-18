@@ -307,8 +307,8 @@ type RequestMatcher struct {
 	// - CONNECT
 	//
 	// +listType=set
-	// +kubebuilder:validation:Items:Enum=GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS,TRACE,CONNECT
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:XValidation:message="methods must only contain valid HTTP methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, TRACE, CONNECT",rule="self.all(m, m in ['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS','TRACE','CONNECT'])"
 	Methods []string `json:"methods,omitempty"`
 }
 

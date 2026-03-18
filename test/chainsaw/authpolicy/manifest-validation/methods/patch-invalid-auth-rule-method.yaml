@@ -1,0 +1,10 @@
+spec:
+  authRules:
+    - paths:
+        - /secure
+      methods:
+        - INVALID_METHOD
+      when:
+        - claim: role
+          values:
+            - entra_user_role
