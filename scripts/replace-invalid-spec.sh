@@ -15,7 +15,7 @@ if output=$(kubectl replace -f "${resource_file}" -n chainsaw-manifest-validatio
   exit 1
 fi
 
-if ! grep -q -- "${expected_error}" <<<"${output}"; then
+if ! grep -qF -- "${expected_error}" <<<"${output}"; then
   echo "kubectl patch did not fail with expected validation error" >&2
   echo "${output}" >&2
   exit 1
