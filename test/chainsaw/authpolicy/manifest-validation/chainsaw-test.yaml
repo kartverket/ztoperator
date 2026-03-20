@@ -80,10 +80,10 @@ spec:
             content: |
               ./../../../../scripts/patch-invalid-spec.sh \
                 methods/patch-invalid-auth-rule-method.yaml \
-                "methods must only contain valid HTTP methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, TRACE, CONNECT"
+                'Unsupported value: "INVALID_METHOD"'
 
               ./../../../../scripts/patch-invalid-spec.sh \
                 methods/patch-invalid-ignore-auth-rule-method.yaml \
-                "methods must only contain valid HTTP methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, TRACE, CONNECT"
+                'Unsupported value: "INVALID_METHOD"'
         - delete:
             file: methods/authpolicy.yaml

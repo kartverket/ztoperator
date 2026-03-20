@@ -310,7 +310,7 @@ type RequestMatcher struct {
 	// - CONNECT
 	//
 	// +listType=set
-	// +kubebuilder:validation:Items:Enum=GET;POST;PUT;PATCH;DELETE;HEAD;OPTIONS;TRACE;CONNECT
+	// +kubebuilder:validation:items:Enum=GET;POST;PUT;PATCH;DELETE;HEAD;OPTIONS;TRACE;CONNECT
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:MaxItems=9
 	Methods []string `json:"methods,omitempty"`
