@@ -1,0 +1,7 @@
+spec:
+  autoLogin:
+    enabled: true
+    scopes:
+      - openid
+    loginParams:
+      "invalid-key!": value

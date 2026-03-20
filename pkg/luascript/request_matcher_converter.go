@@ -33,7 +33,7 @@ func ConvertRequestMatchersToLuaTableString(requestMatchers []v1alpha1.RequestMa
 						sb.WriteString(",")
 					}
 					sb.WriteString(`["`)
-					sb.WriteString(method)
+					sb.WriteString(EscapeLuaString(method))
 					sb.WriteString(`"]=true`)
 				}
 			}

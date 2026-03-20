@@ -3,6 +3,8 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/state"
@@ -51,12 +53,46 @@ func ResolveDiscoveryDocument(
 	identityProviderUris.IssuerURI = *discoveryDocument.Issuer
 	identityProviderUris.JwksURI = *discoveryDocument.JwksURI
 	identityProviderUris.TokenURI = *discoveryDocument.TokenEndpoint
+
+	urisToValidate := map[string]string{
+		"issuer":         identityProviderUris.IssuerURI,
+		"jwks_uri":       identityProviderUris.JwksURI,
+		"token_endpoint": identityProviderUris.TokenURI,
+	}
+
 	if discoveryDocument.AuthorizationEndpoint != nil {
 		identityProviderUris.AuthorizationURI = *discoveryDocument.AuthorizationEndpoint
+		urisToValidate["authorization_endpoint"] = identityProviderUris.AuthorizationURI
 	}
 	if discoveryDocument.EndSessionEndpoint != nil {
 		identityProviderUris.EndSessionURI = discoveryDocument.EndSessionEndpoint
+		urisToValidate["end_session_endpoint"] = *identityProviderUris.EndSessionURI
+	}
+
+	for field, uri := range urisToValidate {
+		if err := validateDiscoveryURI(field, uri); err != nil {
+			return nil, fmt.Errorf(
+				"invalid discovery document from well-known uri: %s for AuthPolicy %s/%s: %w",
+				authPolicy.Spec.WellKnownURI,
+				authPolicy.Namespace,
+				authPolicy.Name,
+				err,
+			)
+		}
 	}
 
 	return &identityProviderUris, nil
+}
+
+// validateDiscoveryURI checks that a URI from an OIDC discovery document is
+// structurally valid and does not contain characters that could break Lua
+// string interpolation (double quotes, backslashes, control characters).
+func validateDiscoveryURI(field, uri string) error {
+	if _, err := url.Parse(uri); err != nil {
+		return fmt.Errorf("field %s is not a valid URI: %w", field, err)
+	}
+	if strings.ContainsAny(uri, "\"\\\n\r\x00") {
+		return fmt.Errorf("field %s contains unsafe characters (quotes, backslashes, or control characters)", field)
+	}
+	return nil
 }

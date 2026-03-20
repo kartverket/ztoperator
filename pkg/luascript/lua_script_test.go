@@ -354,3 +354,127 @@ func TestGeneratedLuaScript_OnRequest_LegacyStarWildcard_MatchesMultipleSegments
 		})
 	}
 }
+
+func TestGeneratedLuaScript_InjectionInLoginParamKey_ProducesValidLua(t *testing.T) {
+	cfg := defaultAutoLoginConfig()
+	cfg.LoginParams = map[string]string{
+		`evil"]=true} os.execute("rm -rf /") --`: "value",
+	}
+
+	script := luascript.GenerateLuaScript(defaultAuthPolicy(), cfg, defaultIdpUris())
+
+	// The generated script must be valid Lua that can be loaded without error
+	L := lua.NewState()
+	defer L.Close()
+
+	require.NoError(t, L.DoString(mockHandleStub))
+	require.NoError(
+		t,
+		L.DoString(script),
+		"generated Lua script should be syntactically valid despite injection attempt in key",
+	)
+}
+
+func TestGeneratedLuaScript_InjectionInLoginParamValue_ProducesValidLua(t *testing.T) {
+	cfg := defaultAutoLoginConfig()
+	cfg.LoginParams = map[string]string{
+		"acr_values": `high" os.execute("evil") --`,
+	}
+
+	script := luascript.GenerateLuaScript(defaultAuthPolicy(), cfg, defaultIdpUris())
+
+	L := lua.NewState()
+	defer L.Close()
+
+	require.NoError(t, L.DoString(mockHandleStub))
+	require.NoError(
+		t,
+		L.DoString(script),
+		"generated Lua script should be syntactically valid despite injection attempt in value",
+	)
+}
+
+func TestGeneratedLuaScript_InjectionInAuthorizationURI_ProducesValidLua(t *testing.T) {
+	idpUris := defaultIdpUris()
+	idpUris.AuthorizationURI = `https://evil.com/authorize?x=1" os.execute("evil") --`
+
+	script := luascript.GenerateLuaScript(defaultAuthPolicy(), defaultAutoLoginConfig(), idpUris)
+
+	L := lua.NewState()
+	defer L.Close()
+
+	require.NoError(t, L.DoString(mockHandleStub))
+	require.NoError(
+		t,
+		L.DoString(script),
+		"generated Lua script should be syntactically valid despite injection attempt in authorization URI",
+	)
+}
+
+func TestGeneratedLuaScript_InjectionInEndSessionURI_ProducesValidLua(t *testing.T) {
+	idpUris := defaultIdpUris()
+	idpUris.EndSessionURI = helperfunctions.Ptr(`https://evil.com/endsession?x=1" os.execute("evil") --`)
+
+	script := luascript.GenerateLuaScript(defaultAuthPolicy(), defaultAutoLoginConfig(), idpUris)
+
+	L := lua.NewState()
+	defer L.Close()
+
+	require.NoError(t, L.DoString(mockHandleStub))
+	require.NoError(
+		t,
+		L.DoString(script),
+		"generated Lua script should be syntactically valid despite injection attempt in end-session URI",
+	)
+}
+
+func TestGeneratedLuaScript_InjectionInMethod_ProducesValidLua(t *testing.T) {
+	policy := defaultAuthPolicy()
+	policy.Spec.IgnoreAuthRules = &[]v1alpha1.RequestMatcher{
+		{
+			Paths:   []string{"/public"},
+			Methods: []string{`GET"]=true} os.execute("rm -rf /") --`},
+		},
+	}
+
+	script := luascript.GenerateLuaScript(policy, defaultAutoLoginConfig(), defaultIdpUris())
+
+	L := lua.NewState()
+	defer L.Close()
+
+	require.NoError(t, L.DoString(mockHandleStub))
+	require.NoError(
+		t,
+		L.DoString(script),
+		"generated Lua script should be syntactically valid despite injection attempt in HTTP method",
+	)
+}
+
+func TestGeneratedLuaScript_NilEndSessionURI_ProducesValidLua(t *testing.T) {
+	idpUris := defaultIdpUris()
+	idpUris.EndSessionURI = nil
+
+	script := luascript.GenerateLuaScript(defaultAuthPolicy(), defaultAutoLoginConfig(), idpUris)
+
+	L := lua.NewState()
+	defer L.Close()
+
+	require.NoError(t, L.DoString(mockHandleStub))
+	require.NoError(t, L.DoString(script), "generated Lua script should be valid when EndSessionURI is nil")
+}
+
+func TestGeneratedLuaScript_NilEndSessionURI_LogoutRedirectSkipped(t *testing.T) {
+	idpUris := defaultIdpUris()
+	idpUris.EndSessionURI = nil
+
+	script := luascript.GenerateLuaScript(defaultAuthPolicy(), defaultAutoLoginConfig(), idpUris)
+
+	// A 302 to some arbitrary location must pass through unmodified when
+	// end_session_endpoint is "" (the Lua string.sub guard never matches).
+	headers := runOnResponse(t, script, map[string]string{
+		":status":  "302",
+		"location": "https://other.example.com/somewhere",
+	})
+
+	assert.Equal(t, "https://other.example.com/somewhere", headers["location"])
+}

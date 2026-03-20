@@ -67,15 +67,23 @@ func GenerateLuaScript(
 		queryEscapedPostLogoutRedirectURI = ""
 	}
 
+	var endSessionURI string
+	if identityProviderUris.EndSessionURI != nil {
+		endSessionURI = *identityProviderUris.EndSessionURI
+	} else {
+		// We handle endSessionURI == nil as "" to make it easier when building the Lua script
+		endSessionURI = ""
+	}
+
 	return fmt.Sprintf(
 		luaScriptTemplate,
 		ignoreRulesLua,
 		requireRulesLua,
 		denyRedirectRulesLua,
-		identityProviderUris.AuthorizationURI,
+		EscapeLuaString(identityProviderUris.AuthorizationURI),
 		loginParamsAsLua,
-		*identityProviderUris.EndSessionURI,
-		queryEscapedPostLogoutRedirectURI,
+		EscapeLuaString(endSessionURI),
+		EscapeLuaString(queryEscapedPostLogoutRedirectURI),
 		BypassOauthLoginHeaderName,
 		DenyRedirectHeaderName,
 	)

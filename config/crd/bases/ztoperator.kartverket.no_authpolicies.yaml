@@ -165,7 +165,18 @@ spec:
                         - TRACE
                         - CONNECT
                       items:
+                        enum:
+                        - GET
+                        - POST
+                        - PUT
+                        - PATCH
+                        - DELETE
+                        - HEAD
+                        - OPTIONS
+                        - TRACE
+                        - CONNECT
                         type: string
+                      maxItems: 9
                       type: array
                       x-kubernetes-list-type: set
                     paths:
@@ -223,10 +234,14 @@ spec:
                   loginParams:
                     additionalProperties:
                       type: string
-                    description: LoginParams specifies a map of query parameters and
-                      their values which will be added in the authorize request made
-                      towards the configured identity provider.
+                    description: |-
+                      LoginParams specifies a map of query parameters and their values which will be added in the authorize request made towards the configured identity provider.
+                      Keys must be valid OAuth parameter names (letters, digits, and underscores).
+                    maxProperties: 32
                     type: object
+                    x-kubernetes-validations:
+                    - message: loginParams keys must match ^[a-zA-Z_][a-zA-Z0-9_]*$
+                      rule: self.all(k, k.matches('^[a-zA-Z_][a-zA-Z0-9_]*$'))
                   loginPath:
                     description: |-
                       LoginPath specifies a list of URI paths that should trigger the auto-login behavior.
@@ -339,7 +354,18 @@ spec:
                         - TRACE
                         - CONNECT
                       items:
+                        enum:
+                        - GET
+                        - POST
+                        - PUT
+                        - PATCH
+                        - DELETE
+                        - HEAD
+                        - OPTIONS
+                        - TRACE
+                        - CONNECT
                         type: string
+                      maxItems: 9
                       type: array
                       x-kubernetes-list-type: set
                     paths:

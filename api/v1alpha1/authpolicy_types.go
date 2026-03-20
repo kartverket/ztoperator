@@ -191,7 +191,10 @@ type AutoLogin struct {
 	Scopes []string `json:"scopes"`
 
 	// LoginParams specifies a map of query parameters and their values which will be added in the authorize request made towards the configured identity provider.
+	// Keys must be valid OAuth parameter names (letters, digits, and underscores).
 	//
+	// +kubebuilder:validation:XValidation:message="loginParams keys must match ^[a-zA-Z_][a-zA-Z0-9_]*$",rule="self.all(k, k.matches('^[a-zA-Z_][a-zA-Z0-9_]*$'))"
+	// +kubebuilder:validation:MaxProperties=32
 	// +kubebuilder:validation:Optional
 	LoginParams map[string]string `json:"loginParams,omitempty"`
 }
@@ -307,8 +310,9 @@ type RequestMatcher struct {
 	// - CONNECT
 	//
 	// +listType=set
-	// +kubebuilder:validation:Items:Enum=GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS,TRACE,CONNECT
+	// +kubebuilder:validation:items:Enum=GET;POST;PUT;PATCH;DELETE;HEAD;OPTIONS;TRACE;CONNECT
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:MaxItems=9
 	Methods []string `json:"methods,omitempty"`
 }
 

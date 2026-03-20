@@ -9,8 +9,10 @@ import (
 
 // ConvertLoginParamsToLuaParams encodes a map of OAuth login parameters into a
 // Lua table literal string suitable for embedding in the generated EnvoyFilter
-// Lua script. Keys are emitted in sorted order for deterministic output. Values
-// are URL-encoded with [url.QueryEscape] before embedding.
+// Lua script. Keys are emitted in sorted order for deterministic output. Both
+// keys and values are escaped for safe embedding inside Lua double-quoted
+// strings with [EscapeLuaString]. Values are additionally URL-encoded with
+// [url.QueryEscape] before Lua-escaping.
 //
 // An empty or nil map returns an empty Lua table.
 //
@@ -42,7 +44,7 @@ func ConvertLoginParamsToLuaParams(rawLoginParams map[string]string) string {
 			sb.WriteString(",")
 		}
 		first = false
-		fmt.Fprintf(&sb, `["%s"]="%s"`, k, v)
+		fmt.Fprintf(&sb, `["%s"]="%s"`, EscapeLuaString(k), EscapeLuaString(v))
 	}
 	sb.WriteString("}")
 	return sb.String()
