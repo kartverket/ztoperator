@@ -44,6 +44,7 @@ KIND_CLUSTER_NAME          ?= ztoperator
 KUBECONTEXT                ?= kind-$(KIND_CLUSTER_NAME)
 ISTIO_VERSION 				= $(call extract-version,istio.io/client-go)
 CERT_MANAGER_VERSION		= 1.19.2
+LOCAL_WEBHOOK_CERTS_DIR	   ?= webhook-certs
 
 .PHONY: help
 help: ## Display this help.
@@ -52,8 +53,8 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: run-local
-run-local: ensurelocal ensureztoperatornotdeployed generate install sourceenv ## Run ztoperator from your host.
-	go run ./cmd/main.go
+run-local: ensurelocal ensureztoperatornotdeployed generate install webhooks sourceenv ## Run ztoperator from your host.
+	go run ./cmd/main.go -webhook-cert-path=./webhook-certs
 
 .PHONY: isrunning
 isrunning: ## Check if ztoperator is running on your host machine (i.e. from IDE or with 'make run-local')
@@ -72,7 +73,7 @@ sourceenv: ## Source environment variables from .env file
 	@set -a; [ -f .env ] && . .env; set +a
 
 .PHONY: local
-local: cluster accesserator-namespace cert-manager istio-gateways skiperator mock-oauth2 generate install ## Set up entire local development environment with external dependencies
+local: cluster ztoperator-namespace cert-manager istio-gateways skiperator mock-oauth2 generate install ## Set up entire local development environment with external dependencies
 
 .PHONY: clean
 clean: kind ## Clean up local environment by deleting kind cluster
@@ -80,7 +81,7 @@ clean: kind ## Clean up local environment by deleting kind cluster
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	"$(CONTROLLER_GEN)" rbac:roleName=ztoperator crd paths="./..." output:crd:artifacts:config=config/crd/bases
+	"$(CONTROLLER_GEN)" rbac:roleName=ztoperator crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases output:webhook:artifacts:config=config/webhook/bases
 
 .PHONY: docs
 docs: ## Generate API documentation from CRD bases using crdoc
@@ -144,30 +145,41 @@ ifndef ignore-not-found
 endif
 
 .PHONY: deploy
-deploy: ensurelocal isnotrunning accesserator-namespace generate install kustomize docker-build ## Deploy ztoperator and all the required resources for ztoperator to run properly to the kind cluster
+deploy: ensurelocal isnotrunning ztoperator-namespace generate install kustomize docker-build ## Deploy ztoperator and all the required resources for ztoperator to run properly to the kind cluster
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KIND)" load docker-image ${IMG} --name $(KIND_CLUSTER_NAME)
 	"$(KUBECTL)" create secret generic ztoperator-env --from-env-file=.env -n ztoperator-system --context $(KUBECONTEXT)
+	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy ztoperator and all the resources deployed by ztoperator to the kind cluster. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+	@out="$$( "$(KUSTOMIZE)" build config/webhook 2>/dev/null || true )"; \
+	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No manager resources to delete; skipping."; fi
 	@out="$$( "$(KUSTOMIZE)" build config/manager 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No manager resources to delete; skipping."; fi
 
+.PHONY: webhooks
+webhooks: kustomize ## Extract webhook certificate details
+	@/bin/bash ./scripts/get-webhook-certs.sh
+
 .PHONY: install
-install: kustomize generate ## Install CRDs and ClusterRoles into the K8s cluster specified in ~/.kube/config.
+install: kustomize generate ## Install CRDs, Webhook configurations and ClusterRoles into the local kind cluster.
 	@out="$$( "$(KUSTOMIZE)" build config/crd 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No CRDs to install; skipping."; fi
 	@out="$$( "$(KUSTOMIZE)" build config/rbac 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No ClusterRoles to install; skipping."; fi
+	@out="$$( "$(KUSTOMIZE)" build config/webhook-local 2>/dev/null || true )"; \
+	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No Webhook configurations to install; skipping."; fi
 
 .PHONY: uninstall
-uninstall: generate kustomize kubectl ## Uninstall CRDs and ClusterRoles from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+uninstall: generate kustomize kubectl ## Uninstall CRDs, Webhook configurations and ClusterRoles from the local kind cluster. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	@out="$$( "$(KUSTOMIZE)" build config/crd 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No CRDs to delete; skipping."; fi
 	@out="$$( "$(KUSTOMIZE)" build config/rbac 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No ClusterRoles to delete; skipping."; fi
+	@out="$$( "$(KUSTOMIZE)" build config/webhook-local 2>/dev/null || true )"; \
+	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No Webhook configurations to delete; skipping."; fi
 
 ##@ Cluster
 
@@ -179,7 +191,7 @@ cluster: kind ## Create Kind cluster with kube context kind-ztoperator
 ##@ Namespace
 
 .PHONY: ztoperator-namespace
-accesserator-namespace: kubectl ## Create ztoperator-system namespace in the cluster
+ztoperator-namespace: kubectl ## Create ztoperator-system namespace in the cluster
 	@/bin/bash ./scripts/create-ztoperator-namespace.sh
 
 ##@ Operators
@@ -213,7 +225,7 @@ cert-manager: kustomize kubectl ## Install cert-manager to the cluster
 	@echo -e "🤞  Installing cert-manager..."
 	"$(KUBECTL)" apply -f https://github.com/cert-manager/cert-manager/releases/download/v$(CERT_MANAGER_VERSION)/cert-manager.yaml
 	@echo "🕑  Waiting for cert-manager to be ready..."
-	"$(KUBECTL)" -n cert-manager wait deploy --all --for=condition=Available --timeout=60s
+	"$(KUBECTL)" -n cert-manager wait deploy --all --for=condition=Available --timeout=120s
 	@echo -e "✅  Cert-manager installed!"
 	@out="$$( "$(KUSTOMIZE)" build config/cert-manager 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No cert manager resources to install; skipping."; fi

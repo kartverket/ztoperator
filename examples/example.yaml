@@ -3,6 +3,7 @@ kind: Namespace
 metadata:
   name: test
   labels:
+    ztoperator-webhooks: enabled
     istio.io/rev: default
 ---
 apiVersion: skiperator.kartverket.no/v1alpha1
