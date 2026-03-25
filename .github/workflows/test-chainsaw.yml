@@ -12,15 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version-file: go.mod
 
       - name: Setup Hurl
-        uses: gacts/install-hurl@8c80c69c281b4b618858de1e1a9ce931e9e61c97
+        uses: gacts/install-hurl@07862af8bae89d374a3e82e359293d6e9d73d900 # v1.3.2
 
       - name: Setup local cluster, deploy Ztoperator, make virtualenv, expose ingress and run chainsaw tests
         run: |
