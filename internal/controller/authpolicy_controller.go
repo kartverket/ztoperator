@@ -6,7 +6,9 @@ import (
 	"fmt"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/eventhandler/configmap"
 	"github.com/kartverket/ztoperator/internal/eventhandler/pod"
+	"github.com/kartverket/ztoperator/internal/eventhandler/secret"
 	"github.com/kartverket/ztoperator/internal/reconciler"
 	"github.com/kartverket/ztoperator/internal/resolver"
 	"github.com/kartverket/ztoperator/internal/state"
@@ -46,6 +48,8 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&v1alpha4.EnvoyFilter{}).
 		Owns(&v1.Secret{}).
 		Watches(&v1.Pod{}, pod.EventHandler(r.Client)).
+		Watches(&v1.Secret{}, secret.EventHandler(r.Client)).
+		Watches(&v1.ConfigMap{}, configmap.EventHandler(r.Client)).
 		Complete(r)
 }
 

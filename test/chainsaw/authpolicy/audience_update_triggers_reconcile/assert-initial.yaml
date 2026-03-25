@@ -1,0 +1,24 @@
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: auth-policy
+spec:
+  jwtRules:
+    - audiences:
+        - audience-v1
+        - secret-audience-v1
+      forwardOriginalToken: true
+      issuer: http://mock-oauth2.auth:8080/entraid
+      jwksUri: http://mock-oauth2.auth:8080/entraid/jwks
+  selector:
+    matchLabels:
+      app: application
+---
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+status:
+  phase: Ready
+  ready: true
+
