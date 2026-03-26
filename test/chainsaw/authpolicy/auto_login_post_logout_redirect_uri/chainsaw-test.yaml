@@ -22,7 +22,7 @@ spec:
         - create:
             file: authpolicy-with-post-logout-redirect.yaml
         - script:
-            content: sleep 7
+            content: sleep 14
         - script:
             content: |
               hurl --error-format long \
