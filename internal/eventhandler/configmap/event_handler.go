@@ -1,4 +1,4 @@
-package pod
+package configmap
 
 import (
 	"context"
@@ -12,11 +12,16 @@ import (
 
 func EventHandler(c client.Client) handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		pod, ok := obj.(*corev1.Pod)
+		configMap, ok := obj.(*corev1.ConfigMap)
 		if !ok {
 			return nil
 		}
 
-		return eventhandler.EnqueueAuthPoliciesInNamespace(ctx, c, pod.Namespace)
+		// Owned configmaps already trigger reconcile
+		if eventhandler.IsOwnedByAuthPolicy(configMap) {
+			return nil
+		}
+
+		return eventhandler.EnqueueAuthPoliciesInNamespace(ctx, c, configMap.Namespace)
 	})
 }

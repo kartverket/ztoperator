@@ -1,4 +1,4 @@
-package pod
+package secret
 
 import (
 	"context"
@@ -12,11 +12,16 @@ import (
 
 func EventHandler(c client.Client) handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		pod, ok := obj.(*corev1.Pod)
+		secret, ok := obj.(*corev1.Secret)
 		if !ok {
 			return nil
 		}
 
-		return eventhandler.EnqueueAuthPoliciesInNamespace(ctx, c, pod.Namespace)
+		// Owned secrets already trigger reconcile
+		if eventhandler.IsOwnedByAuthPolicy(secret) {
+			return nil
+		}
+
+		return eventhandler.EnqueueAuthPoliciesInNamespace(ctx, c, secret.Namespace)
 	})
 }

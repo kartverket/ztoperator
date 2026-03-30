@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audience-configmap
+data:
+  AUDIENCE: "audience-v2"
+

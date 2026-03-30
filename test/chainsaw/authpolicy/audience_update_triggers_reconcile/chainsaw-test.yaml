@@ -1,0 +1,29 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: audience-update-triggers-reconcile
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        - create:
+            file: ../../../resources/skiperator/application.yaml
+        - create:
+            file: authpolicy.yaml
+        - assert:
+            file: assert-initial.yaml
+        - update:
+            file: configmap-updated.yaml
+        - assert:
+            file: assert-after-configmap-update.yaml
+        - update:
+            file: secret-updated.yaml
+        - assert:
+            file: assert-after-secret-update.yaml
+
