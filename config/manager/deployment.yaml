@@ -23,6 +23,7 @@ spec:
             - -leader-elect
             - -metrics-bind-address=0.0.0.0:8181
             - -metrics-secure=false
+            - -webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
           envFrom:
             - secretRef:
                 name: ztoperator-env
@@ -38,6 +39,8 @@ spec:
               name: metrics
             - containerPort: 8081
               name: probes
+            - containerPort: 9443
+              name: webhook-server
           readinessProbe:
             httpGet:
               path: /readyz
@@ -62,6 +65,10 @@ spec:
             runAsUser: 65532
             seccompProfile:
               type: RuntimeDefault
+          volumeMounts:
+            - mountPath: /tmp/k8s-webhook-server/serving-certs
+              name: webhook-certs
+              readOnly: true
       imagePullSecrets:
         - name: github-auth
       priorityClassName: skip-critical
@@ -69,3 +76,8 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       serviceAccountName: ztoperator
+      volumes:
+        - name: webhook-certs
+          secret:
+            defaultMode: 420
+            secretName: webhook-server-cert
