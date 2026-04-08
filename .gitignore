@@ -42,3 +42,6 @@ venv/
 
 # Debug binary
 cmd/__debug_bin*
+
+# Local webhook certs
+webhook-certs/

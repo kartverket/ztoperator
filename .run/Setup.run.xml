@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Setup" type="MAKEFILE_TARGET_RUN_CONFIGURATION" factoryName="Makefile">
-    <makefile filename="$PROJECT_DIR$/Makefile" target="ensurelocal ensureztoperatornotdeployed generate install" workingDirectory="$PROJECT_DIR$" arguments="">
+    <makefile filename="$PROJECT_DIR$/Makefile" target="ensurelocal ensureztoperatornotdeployed generate install webhooks" workingDirectory="$PROJECT_DIR$" arguments="">
       <envs />
     </makefile>
     <method v="2" />
