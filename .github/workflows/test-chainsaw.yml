@@ -20,7 +20,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Setup Hurl
-        uses: gacts/install-hurl@07862af8bae89d374a3e82e359293d6e9d73d900 # v1.3.2
+        uses: gacts/install-hurl@4e426ea8f8626b6f9e87f473751d8a0572370ba3 # v1.3.3
 
       - name: Setup local cluster, deploy Ztoperator, make virtualenv, expose ingress and run chainsaw tests
         run: |
