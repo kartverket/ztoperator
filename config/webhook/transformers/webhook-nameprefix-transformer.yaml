@@ -1,0 +1,8 @@
+apiVersion: builtin
+kind: PrefixTransformer
+metadata:
+  name: webhook-config-prefix
+prefix: ztoperator-
+fieldSpecs:
+  - path: metadata/name
+    kind: ValidatingWebhookConfiguration

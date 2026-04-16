@@ -2,7 +2,7 @@
   <configuration default="false" name="Ztoperator" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="ztoperator" />
     <working_directory value="$PROJECT_DIR$" />
-    <parameters value="-metrics-bind-address=0.0.0.0:8181 -metrics-secure=false" />
+    <parameters value="-metrics-bind-address=0.0.0.0:8181 -metrics-secure=false -webhook-cert-path=./webhook-certs" />
     <EXTENSION ID="net.ashald.envfile">
       <option name="IS_ENABLED" value="true" />
       <option name="IS_SUBST" value="false" />
