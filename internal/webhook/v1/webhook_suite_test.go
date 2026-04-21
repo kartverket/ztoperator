@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -39,6 +40,8 @@ var (
 	k8sClient client.Client
 	cfg       *rest.Config
 	testEnv   *envtest.Environment
+
+	webhookManifestsDir string
 )
 
 const skiperatorAppName = "skiperator-app"
@@ -68,6 +71,9 @@ var _ = BeforeSuite(func() {
 	err = config.Load()
 	Expect(err).NotTo(HaveOccurred())
 
+	webhookManifestsDir, err = buildWebhookManifestsWithKustomize()
+	Expect(err).NotTo(HaveOccurred())
+
 	// +kubebuilder:scaffold:scheme
 
 	By("bootstrapping test environment")
@@ -79,7 +85,7 @@ var _ = BeforeSuite(func() {
 		ErrorIfCRDPathMissing: true,
 
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
-			Paths: []string{filepath.Join("..", "..", "..", "config", "webhook", "bases")},
+			Paths: []string{webhookManifestsDir},
 		},
 	}
 
@@ -165,22 +171,56 @@ func getFirstFoundEnvTestBinaryDir() string {
 	return ""
 }
 
-func getWebhookEnabledNamespace(name string) *corev1.Namespace {
-	return &corev1.Namespace{
+// buildWebhookManifestsWithKustomize uses the Makefile target to build the webhook manifests with Kustomize.
+// This is done to include namespace selectors and object conditions in the webhook configuration we test against.
+func buildWebhookManifestsWithKustomize() (string, error) {
+	repoRoot := filepath.Join("..", "..", "..")
+	outDir := filepath.Join(repoRoot, "webhook-tests")
+
+	cmd := exec.Command("make", "-C", repoRoot, "webhook-test-manifests")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to build webhook test manifests via make: %w, output: %s", err, string(out))
+	}
+
+	manifestPath := filepath.Join(outDir, "webhook-manifests.yaml")
+	if _, err := os.Stat(manifestPath); err != nil {
+		return "", fmt.Errorf("expected manifest file %s was not created: %w", manifestPath, err)
+	}
+
+	return outDir, nil
+}
+
+func getWebhookNamespace(name string, webhookEnabled bool) *corev1.Namespace {
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"ztoperator-webhooks": "enabled",
-			},
+			Name:   name,
+			Labels: map[string]string{},
+		},
+	}
+	if webhookEnabled {
+		ns.Labels[v1.CreatedBySkipNamespaceLabel] = v1.CreatedBySkipNamespaceLabelValue
+	}
+	return ns
+}
+
+func getPod(objectMeta metav1.ObjectMeta, containerName string) *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: objectMeta,
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{
+				Name:  containerName,
+				Image: "nginx:stable",
+			}},
 		},
 	}
 }
 
 var _ = Describe("Pod validating webhook", func() {
-	It("does not create when pod is annotated correctly and authpolicy does not exist", func() {
-		ns := getWebhookEnabledNamespace("pod-webhook-create-fail-ns")
-		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+	It("does not block pod creation when pod is annotated correctly and AuthPolicy does not exists, because it lies in webhook disabled namespace", func() {
+		ns := getWebhookNamespace("pod-webhook-create-succeeds-disabled-ns", false)
 		skiperatorAppName := skiperatorAppName
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
 
 		pod := &corev1.Pod{
@@ -203,13 +243,11 @@ var _ = Describe("Pod validating webhook", func() {
 		}
 		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
 
-		Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring("no AuthPolicy resource was found for the corresponding Application")))
-
-		Expect(k8sClient.Delete(ctx, ns)).To(Succeed())
+		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 	})
 
-	It("creates when pod is annotated correctly and authpolicy exists", func() {
-		ns := getWebhookEnabledNamespace("pod-webhook-create-succeed-ns")
+	It("does not block pod creation when pod is annotated correctly and AuthPolicy exists, but it lies in webhook disabled namespace", func() {
+		ns := getWebhookNamespace("pod-webhook-create-failed-disabled-ns", false)
 		skiperatorAppName := skiperatorAppName
 		authPolicyName := "auth-policy"
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
@@ -251,12 +289,84 @@ var _ = Describe("Pod validating webhook", func() {
 		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
+	})
 
-		Expect(k8sClient.Delete(ctx, ns)).To(Succeed())
+	It("does not create when pod is annotated correctly and authpolicy does not exist", func() {
+		ns := getWebhookNamespace("pod-webhook-create-fail-ns", true)
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		skiperatorAppName := skiperatorAppName
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
+
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-webhook-create",
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					v1.ZtoperatorVerifyAnnotationKey: v1.ZtoperatorVerifyAnnotationValue,
+				},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name:  skiperatorAppName,
+					Image: "nginx:stable",
+				}},
+			},
+		}
+		if pod.Labels == nil {
+			pod.Labels = make(map[string]string)
+		}
+		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+
+		Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring("no AuthPolicy resource was found for the corresponding Application")))
+	})
+
+	It("creates when pod is annotated correctly and authpolicy exists", func() {
+		ns := getWebhookNamespace("pod-webhook-create-succeed-ns", true)
+		skiperatorAppName := skiperatorAppName
+		authPolicyName := "auth-policy"
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
+
+		authPolicy := ztoperatorv1.AuthPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      authPolicyName,
+				Namespace: ns.GetName(),
+			},
+			Spec: ztoperatorv1.AuthPolicySpec{
+				Selector: ztoperatorv1.WorkloadSelector{
+					MatchLabels: map[string]string{"app": skiperatorAppName},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, &authPolicy)).To(Succeed())
+		authPolicy.Status.Ready = true
+		Expect(k8sClient.Status().Update(ctx, &authPolicy)).To(Succeed())
+
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-webhook-create",
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					v1.ZtoperatorVerifyAnnotationKey: v1.ZtoperatorVerifyAnnotationValue,
+				},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name:  skiperatorAppName,
+					Image: "nginx:stable",
+				}},
+			},
+		}
+		if pod.Labels == nil {
+			pod.Labels = make(map[string]string)
+		}
+		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+
+		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 	})
 
 	It("does not create when pod is annotated correctly and authpolicy for different app exists", func() {
-		ns := getWebhookEnabledNamespace("pod-webhook-different-app-ns")
+		ns := getWebhookNamespace("pod-webhook-different-app-ns", true)
 		skiperatorAppName := skiperatorAppName
 		authPolicyName := "auth-policy"
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
@@ -298,7 +408,5 @@ var _ = Describe("Pod validating webhook", func() {
 		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring("no AuthPolicy resource was found for the corresponding Application")))
-
-		Expect(k8sClient.Delete(ctx, ns)).To(Succeed())
 	})
 })
