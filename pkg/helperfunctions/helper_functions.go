@@ -11,9 +11,11 @@ import (
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func LowestNonZeroResult(i, j ctrl.Result) ctrl.Result {
@@ -105,4 +107,12 @@ func GetProtectedPods(ctx context.Context, k8sClient client.Client, authPolicy v
 		)
 	}
 	return &podList.Items, nil
+}
+
+// GetMockKubernetesClient returns a fake Kubernetes client with the provided scheme and objects. Only used in testing.
+func GetMockKubernetesClient(scheme *runtime.Scheme, objects ...client.Object) client.Client {
+	return fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(objects...).
+		Build()
 }
