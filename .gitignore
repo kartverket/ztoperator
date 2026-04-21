@@ -45,3 +45,6 @@ cmd/__debug_bin*
 
 # Local webhook certs
 webhook-certs/
+
+# Local webhook manifests for tests
+webhook-tests/
