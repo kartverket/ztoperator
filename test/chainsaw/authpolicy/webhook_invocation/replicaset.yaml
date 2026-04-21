@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  labels:
+    app: app
+status:
+  conditions:
+    - message: 'admission webhook "vpod-v1.kb.io" denied the request: no AuthPolicy resource was found for the corresponding Application'
+      reason: FailedCreate
+      status: "True"
+      type: ReplicaFailure
