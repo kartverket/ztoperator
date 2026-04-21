@@ -169,8 +169,16 @@ install: kustomize generate ## Install CRDs, Webhook configurations and ClusterR
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No CRDs to install; skipping."; fi
 	@out="$$( "$(KUSTOMIZE)" build config/rbac 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No ClusterRoles to install; skipping."; fi
-	@out="$$( "$(KUSTOMIZE)" build config/webhook-local 2>/dev/null || true )"; \
-	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No Webhook configurations to install; skipping."; fi
+	@if $(MAKE) ensureztoperatornotdeployed >/dev/null 2>&1; then \
+		echo "Ztoperator is not deployed; installing local webhook config."; \
+		out="$$( "$(KUSTOMIZE)" build config/webhook-local 2>/dev/null || true )"; \
+		if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No Webhook configurations to install; skipping."; fi; \
+	else \
+		echo "Ztoperator is deployed; installing cluster webhook config."; \
+		out="$$( "$(KUSTOMIZE)" build config/webhook 2>/dev/null || true )"; \
+		if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; else echo "No Webhook configurations to install; skipping."; fi; \
+	fi
+
 
 .PHONY: uninstall
 uninstall: generate kustomize kubectl ## Uninstall CRDs, Webhook configurations and ClusterRoles from the local kind cluster. Call with ignore-not-found=true to ignore resource not found errors during deletion.
@@ -178,8 +186,15 @@ uninstall: generate kustomize kubectl ## Uninstall CRDs, Webhook configurations 
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No CRDs to delete; skipping."; fi
 	@out="$$( "$(KUSTOMIZE)" build config/rbac 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No ClusterRoles to delete; skipping."; fi
-	@out="$$( "$(KUSTOMIZE)" build config/webhook-local 2>/dev/null || true )"; \
-	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No Webhook configurations to delete; skipping."; fi
+	@if $(MAKE) ensureztoperatornotdeployed >/dev/null 2>&1; then \
+		echo "Ztoperator is not deployed; uninstalling local webhook config."; \
+		out="$$( "$(KUSTOMIZE)" build config/webhook-local 2>/dev/null || true )"; \
+		if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No Webhook configurations to delete; skipping."; fi; \
+	else \
+		echo "Ztoperator is deployed; uninstalling cluster webhook config."; \
+		out="$$( "$(KUSTOMIZE)" build config/webhook 2>/dev/null || true )"; \
+		if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No Webhook configurations to delete; skipping."; fi; \
+	fi
 
 ##@ Cluster
 
@@ -264,6 +279,11 @@ ensureztoperatornotdeployed: kubectl ## Ensure ztoperator is NOT deployed in the
 .PHONY: ensureztoperatordeployed
 ensureztoperatordeployed: kubectl ensurelocal isnotrunning ## Ensure ztoperator is deployed in the kind cluster
 	@/bin/bash ./scripts/ensure-ztoperator-deployed.sh || (echo "❌ Ztoperator resources are not deployed correctly to the cluster. To fix it, run 'make deploy'." && exit 1)
+
+.PHONY: webhook-test-manifests
+webhook-test-manifests: kustomize ## Build webhook manifests for envtest into webhook-tests/
+	@mkdir -p webhook-tests
+	@"$(KUSTOMIZE)" build config/webhook > webhook-tests/webhook-manifests.yaml
 
 ##@ Dependencies
 
