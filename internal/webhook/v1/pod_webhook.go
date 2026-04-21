@@ -3,9 +3,11 @@ package v1
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -14,10 +16,14 @@ import (
 )
 
 const (
+	CreatedBySkipNamespaceLabel      = "skip.kartverket.no/skip-managed"
+	CreatedBySkipNamespaceLabelValue = "true"
+
 	SkiperatorApplicationRefLabel = "application.skiperator.no/app-name"
 
-	ZtoperatorVerifyAnnotationKey   = "ztoperator.kartverket.no/verify-authpolicy"
-	ZtoperatorVerifyAnnotationValue = "true"
+	ZtoperatorWebhookAnnotationPrefix = "ztoperator.kartverket.no/"
+	ZtoperatorVerifyAnnotationKey     = ZtoperatorWebhookAnnotationPrefix + "verify-authpolicy"
+	ZtoperatorVerifyAnnotationValue   = "true"
 )
 
 // nolint:unused
@@ -54,6 +60,22 @@ func (v *PodCustomValidator) ValidateDelete(_ context.Context, pod *corev1.Pod) 
 
 func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) (admission.Warnings, error) {
 	podlog.Info("Validating for Pod", "name", pod.GetName())
+
+	isPodWebhookEligible, errMsg := IsWebhookEligible(ctx, k8sClient, *pod)
+	if !isPodWebhookEligible {
+		podlog.Error(
+			fmt.Errorf(
+				"webhook eligibility check failed: %s",
+				errMsg,
+			),
+			"received validating webhook request for pod that is not eligible for Ztoperator webhook processing",
+			"pod",
+			types.NamespacedName{
+				Namespace: pod.GetNamespace(),
+				Name:      pod.GetName(),
+			},
+		)
+	}
 
 	podAuthPolicy, err := GetPodAuthPolicyConfiguration(ctx, k8sClient, pod)
 	if err != nil {
@@ -122,4 +144,44 @@ func GetPodAuthPolicyConfiguration(
 		AppName:                          appName,
 		CreatedFromSkiperatorApplication: true,
 	}, nil
+}
+
+func IsWebhookEligible(ctx context.Context, k8sClient client.Client, pod corev1.Pod) (bool, string) {
+	if pod.Labels == nil {
+		return false, fmt.Sprintf("pod %s/%s has no labels", pod.Namespace, pod.Name)
+	}
+	_, isSkiperatorPod := pod.Labels[SkiperatorApplicationRefLabel]
+	if !isSkiperatorPod {
+		return false, fmt.Sprintf("pod %s/%s is not created from a Skiperator Application", pod.Namespace, pod.Name)
+	}
+	if pod.Annotations == nil {
+		return false, fmt.Sprintf("pod %s/%s has no annotations", pod.Namespace, pod.Name)
+	}
+	hasZtoperatorWebhookAnnotationPrefix := false
+	for annotation := range pod.Annotations {
+		if strings.HasPrefix(annotation, ZtoperatorWebhookAnnotationPrefix) {
+			hasZtoperatorWebhookAnnotationPrefix = true
+		}
+	}
+	if !hasZtoperatorWebhookAnnotationPrefix {
+		return false, fmt.Sprintf("pod %s/%s has no Ztoperator webhook annotations", pod.Namespace, pod.Name)
+	}
+	ns := &corev1.Namespace{}
+	if err := k8sClient.Get(ctx, client.ObjectKey{Name: pod.Namespace}, ns); err != nil {
+		if errors.IsNotFound(err) {
+			return false, fmt.Sprintf("namespace %s not found", pod.Namespace)
+		}
+		return false, fmt.Sprintf("failed to get namespace %s: %s", pod.Namespace, err.Error())
+	}
+	if ns.Labels == nil {
+		return false, fmt.Sprintf("namespace %s has no labels", pod.Namespace)
+	}
+	value, hasLabel := ns.Labels[CreatedBySkipNamespaceLabel]
+	if !hasLabel {
+		return false, fmt.Sprintf("namespace %s does not have the created by SKIP label", pod.Namespace)
+	}
+	if value != CreatedBySkipNamespaceLabelValue {
+		return false, fmt.Sprintf("namespace %s does have the created by SKIP label, but it's value is not %s", pod.Namespace, CreatedBySkipNamespaceLabelValue)
+	}
+	return true, ""
 }
