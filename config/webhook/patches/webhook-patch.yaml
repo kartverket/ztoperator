@@ -12,7 +12,14 @@ webhooks:
         namespace: ztoperator-system
     namespaceSelector:
       matchExpressions:
-        - key: ztoperator-webhooks
+        - key: skip.kartverket.no/skip-managed
           operator: In
           values:
-            - enabled
+            - "true"
+    matchConditions:
+      - name: has-ztoperator-annotation-prefix
+        expression: >
+          object != null &&
+          object.metadata != null &&
+          ('annotations' in object.metadata) &&
+          object.metadata.annotations.exists(k, k.startsWith("ztoperator.kartverket.no/"))
