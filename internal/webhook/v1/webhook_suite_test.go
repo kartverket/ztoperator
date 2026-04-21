@@ -34,6 +34,11 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
+const (
+	authPolicyName    = "auth-policy"
+	skiperatorAppName = "skiperator-app"
+)
+
 var (
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -43,8 +48,6 @@ var (
 
 	webhookManifestsDir string
 )
-
-const skiperatorAppName = "skiperator-app"
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -204,18 +207,6 @@ func getWebhookNamespace(name string, webhookEnabled bool) *corev1.Namespace {
 	return ns
 }
 
-func getPod(objectMeta metav1.ObjectMeta, containerName string) *corev1.Pod {
-	return &corev1.Pod{
-		ObjectMeta: objectMeta,
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{{
-				Name:  containerName,
-				Image: "nginx:stable",
-			}},
-		},
-	}
-}
-
 var _ = Describe("Pod validating webhook", func() {
 	It("does not block pod creation when pod is annotated correctly and AuthPolicy does not exists, because it lies in webhook disabled namespace", func() {
 		ns := getWebhookNamespace("pod-webhook-create-succeeds-disabled-ns", false)
@@ -249,7 +240,7 @@ var _ = Describe("Pod validating webhook", func() {
 	It("does not block pod creation when pod is annotated correctly and AuthPolicy exists, but it lies in webhook disabled namespace", func() {
 		ns := getWebhookNamespace("pod-webhook-create-failed-disabled-ns", false)
 		skiperatorAppName := skiperatorAppName
-		authPolicyName := "auth-policy"
+		authPolicyName := authPolicyName
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
 
@@ -323,7 +314,7 @@ var _ = Describe("Pod validating webhook", func() {
 	It("creates when pod is annotated correctly and authpolicy exists", func() {
 		ns := getWebhookNamespace("pod-webhook-create-succeed-ns", true)
 		skiperatorAppName := skiperatorAppName
-		authPolicyName := "auth-policy"
+		authPolicyName := authPolicyName
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
 
@@ -368,7 +359,7 @@ var _ = Describe("Pod validating webhook", func() {
 	It("does not create when pod is annotated correctly and authpolicy for different app exists", func() {
 		ns := getWebhookNamespace("pod-webhook-different-app-ns", true)
 		skiperatorAppName := skiperatorAppName
-		authPolicyName := "auth-policy"
+		authPolicyName := authPolicyName
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
 
