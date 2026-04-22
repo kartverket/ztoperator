@@ -148,7 +148,14 @@ endif
 deploy: ensurelocal isnotrunning ztoperator-namespace generate install kustomize docker-build ## Deploy ztoperator and all the required resources for ztoperator to run properly to the kind cluster
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KIND)" load docker-image ${IMG} --name $(KIND_CLUSTER_NAME)
-	"$(KUBECTL)" create secret generic ztoperator-env --from-env-file=.env -n ztoperator-system --context $(KUBECONTEXT)
+		@if "$(KUBECTL)" get secret ztoperator-env -n ztoperator-system --context $(KUBECONTEXT) >/dev/null 2>&1; then \
+    		echo "⏳ Updating existing ztoperator-env secret..."; \
+    		"$(KUBECTL)" create secret generic ztoperator-env --from-env-file=.env -n ztoperator-system --context $(KUBECONTEXT) --dry-run=client -o yaml | \
+    		"$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; \
+    	else \
+    		echo "⏳ Creating ztoperator-env secret..."; \
+    		"$(KUBECTL)" create secret generic ztoperator-env --from-env-file=.env -n ztoperator-system --context $(KUBECONTEXT); \
+    	fi
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 
