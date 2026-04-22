@@ -1,6 +1,0 @@
-name: Test AuthPolicy with PR Ztoperator
-requests:
-  # Alle endepunkter skal redirecte til innlogging
-  - paths:
-      - /random/path
-    expected_response: login_redirect

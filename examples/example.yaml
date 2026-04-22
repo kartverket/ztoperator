@@ -52,7 +52,7 @@ spec:
     matchLabels:
       app: app
   enabled: true
-  wellKnownURI: http://mock-oauth2:8080/ztoperator/.well-known/openid-configuration
+  wellKnownURI: http://mock-oauth2.auth:8080/ztoperator/.well-known/openid-configuration
   autoLogin:
     enabled: true
     scopes:
