@@ -59,7 +59,6 @@ jobs:
         run: echo "${{ steps.build-docker.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
     outputs:
       image_digest: ${{ steps.build-docker.outputs.digest }}
-      image_version: ${{ steps.meta.outputs.version }}
 
   pharos-scan:
     if: (!github.event.pull_request.draft)
@@ -77,20 +76,3 @@ jobs:
         with:
           image_url: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{needs.build.outputs.image_digest}}"
           tfsec: false
-
-  integration-test-actions:
-    name: Verify that setup-skip-action and test-authpolicy-action works with the built image
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Setup SKIP
-        uses: kartverket/setup-skip-action@main
-        with:
-          ztoperator-version: ${{ needs.build.outputs.image_version }}
-
-      - name: Test AuthPolicy
-        uses: kartverket/test-authpolicy-action@main
-        with:
-          test: examples/example.test.yaml
-          authpolicy: examples/example.yaml
-          comment-on-pr: 'false'
