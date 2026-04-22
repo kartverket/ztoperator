@@ -29,6 +29,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Get sanitized branch name
+        id: branch
+        run: |
+          BRANCH="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          echo "name=${BRANCH//\//-}" >> $GITHUB_OUTPUT
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
@@ -36,7 +42,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             # Tag with branch name
-            type=ref,event=branch
+            type=raw,value=${{ steps.branch.outputs.name }}
             # Tag with the git SHA
             type=sha,format=long
 
