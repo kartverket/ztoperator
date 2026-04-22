@@ -13,9 +13,32 @@ spec:
         skip.kartverket.no/skip-managed: "true"
   steps:
     - try:
+        # Assert that applications without annotation starts as expected
         - create:
-            file: skiperator-application.yaml
+            file: without-annotation-skiperator-application.yaml
         - assert:
-            file: replicaset.yaml
+            file: without-annotation-pod.yaml
+
+        # Assert that applications with annotation are blocked because of missing AuthPolicy
+        - create:
+            file: with-annotation-skiperator-application.yaml
+        # Need to restart deployment once the ServiceAccount is created
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: ServiceAccount
+              metadata:
+                name: app-with-annotation
+        # Now restart to clear the stale condition
+        - script:
+            content: kubectl delete replicaset -n $NAMESPACE -l app=app-with-annotation --ignore-not-found
+        - assert:
+            file: with-annotation-replicaset.yaml
         - error:
-            file: pod.yaml
+            file: with-annotation-pod.yaml
+
+        # Assert that applications with annotation starts as expected when AuthPolicy is created
+        - create:
+            file: with-annotation-authpolicy.yaml
+        - assert:
+            file: with-annotation-pod.yaml

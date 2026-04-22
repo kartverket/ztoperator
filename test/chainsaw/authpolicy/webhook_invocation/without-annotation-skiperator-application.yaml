@@ -1,0 +1,7 @@
+apiVersion: skiperator.kartverket.no/v1alpha1
+kind: Application
+metadata:
+  name: app-without-annotation
+spec:
+  image: nginxinc/nginx-unprivileged@sha256:0ac6770a4747ee05799deba85731496e001bbfdcd204a27f364090fa9ad77157
+  port: 8080

@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    ztoperator.kartverket.no/verify-authpolicy: "true"
+  labels:
+    app: app-with-annotation
+    app.kubernetes.io/managed-by: skiperator
+    application.skiperator.no/app: app-with-annotation
+    application.skiperator.no/app-name: app-with-annotation
+    skiperator.kartverket.no/controller: application
+spec:
+  containers:
+    - name: app-with-annotation
+  initContainers:
+    - name: istio-init
+    - name: istio-proxy
+status:
+  containerStatuses:
+    - name: app-with-annotation
+      ready: true
+  initContainerStatuses:
+    - name: istio-init
+      ready: true
+    - name: istio-proxy
+      ready: true
