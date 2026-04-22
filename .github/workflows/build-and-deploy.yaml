@@ -36,7 +36,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             # Tag with branch name
-            type=raw,value={{branch}}
+            type=raw,value=${{ fromJSON(format('["{0}"]', github.head_ref || github.ref_name))[0] | replace('/', '-') }}
             # Tag with the git SHA
             type=sha,format=long
 
