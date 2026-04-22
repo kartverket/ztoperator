@@ -148,6 +148,7 @@ func GetPodAuthPolicyConfiguration(
 }
 
 func IsWebhookEligible(ctx context.Context, k8sClient client.Client, pod corev1.Pod) (bool, string) {
+	// Verify that pod is created from skiperator app
 	if pod.Labels == nil {
 		return false, fmt.Sprintf("pod %s/%s has no labels", pod.Namespace, pod.Name)
 	}
@@ -155,6 +156,8 @@ func IsWebhookEligible(ctx context.Context, k8sClient client.Client, pod corev1.
 	if !isSkiperatorPod {
 		return false, fmt.Sprintf("pod %s/%s is not created from a Skiperator Application", pod.Namespace, pod.Name)
 	}
+
+	// Verify that pod has annotations with the Ztoperator webhook annotation prefix
 	if pod.Annotations == nil {
 		return false, fmt.Sprintf("pod %s/%s has no annotations", pod.Namespace, pod.Name)
 	}
@@ -167,6 +170,8 @@ func IsWebhookEligible(ctx context.Context, k8sClient client.Client, pod corev1.
 	if !hasZtoperatorWebhookAnnotationPrefix {
 		return false, fmt.Sprintf("pod %s/%s has no Ztoperator webhook annotations", pod.Namespace, pod.Name)
 	}
+
+	// Verify that the pod lies in a SKIP managed namespace
 	ns := &corev1.Namespace{}
 	if err := k8sClient.Get(ctx, client.ObjectKey{Name: pod.Namespace}, ns); err != nil {
 		if errors.IsNotFound(err) {
