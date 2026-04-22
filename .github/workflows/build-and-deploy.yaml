@@ -35,9 +35,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # Also tag with sanitized branch name
-            type=ref
-            # Always tag with the git SHA
+            # Tag with branch name
+            type=raw,value={{branch}}
+            # Tag with the git SHA
             type=sha,format=long
 
       - name: Build and push Docker image
