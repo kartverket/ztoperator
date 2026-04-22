@@ -75,6 +75,7 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 				Name:      pod.GetName(),
 			},
 		)
+		return nil, nil
 	}
 
 	podAuthPolicy, err := GetPodAuthPolicyConfiguration(ctx, k8sClient, pod)
