@@ -1,4 +1,4 @@
-name: Build, scan and integration-test ztoperator
+name: Build and scan ztoperator
 
 on:
   pull_request:
