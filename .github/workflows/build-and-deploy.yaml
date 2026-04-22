@@ -1,4 +1,4 @@
-name: Build and Deploy ztoperator
+name: Build, scan and integration-test ztoperator
 
 on:
   pull_request:
@@ -35,9 +35,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-          # Also tag with sanitized branch name
+            # Also tag with sanitized branch name
             type=ref
-          # Always tag with the git SHA
+            # Always tag with the git SHA
             type=sha,format=long
 
       - name: Build and push Docker image
