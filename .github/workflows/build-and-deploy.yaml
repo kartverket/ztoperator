@@ -1,44 +1,11 @@
-name: Build and Deploy ztoperator
+name: Build and scan ztoperator
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [main]
-    paths-ignore:
-      - .flox/**
-      - .run/**
-      - .security/**
-      - scripts/**
-      - test/**
-      - .dockerignore
-      - .gitignore
-      - .golangci.yml
-      - .goreleaser.yaml
-      - CONTRIBUTING.md
-      - Dockerfile.goreleaser
-      - LICENSE
-      - README.md
-      - catalog.info
-      - ztoperator_logo.png
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main]
-    paths-ignore:
-      - .flox/**
-      - .run/**
-      - .security/**
-      - scripts/**
-      - test/**
-      - .dockerignore
-      - .gitignore
-      - .golangci.yml
-      - .goreleaser.yaml
-      - CONTRIBUTING.md
-      - Dockerfile.goreleaser
-      - LICENSE
-      - README.md
-      - catalog.info
-      - ztoperator_logo.png
+  push:
+    branches:
+      - main
 
 env:
   REGISTRY: ghcr.io
@@ -62,16 +29,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Get sanitized branch name
+        id: branch
+        run: |
+          BRANCH="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          echo "name=${BRANCH//\//-}" >> $GITHUB_OUTPUT
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # Always tag with the git SHA
+            # Tag with branch name
+            type=raw,value=${{ steps.branch.outputs.name }}
+            # Tag with the git SHA
             type=sha,format=long
-            # Also tag as :main only for pushes to the main branch
-            type=raw,value=main,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
       - name: Build and push Docker image
         id: build-docker

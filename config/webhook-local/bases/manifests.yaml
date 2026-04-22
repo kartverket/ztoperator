@@ -10,12 +10,6 @@ webhooks:
     clientConfig:
       url: https://host.docker.internal:9443/validate--v1-pod
     name: vpod-v1.kb.io
-    namespaceSelector:
-      matchExpressions:
-        - key: ztoperator-webhooks
-          operator: In
-          values:
-            - enabled
     failurePolicy: Fail
     rules:
       - apiGroups:
@@ -27,3 +21,22 @@ webhooks:
         resources:
           - pods
     sideEffects: None
+    namespaceSelector:
+      matchExpressions:
+        - key: skip.kartverket.no/skip-managed
+          operator: In
+          values:
+            - "true"
+    matchConditions:
+      - name: has-ztoperator-annotation-prefix
+        expression: >
+          object != null &&
+          object.metadata != null &&
+          ('annotations' in object.metadata) &&
+          object.metadata.annotations.exists(k, k.startsWith("ztoperator.kartverket.no/"))
+      - name: has-skiperator-app-label
+        expression: >
+          object != null &&
+          object.metadata != null &&
+          ('labels' in object.metadata) &&
+          ('application.skiperator.no/app-name' in object.metadata.labels)    
