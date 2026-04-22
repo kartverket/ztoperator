@@ -83,16 +83,14 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
       - name: Setup SKIP
-        uses: kartverket/setup-skip-action@latest
+        uses: kartverket/setup-skip-action@main
         with:
           ztoperator-version: ${{ needs.build.outputs.image_version }}
 
       - name: Test AuthPolicy
-        uses: kartverket/test-authpolicy-action@latest
+        uses: kartverket/test-authpolicy-action@main
         with:
           test: examples/example.test.yaml
           authpolicy: examples/example.yaml
+          comment-on-pr: 'false'
