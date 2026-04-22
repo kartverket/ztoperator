@@ -35,12 +35,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+          # Also tag with sanitized branch name
+            type=ref
           # Always tag with the git SHA
             type=sha,format=long
-          # Also tag with sanitized branch name for PRs
-            type=ref,event=pr
-          # Also tag as :main only for pushes to the main branch
-            type=raw,value=main,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
       - name: Build and push Docker image
         id: build-docker
@@ -55,6 +53,7 @@ jobs:
         run: echo "${{ steps.build-docker.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
     outputs:
       image_digest: ${{ steps.build-docker.outputs.digest }}
+      image_version: ${{ steps.meta.outputs.version }}
 
   pharos-scan:
     if: (!github.event.pull_request.draft)
@@ -72,3 +71,22 @@ jobs:
         with:
           image_url: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{needs.build.outputs.image_digest}}"
           tfsec: false
+
+  integration-test-actions:
+    name: Verify that setup-skip-action and test-authpolicy-action works with the built image
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup SKIP
+        uses: kartverket/setup-skip-action@latest
+        with:
+          ztoperator-version: ${{ needs.build.outputs.image_version }}
+
+      - name: Test AuthPolicy
+        uses: kartverket/test-authpolicy-action@latest
+        with:
+          test: examples/example.test.yaml
+          authpolicy: examples/example.yaml
