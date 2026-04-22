@@ -1,44 +1,11 @@
 name: Build and Deploy ztoperator
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [main]
-    paths-ignore:
-      - .flox/**
-      - .run/**
-      - .security/**
-      - scripts/**
-      - test/**
-      - .dockerignore
-      - .gitignore
-      - .golangci.yml
-      - .goreleaser.yaml
-      - CONTRIBUTING.md
-      - Dockerfile.goreleaser
-      - LICENSE
-      - README.md
-      - catalog.info
-      - ztoperator_logo.png
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main]
-    paths-ignore:
-      - .flox/**
-      - .run/**
-      - .security/**
-      - scripts/**
-      - test/**
-      - .dockerignore
-      - .gitignore
-      - .golangci.yml
-      - .goreleaser.yaml
-      - CONTRIBUTING.md
-      - Dockerfile.goreleaser
-      - LICENSE
-      - README.md
-      - catalog.info
-      - ztoperator_logo.png
+  push:
+    branches:
+      - main
 
 env:
   REGISTRY: ghcr.io
@@ -68,9 +35,11 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # Always tag with the git SHA
+          # Always tag with the git SHA
             type=sha,format=long
-            # Also tag as :main only for pushes to the main branch
+          # Also tag with sanitized branch name for PRs
+            type=ref,event=pr
+          # Also tag as :main only for pushes to the main branch
             type=raw,value=main,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
       - name: Build and push Docker image
