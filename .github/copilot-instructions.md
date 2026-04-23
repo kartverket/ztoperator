@@ -69,6 +69,7 @@ Controller.Reconcile()
 | `internal/state/` | `Scope` struct — the resolved state bag passed through reconciliation (AuthPolicy + resolved values + descendants) |
 | `internal/statusmanager/` | Condition building, phase/readiness determination, status updates |
 | `internal/eventhandler/pod/` | Watches Pods → enqueues all AuthPolicies in the same namespace for re-reconciliation |
+| `internal/names/` | Centralised child resource name derivation (`EnvoyFilter()`, `EnvoySecret()`, `DenyPolicy()`, `IgnorePolicy()`, `RequirePolicy()`). Always use these instead of hardcoding suffixes |
 | `pkg/resourcegenerators/` | Desired-state generators for each child resource type |
 | `pkg/resourcegenerators/envoyfilter/` | EnvoyFilter generation (OAuth2 filter + Lua filter config patches) |
 | `pkg/resourcegenerators/authorizationpolicy/` | Split into `deny/`, `ignore/`, `require/` sub-packages |
@@ -131,7 +132,7 @@ type Scope struct {
 
 ### Naming Conventions
 
-- Child resource names derive from AuthPolicy name: `<authpolicy-name>`, `<authpolicy-name>-login`, `<authpolicy-name>-deny-auth-rules`, `<authpolicy-name>-ignore-auth`, `<authpolicy-name>-require-auth`, `<authpolicy-name>-envoy-secret`.
+- Child resource names are derived via functions in `internal/names/` (e.g., `names.DenyPolicy(base)`, `names.EnvoySecret(base)`). Never hardcode name suffixes.
 - Package naming follows Go convention (single lowercase word).
 - Resource generator packages export a single `GetDesired(scope, objectMeta)` function.
 
@@ -149,9 +150,22 @@ RBAC permissions are declared via `+kubebuilder:rbac` comments on the `Reconcile
 
 ## Testing
 
-### Unit/Integration Tests (envtest + Ginkgo)
+### Test Framework Choice
 
-- Framework: envtest + Ginkgo/Gomega (BDD-style).
+| Type | Framework | Location | When to use |
+|---|---|---|---|
+| Unit tests | `testify` (`stretchr/testify`) | `pkg/` packages (e.g., `*_test.go` alongside source) | Pure logic: resource generators, validators, helpers, Lua script |
+| Integration tests | Ginkgo / Gomega + envtest | `internal/controller/` | Tests that need a real API server (CRD CRUD, reconcile loop, status updates) |
+| End-to-end tests | Chainsaw + Hurl | `test/chainsaw/authpolicy/<test-name>/` | Full operator running against a cluster with Istio, Skiperator, mock OAuth2 |
+
+### Unit Tests (`testify`)
+
+- Use `assert` / `require` from `github.com/stretchr/testify`.
+- No Ginkgo wrappers — plain `func Test*(t *testing.T)` functions.
+- Run: `make test`
+
+### Integration Tests (envtest + Ginkgo)
+
 - Suite setup in `internal/controller/suite_test.go`: bootstraps envtest with CRDs from `config/crd/bases/`, registers Istio + ztoperator schemes.
 - Run: `make test`
 - Tests use a real API server (envtest) but no real cluster.
@@ -172,7 +186,7 @@ RBAC permissions are declared via `+kubebuilder:rbac` comments on the `Reconcile
 
 ### Test Naming
 
-Chainsaw test directories use descriptive snake_case names that describe the scenario being tested (e.g., `auto_login_sane_defaults`, `baseline_auth_with_multiple_claims_same_key`, `pod_annotation_validation`).
+Chainsaw test directories use descriptive snake_case names that describe the scenario being tested (e.g., `auto_login_callback_path`, `baseline_auth_with_multiple_claims_same_key`, `pod_annotation_validation`).
 
 ## Technology Stack & Compatibility
 
@@ -222,13 +236,7 @@ The operator validates these annotations and sets the AuthPolicy to `Invalid` ph
 
 ## Local Development
 
-### Environment Setup
-
-- **Flox**: Development environment manager (`.flox/env/manifest.toml`). `flox activate` sets up everything.
-- **Kind**: Local Kubernetes cluster (`kind-ztoperator` context).
-- Components installed locally: Istio, cert-manager, Skiperator, mock-oauth2-server.
-- Env vars: `.env` file (currently just `ZTOPERATOR_GIT_REF`).
-- IDE run configs: `.run/Ztoperator.run.xml`, `.run/Setup.run.xml` (JetBrains GoLand/IntelliJ).
+See `CONTRIBUTING.md` and the `Makefile` for full local environment setup (Flox, Kind cluster, Istio, Skiperator, mock-oauth2-server, IDE run configs).
 
 ### Key Make Targets
 
@@ -237,7 +245,7 @@ The operator validates these annotations and sets the AuthPolicy to `Invalid` ph
 | `make local` | Full local environment setup (cluster + all dependencies) |
 | `make run-local` | Run operator from host machine |
 | `make deploy` | Build image, deploy operator to kind cluster |
-| `make test` | Run envtest/Ginkgo unit+integration tests |
+| `make test` | Run unit + integration tests (envtest/Ginkgo) |
 | `make chainsaw-test-host` | Run all Chainsaw e2e tests (operator on host) |
 | `make generate` | Regenerate CRDs, RBAC, DeepCopy code |
 | `make lint` | Run golangci-lint |
@@ -274,11 +282,7 @@ to Invalid with a descriptive error message.
 
 ## CI/CD
 
-- **Build & Deploy**: `.github/workflows/build-and-deploy.yaml` — builds container image, pushes to `ghcr.io`.
-- **Tests**: `.github/workflows/test-and-compare-code-coverage.yml`, `.github/workflows/test-chainsaw.yml`.
-- **Lint**: `.github/workflows/golangci-lint.yml`.
-- **Releases**: `.github/workflows/release-version.yaml` with GoReleaser (`.goreleaser.yaml`).
-- **Dependency updates**: Dependabot for `gomod` and `github-actions` (weekly on Monday 08:00 Europe/Oslo).
+CI/CD workflows in `.github/workflows/` cover build & push (`ghcr.io`), lint, unit tests, Chainsaw e2e tests, and releases via GoReleaser (`.goreleaser.yaml`).
 
 ## Important Constraints
 
