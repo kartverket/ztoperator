@@ -1,21 +1,18 @@
 package validation
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
-	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/pkg/config"
-	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	istioUserVolumeAnnotation      = "sidecar.istio.io/userVolume"
+	IstioUserVolumeAnnotation      = "sidecar.istio.io/userVolume"
 	istioUserVolumeMountAnnotation = "sidecar.istio.io/userVolumeMount"
 )
 
@@ -34,40 +31,12 @@ type istioUserVolumeMount struct {
 	ReadOnly  bool   `json:"readonly"`
 }
 
-func ValidatePodAnnotations(ctx context.Context, k8sClient client.Client, scope *state.Scope) error {
-	if !scope.AutoLoginConfig.Enabled {
+func ValidatePodAnnotations(pod *corev1.Pod, authPolicy v1alpha1.AuthPolicy) error {
+	if authPolicy.Spec.AutoLogin == nil || !authPolicy.Spec.AutoLogin.Enabled {
 		return nil
 	}
 
-	pods, getPodsErr := helperfunctions.GetProtectedPods(ctx, k8sClient, scope.AuthPolicy)
-	if getPodsErr != nil {
-		return fmt.Errorf(
-			"error when getting pods matching the configured labelSelector %s: %w",
-			scope.AuthPolicy.Spec.Selector.MatchLabels,
-			getPodsErr,
-		)
-	}
-	if len(*pods) == 0 {
-		return fmt.Errorf(
-			"no pods found having the labels %s, %s",
-			scope.AuthPolicy.Spec.Selector.MatchLabels,
-			podAnnotationErrorMessageSuffix(),
-		)
-	}
-
-	youngestPod := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			CreationTimestamp: metav1.Time{},
-		},
-	}
-
-	for _, pod := range *pods {
-		if pod.CreationTimestamp.After(youngestPod.CreationTimestamp.Time) {
-			youngestPod = pod
-		}
-	}
-
-	volumes, volumeMounts, collectIstioMountsErr := collectIstioVolumesAndMountsFromPod(youngestPod.Annotations)
+	volumes, volumeMounts, collectIstioMountsErr := collectIstioVolumesAndMountsFromPod(pod.Annotations)
 	if collectIstioMountsErr != nil {
 		return collectIstioMountsErr
 	}
@@ -78,22 +47,23 @@ func ValidatePodAnnotations(ctx context.Context, k8sClient client.Client, scope 
 		}
 	}
 
+	envoySecretName := names.EnvoySecret(authPolicy.Name)
 	if len(envoySecretVolumeMounts) == 0 || !validateSecretVolumeMount(
 		envoySecretVolumeMounts,
 		volumes,
-		scope.AutoLoginConfig.EnvoySecretName,
+		envoySecretName,
 	) {
 		return fmt.Errorf(
 			"secret with name '%s' used by OAuth-EnvoyFilter is not mounted in istio-proxy, %s",
-			scope.AutoLoginConfig.EnvoySecretName,
-			podAnnotationErrorMessageSuffix(),
+			envoySecretName,
+			PodAnnotationErrorMessageSuffix(),
 		)
 	}
 
 	return nil
 }
 
-func podAnnotationErrorMessageSuffix() string {
+func PodAnnotationErrorMessageSuffix() string {
 	return fmt.Sprintf(
 		"see https://github.com/kartverket/ztoperator/blob/%s/README.md#-mounting-oauth-credentials-in-the-istio-sidecar "+
 			"on how to do it correctly",
@@ -105,11 +75,11 @@ func collectIstioVolumesAndMountsFromPod(
 	podAnnotations map[string]string,
 ) ([]istioUserVolume, []istioUserVolumeMount, error) {
 	var volumes []istioUserVolume
-	if err := json.Unmarshal([]byte(podAnnotations[istioUserVolumeAnnotation]), &volumes); err != nil {
+	if err := json.Unmarshal([]byte(podAnnotations[IstioUserVolumeAnnotation]), &volumes); err != nil {
 		return nil, nil, fmt.Errorf(
 			"the required annotation '%s' is either missing or its content is not properly formatted, %s",
-			istioUserVolumeAnnotation,
-			podAnnotationErrorMessageSuffix(),
+			IstioUserVolumeAnnotation,
+			PodAnnotationErrorMessageSuffix(),
 		)
 	}
 
@@ -118,7 +88,7 @@ func collectIstioVolumesAndMountsFromPod(
 		return nil, nil, fmt.Errorf(
 			"the required annotation '%s' is either missing or its content is not properly formatted, %s",
 			istioUserVolumeMountAnnotation,
-			podAnnotationErrorMessageSuffix(),
+			PodAnnotationErrorMessageSuffix(),
 		)
 	}
 

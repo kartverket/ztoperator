@@ -113,7 +113,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return reconcile.Result{}, err
 	}
 
-	scope = validateAuthPolicy(ctx, r.Client, scope)
+	scope = validateAuthPolicy(ctx, scope)
 
 	reconcileActions := reconciler.ReconcileActions(scope)
 
@@ -238,32 +238,21 @@ func resolveAuthPolicy(
 	}, nil
 }
 
-func validateAuthPolicy(ctx context.Context, k8sClient client.Client, scope *state.Scope) *state.Scope {
+func validateAuthPolicy(ctx context.Context, scope *state.Scope) *state.Scope {
 	rLog := log.GetLogger(ctx)
-	for _, validator := range validation.GetValidators() {
-		if validationErr := validator.Validate(ctx, k8sClient, scope); validationErr != nil {
-			rLog.Error(
-				validationErr,
-				fmt.Sprintf(
-					"%s failed for AuthPolicy with name %s/%s",
-					validator.Type.String(),
-					scope.AuthPolicy.Namespace,
-					scope.AuthPolicy.Name,
-				),
-			)
-			rLog.Debug(
-				fmt.Sprintf(
-					"%s failed for AuthPolicy with name %s/%s. Defaulting to default deny on all paths.",
-					validator.Type.String(),
-					scope.AuthPolicy.Namespace,
-					scope.AuthPolicy.Name,
-				),
-			)
-			scope.InvalidConfig = true
-			validationErrorMessage := validationErr.Error()
-			scope.ValidationErrorMessage = &validationErrorMessage
-			return scope
-		}
+
+	rLog.Debug("Validating paths for AuthPolicy", "namespace", scope.AuthPolicy.Namespace, "name", scope.AuthPolicy.Name)
+	if err := validation.ValidatePaths(scope.AuthPolicy.GetPaths()); err != nil {
+		rLog.Error(
+			err,
+			"path validation failed for AuthPolicy",
+			"namespace", scope.AuthPolicy.Namespace,
+			"name", scope.AuthPolicy.Name,
+		)
+		scope.InvalidConfig = true
+		validationErrorMessage := err.Error()
+		scope.ValidationErrorMessage = &validationErrorMessage
+		return scope
 	}
 
 	scope.InvalidConfig = false

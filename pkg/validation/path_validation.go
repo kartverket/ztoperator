@@ -2,6 +2,7 @@ package validation
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -9,6 +10,15 @@ const (
 	errBracketsBeyondTemplateFmt = "invalid or unsupported path %s. Contains '{' or '}' beyond a supported path template"
 	errMatchAnyNotLastFmt        = "invalid or unsupported path %s. {**} is not the last operator"
 	errInvalidLiteralFmt         = "invalid or unsupported path %s. Contains segment %s with invalid string literal"
+
+	matchOneTemplate = "{*}"
+	matchAnyTemplate = "{**}"
+)
+
+var (
+	// Valid pchar from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
+	// pchar = unreserved / pct-encoded / sub-delims / ":" / "@".
+	validLiteral = regexp.MustCompile("^[a-zA-Z0-9-._~%!$&'()+,;:@=]+$")
 )
 
 func ValidatePaths(paths []string) error {
