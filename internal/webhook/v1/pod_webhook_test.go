@@ -47,7 +47,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		})
 	})
 
-	Describe("GetPodAuthPolicyuration", func() {
+	Describe("GetPodAuthPolicyConfiguration", func() {
 		It("returns CreatedFromSkiperatorApplication=false when Pod is not created from Skiperator Application", func() {
 			pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: skiperatorAppName, Namespace: "ns"}}
 			cfg, err := v1.GetPodAuthPolicyConfiguration(ctx, nil, pod)
@@ -70,7 +70,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			Expect(cfg).To(BeNil())
 		})
 
-		It("returns PodAuthPolicyuration with only AppName and CreatedFromSkiperatorApplication=true when pod is NOT annotated to verify nor to have any services", func() {
+		It("returns PodAuthPolicyConfiguration with only AppName and CreatedFromSkiperatorApplication=true when pod is NOT annotated to verify nor to have any services", func() {
 			skiperatorAppName := skiperatorAppName
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
