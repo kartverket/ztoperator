@@ -15,6 +15,7 @@ import (
 	ztoperatorv1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
+	"github.com/kartverket/ztoperator/pkg/validation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -399,5 +400,68 @@ var _ = Describe("Pod validating webhook", func() {
 		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring("no AuthPolicy resource was found for the corresponding Application")))
+	})
+
+	It("does not create when pod is missing annotations (authPolicy has enabled autoLogin)", func() {
+		ns := getWebhookNamespace("pod-webhook-invalid-annotations", true)
+		skiperatorAppName := skiperatorAppName
+		authPolicyName := authPolicyName
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
+
+		authPolicy := ztoperatorv1.AuthPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      authPolicyName,
+				Namespace: ns.GetName(),
+			},
+			Spec: ztoperatorv1.AuthPolicySpec{
+				Selector: ztoperatorv1.WorkloadSelector{
+					MatchLabels: map[string]string{"app": skiperatorAppName},
+				},
+				AutoLogin: &ztoperatorv1.AutoLogin{
+					Enabled: true,
+					Scopes:  []string{"openid"},
+				},
+				OAuthCredentials: &ztoperatorv1.OAuthCredentials{
+					SecretRef:       "secret",
+					ClientSecretKey: "CLIENT_ID",
+					ClientIDKey:     "CLIENT_SECRET",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, &authPolicy)).To(Succeed())
+		authPolicy.Status.Ready = true
+		Expect(k8sClient.Status().Update(ctx, &authPolicy)).To(Succeed())
+
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-webhook-create",
+				Namespace: ns.Name,
+				Labels: map[string]string{
+					v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+				},
+				Annotations: map[string]string{
+					v1.ZtoperatorVerifyAnnotationKey: v1.ZtoperatorVerifyAnnotationValue,
+				},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Name:  skiperatorAppName,
+					Image: "nginx:stable",
+				}},
+			},
+		}
+		if pod.Labels == nil {
+			pod.Labels = make(map[string]string)
+		}
+		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+
+		Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring(
+			fmt.Sprintf(
+				"the required annotation '%s' is either missing or its content is not properly formatted, %s",
+				validation.IstioUserVolumeAnnotation,
+				validation.PodAnnotationErrorMessageSuffix(),
+			),
+		)))
 	})
 })

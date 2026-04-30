@@ -21,6 +21,8 @@ jobs:
 
       - name: Setup Hurl
         uses: gacts/install-hurl@07862af8bae89d374a3e82e359293d6e9d73d900 # v1.3.2
+        with:
+          version: '6.1.1'
 
       - name: Setup local cluster, deploy Ztoperator, make virtualenv, expose ingress and run chainsaw tests
         run: |

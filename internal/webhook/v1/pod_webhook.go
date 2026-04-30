@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/pkg/validation"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -78,11 +79,11 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 		return nil, nil
 	}
 
-	podAuthPolicy, err := GetPodAuthPolicyConfiguration(ctx, k8sClient, pod)
+	podAuthPolicyConfiguration, err := GetPodAuthPolicyConfiguration(ctx, k8sClient, pod)
 	if err != nil {
 		return nil, err
 	}
-	if !podAuthPolicy.CreatedFromSkiperatorApplication {
+	if !podAuthPolicyConfiguration.CreatedFromSkiperatorApplication {
 		// Only validate Pods that are created from Skiperator Applications.
 		podlog.Info("Pod is not created from Skiperator Application, skipping validation", "pod", types.NamespacedName{
 			Namespace: pod.Namespace,
@@ -91,7 +92,9 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 		return nil, nil
 	}
 
-	return nil, nil
+	// Validate that the pod is correctly configured given the AuthPolicy.
+	validationErr := validation.ValidatePodAnnotations(pod, podAuthPolicyConfiguration.AuthPolicy)
+	return nil, validationErr
 }
 
 // PodAuthPolicyConfiguration holds all resolved security context for a Pod,
