@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: application
+    app.kubernetes.io/managed-by: skiperator
+    app.kubernetes.io/name: application
+    app.kubernetes.io/version: latest
+    application.skiperator.no/app: application
+    application.skiperator.no/app-name: application
+    skiperator.kartverket.no/controller: application
+status:
+  phase: Running
