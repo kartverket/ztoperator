@@ -59,7 +59,7 @@ jobs:
         run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/860126c650c2d05b63b83a3895e41268162315a3/install.sh | sh -s -- -b /usr/local/bin # v1.42.3
 
       - name: Release with Goreleaser
-        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7.0.0
+        uses: goreleaser/goreleaser-action@1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8 # v7.2.1
         with:
           distribution: goreleaser
           version: latest
