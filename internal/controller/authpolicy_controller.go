@@ -27,7 +27,9 @@ import (
 	k8sErrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -42,7 +44,10 @@ type AuthPolicyReconciler struct {
 // SetupWithManager sets up the controller with the Manager.
 func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&ztoperatorv1alpha1.AuthPolicy{}).
+		For(
+			&ztoperatorv1alpha1.AuthPolicy{},
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+		).
 		Owns(&istioclientsecurityv1.RequestAuthentication{}).
 		Owns(&istioclientsecurityv1.AuthorizationPolicy{}).
 		Owns(&v1alpha4.EnvoyFilter{}).
