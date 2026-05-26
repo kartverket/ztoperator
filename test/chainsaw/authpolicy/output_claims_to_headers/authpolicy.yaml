@@ -11,6 +11,8 @@ spec:
       header: x-token-role
     - claim: aud
       header: x-token-aud
+    - claim: doesntexist
+      header: x-not-in-token-but-in-output-claims
   allowedAudiences:
     - value: maskinporten_client
     - value: maskinporten_server
