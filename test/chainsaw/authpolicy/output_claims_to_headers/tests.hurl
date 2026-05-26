@@ -6,6 +6,9 @@ HTTP 403
 # --- Expecting 200
 GET https://127.0.0.1:8443/random/path
 Host: foo.bar
+x-token-sub: should-be-replaced-by-token-sub
+x-token-role: should-be-replaced-by-token-role
+x-token-aud: should-be-replaced-by-token-aud
 x-not-in-token-but-in-output-claims: should-be-stripped
 x-not-in-token-but-also-not-output-claim: should-be-passed-as-is
 Authorization: Bearer {{token}}
