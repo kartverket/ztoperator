@@ -2,7 +2,7 @@
   <img src="ztoperator_logo.png" alt="Ztoperator Logo" width="600"/>
 </p>
 
-This is diff
+This is diff v2
 
 **Ztoperator** is a Kubernetes Operator that simplifies and enforces Zero Trust security for workloads by integrating with **Istio** and **OAuth 2.0**.
 
