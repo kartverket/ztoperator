@@ -186,3 +186,6 @@ as well as a **custom metric** called `ztoperator_authpolicy_info`.
 - `auto_login_enabled`: Whether auto-login is enabled
 - `protected_pod`: The name of the pod protected by the `AuthPolicy`
 - `protected_deployment`: The name of the deployment the protected pod belongs to
+
+på bånn
+
