@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/eventhandler/configmap"
@@ -14,6 +15,7 @@ import (
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/internal/statusmanager"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	"github.com/kartverket/ztoperator/pkg/labels"
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/metrics"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
@@ -104,6 +106,17 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		rLog.Info(fmt.Sprintf("Deleting AuthPolicy with name %s", req.String()))
 		metrics.DeleteAuthPolicyInfo(req.NamespacedName)
 		return ctrl.Result{}, nil
+	}
+
+	if originalAuthPolicy.Labels == nil {
+		originalAuthPolicy.Labels = make(map[string]string)
+	}
+	maps.Copy(originalAuthPolicy.Labels, labels.AuthPolicyStandardLabels())
+	if !maps.Equal(originalAuthPolicy.Labels, authPolicy.Labels) {
+		err := r.Patch(ctx, originalAuthPolicy, client.MergeFrom(authPolicy))
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	scope, err := resolveAuthPolicy(ctx, r.Client, authPolicy, r.DiscoveryDocumentResolver)

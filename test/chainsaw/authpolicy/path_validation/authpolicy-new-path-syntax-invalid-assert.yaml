@@ -4,6 +4,9 @@ apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
   name: single-asterix-not-alone-in-segment-deny-auth-rules
+  labels:
+    ztoperator.kartverket.no/controller: authpolicy
+    app.kubernetes.io/managed-by: ztoperator
 spec:
   action: DENY
   rules:
@@ -21,6 +24,9 @@ apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
   name: wildcard-after-double-asterix-deny-auth-rules
+  labels:
+    ztoperator.kartverket.no/controller: authpolicy
+    app.kubernetes.io/managed-by: ztoperator
 spec:
   action: DENY
   rules:

@@ -10,7 +10,6 @@ import (
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -37,14 +36,6 @@ func LowestNonZeroResult(i, j ctrl.Result) ctrl.Result {
 		return j
 	default:
 		return ctrl.Result{RequeueAfter: 0 * time.Second}
-	}
-}
-
-func BuildObjectMeta(name, namespace string) metav1.ObjectMeta {
-	return metav1.ObjectMeta{
-		Name:      name,
-		Namespace: namespace,
-		Labels:    map[string]string{"type": "ztoperator.kartverket.no"},
 	}
 }
 

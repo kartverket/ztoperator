@@ -4,4 +4,7 @@ data:
 kind: Secret
 metadata:
   name: auth-policy-envoy-secret
+  labels:
+    ztoperator.kartverket.no/controller: authpolicy
+    app.kubernetes.io/managed-by: ztoperator
 type: Opaque

@@ -3,6 +3,9 @@ apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
   name: auth-policy-only-baseline-auth-require-auth
+  labels:
+    ztoperator.kartverket.no/controller: authpolicy
+    app.kubernetes.io/managed-by: ztoperator
 spec:
   rules:
     - to:
