@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	skiperatorv1 "github.com/kartverket/skiperator/api/v1alpha1"
 	ztoperatorv1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
@@ -63,8 +62,6 @@ var _ = BeforeSuite(func() {
 
 	var err error
 	err = corev1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	err = skiperatorv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = ztoperatorv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
