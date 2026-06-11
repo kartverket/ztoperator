@@ -34,17 +34,48 @@ SHELL = /usr/bin/env bash -o pipefail
 
 ##@ Variables
 
-# Extracts the version number for a given dependency found in go.mod.
-# Makes the test setup be in sync with what the operator itself uses.
-extract-version = $(shell cat go.mod | grep $(1) | awk '{$$1=$$1};1' | cut -d' ' -f2 | sed 's/^v//')
+KUBERNETES_VERSION			= 1.35.1
+CERT_MANAGER_VERSION		= 1.20.2
+ISTIO_VERSION 				= $(call extract-version,istio.io/client-go)
 
-KUBERNETES_VERSION			= 1.35.0
 KIND_IMAGE					= kindest/node:v$(KUBERNETES_VERSION)
 KIND_CLUSTER_NAME          ?= ztoperator
 KUBECONTEXT                ?= kind-$(KIND_CLUSTER_NAME)
-ISTIO_VERSION 				= $(call extract-version,istio.io/client-go)
-CERT_MANAGER_VERSION		= 1.19.2
 LOCAL_WEBHOOK_CERTS_DIR	   ?= webhook-certs
+
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p "$(LOCALBIN)"
+
+## Tool Binaries
+KUBECTL ?= $(LOCALBIN)/kubectl
+KIND ?= $(LOCALBIN)/kind
+KUSTOMIZE ?= $(LOCALBIN)/kustomize
+CHAINSAW ?= $(LOCALBIN)/chainsaw
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+HELM ?= $(LOCALBIN)/helm
+
+## Tool Versions
+KUSTOMIZE_VERSION ?= v5.8.1
+CHAINSAW_VERSION ?= v0.2.15
+CONTROLLER_TOOLS_VERSION ?= v0.21.0
+KUBECTL_VERSION ?= v$(KUBERNETES_VERSION)
+KIND_VERSION ?= v0.31.0
+GOLANGCI_LINT_VERSION ?= v2.10.1
+HELM_VERSION ?= v4.0.0
+
+#ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
+ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
+  [ -n "$$v" ] || { echo "Set ENVTEST_VERSION manually (controller-runtime replace has no tag)" >&2; exit 1; }; \
+  printf '%s\n' "$$v" | sed -E 's/^v?([0-9]+)\.([0-9]+).*/release-\1.\2/')
+
+#ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
+ENVTEST_K8S_VERSION ?= $(shell v='$(call gomodver,k8s.io/api)'; \
+  [ -n "$$v" ] || { echo "Set ENVTEST_K8S_VERSION manually (k8s.io/api replace has no tag)" >&2; exit 1; }; \
+  printf '%s\n' "$$v" | sed -E 's/^v?[0-9]+\.([0-9]+).*/1.\1/')
 
 .PHONY: help
 help: ## Display this help.
@@ -301,40 +332,6 @@ istiohelm: helm ## Fetch helm charts for Istio
 	# Make sure the requested ISTIO_VERSION is available; update index if not
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "Updating Helm repos to fetch Istio charts..." && "$(HELM)" repo update)
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "❌ Istio Helm chart version $(ISTIO_VERSION) not found in repo index." && echo "   Tip: check available versions with: helm search repo istio/gateway --versions" && exit 1)
-
-## Location to install dependencies to
-LOCALBIN ?= $(shell pwd)/bin
-$(LOCALBIN):
-	mkdir -p "$(LOCALBIN)"
-
-## Tool Binaries
-KUBECTL ?= $(LOCALBIN)/kubectl
-KIND ?= $(LOCALBIN)/kind
-KUSTOMIZE ?= $(LOCALBIN)/kustomize
-CHAINSAW ?= $(LOCALBIN)/chainsaw
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-ENVTEST ?= $(LOCALBIN)/setup-envtest
-GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
-HELM ?= $(LOCALBIN)/helm
-
-## Tool Versions
-KUSTOMIZE_VERSION ?= v5.7.1
-CHAINSAW_VERSION ?= v0.2.14
-CONTROLLER_TOOLS_VERSION ?= v0.19.0
-KUBECTL_VERSION ?= v1.34.2
-KIND_VERSION ?= v0.31.0
-GOLANGCI_LINT_VERSION ?= v2.10.1
-HELM_VERSION ?= v4.0.0
-
-#ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
-ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
-  [ -n "$$v" ] || { echo "Set ENVTEST_VERSION manually (controller-runtime replace has no tag)" >&2; exit 1; }; \
-  printf '%s\n' "$$v" | sed -E 's/^v?([0-9]+)\.([0-9]+).*/release-\1.\2/')
-
-#ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
-ENVTEST_K8S_VERSION ?= $(shell v='$(call gomodver,k8s.io/api)'; \
-  [ -n "$$v" ] || { echo "Set ENVTEST_K8S_VERSION manually (k8s.io/api replace has no tag)" >&2; exit 1; }; \
-  printf '%s\n' "$$v" | sed -E 's/^v?[0-9]+\.([0-9]+).*/1.\1/')
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
