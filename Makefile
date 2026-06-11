@@ -312,11 +312,32 @@ ensurelocal: kind kubectl ## Ensure local environment is set up with necessary t
 
 .PHONY: ensureztoperatornotdeployed
 ensureztoperatornotdeployed: kubectl ## Ensure ztoperator is NOT deployed in the kind cluster
-	"$(KUBECTL)" -n ztoperator-system get deployment ztoperator >/dev/null 2>&1 && (echo "❌ Ztoperator IS deployed to the cluster" && exit 1) || (echo "✅ Ztoperator IS NOT deployed to the cluster" && exit 0)
+	@if "$(KUBECTL)" -n ztoperator-system get deployment ztoperator >/dev/null 2>&1; then \
+		echo "❌ Ztoperator IS deployed to the cluster"; \
+		exit 1; \
+	else \
+		echo "✅ Ztoperator IS NOT deployed to the cluster"; \
+	fi
 
 .PHONY: ensureztoperatordeployed
 ensureztoperatordeployed: kubectl ensurelocal isnotrunning ## Ensure ztoperator is deployed in the kind cluster
 	@/bin/bash ./scripts/ensure-ztoperator-deployed.sh || (echo "❌ Ztoperator resources are not deployed correctly to the cluster. To fix it, run 'make deploy'." && exit 1)
+
+.PHONY: ensurerunningordeployed
+ensurerunningordeployed: ## Ensure ztoperator is running on host OR deployed in cluster, but not both
+	@$(MAKE) isrunning >/dev/null 2>&1 && running=1 || running=0; \
+	$(MAKE) ensureztoperatordeployed >/dev/null 2>&1 && deployed=1 || deployed=0; \
+	if [ "$$running" = "1" ] && [ "$$deployed" = "1" ]; then \
+		echo "❌ Ztoperator is both running on the host AND deployed in the cluster. Stop one before continuing."; \
+		exit 1; \
+	fi; \
+	if [ "$$running" = "0" ] && [ "$$deployed" = "0" ]; then \
+		echo "❌ Ztoperator is neither running on the host nor deployed in the cluster."; \
+		echo "   Start it in your IDE / with 'make run-local', or deploy it with 'make deploy'."; \
+		exit 1; \
+	fi; \
+	if [ "$$running" = "1" ]; then echo "✅ Ztoperator is running on the host."; fi; \
+	if [ "$$deployed" = "1" ]; then echo "✅ Ztoperator is deployed an running in the local cluster."; fi
 
 .PHONY: webhook-test-manifests
 webhook-test-manifests: kustomize ## Build webhook manifests for envtest into webhook-tests/
@@ -476,41 +497,34 @@ isingressready: ## Check if venv is activated and Istio ingress gateway is expos
 test: generate fmt vet setup-envtest ## Run go tests.
 	KUBEBUILDER_ASSETS="$(shell "$(ENVTEST)" use $(ENVTEST_K8S_VERSION) --bin-dir "$(LOCALBIN)" -p path)" go test $$(go list ./...) -coverprofile cover.out
 
-.PHONY: chainsaw-test-remote
-chainsaw-test-remote: chainsaw isnotrunning ensureztoperatordeployed isingressready ## Run chainsaw tests against local kind cluster with ztoperator running in the cluster
+.PHONY: chainsaw-test-all
+chainsaw-test-all: ## Run chainsaw tests against local kind cluster with ztoperator running in the cluster
 	@bash -ec ' \
 			for dir in test/chainsaw/authpolicy/*/ ; do \
 				echo "Running test in $$dir"; \
-				if ! $(MAKE) chainsaw-test-remote-single dir=$$dir; then \
+				if ! $(MAKE) chainsaw-test-single dir=$$dir; then \
 					echo "Test in $$dir failed."; \
 					exit 1; \
 				fi; \
 			done; \
 	' || (echo "Test(s) failed." && exit 1)
 
-.PHONY: chainsaw-test-remote-single
-chainsaw-test-remote-single: chainsaw isnotrunning ensureztoperatordeployed isingressready ## Run a specific chainsaw test against local kind cluster with ztoperator running in the cluster. Example usage: chainsaw-test-remote-single dir=<CHAINSAW_TEST_DIR>
+.PHONY: chainsaw-test-single
+chainsaw-test-single: chainsaw-ensure-dir chainsaw install ensurelocal ensurerunningordeployed isingressready ## Run a specific chainsaw test. Example usage: make chainsaw-test-single dir=<CHAINSAW_TEST_DIR>
 	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
     	echo "✅ Test succeeded" || (echo "❌ Test failed" && exit 1)
 
-.PHONY: chainsaw-test-host
-chainsaw-test-host: chainsaw install ensurelocal ensureztoperatornotdeployed isrunning isingressready ## Run chainsaw tests against local kind cluster with ztoperator running on host
-	@bash -ec ' \
-    		for dir in test/chainsaw/authpolicy/*/ ; do \
-    			echo "Running test in $$dir"; \
-    			if ! $(MAKE) chainsaw-test-host-single dir=$$dir; then \
-    				echo "Test in $$dir failed."; \
-    				exit 1; \
-    			fi; \
-    		done; \
-	' || (echo "Test(s) failed." && exit 1)
-
-.PHONY: chainsaw-test-host-single
-chainsaw-test-host-single: chainsaw install ensurelocal ensureztoperatornotdeployed isrunning isingressready ## Run a specific chainsaw test against local kind cluster with ztoperator running on host. Example usage: chainsaw-test-host-single dir=<CHAINSAW_TEST_DIR>
-	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
-    	echo "✅ Test succeeded" || (echo "❌ Test failed" && exit 1)
+.PHONY: chainsaw-ensure-dir
+chainsaw-ensure-dir: ## Ensure that the 'dir' variable is set when running 'make chainsaw-test-single' and that the dir exists
+	$(if $(strip $(dir)),,$(error dir is not set. Usage: make chainsaw-test-single dir=<CHAINSAW_TEST_DIR>))
+	@test -d $(dir) || { echo "❌ dir $(dir) is not a directory"; exit 1; }
 
 ##@ Custom targets
+
+# Extracts the version number for a given dependency found in go.mod.
+# Makes the test setup be in sync with what the operator itself uses.
+extract-version = $(shell cat go.mod | grep $(1) | awk '{$$1=$$1};1' | cut -d' ' -f2 | sed 's/^v//')
+
 ensureflox: ## Ensure Flox is installed and activated
 	@if ! command -v "flox" >/dev/null 2>&1; then \
 		echo -e "❌  Flox is not installed. Please install Flox (https://flox.dev/docs/install-flox/) and try again."; \
