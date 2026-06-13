@@ -34,17 +34,48 @@ SHELL = /usr/bin/env bash -o pipefail
 
 ##@ Variables
 
-# Extracts the version number for a given dependency found in go.mod.
-# Makes the test setup be in sync with what the operator itself uses.
-extract-version = $(shell cat go.mod | grep $(1) | awk '{$$1=$$1};1' | cut -d' ' -f2 | sed 's/^v//')
+KUBERNETES_VERSION			= 1.35.1
+CERT_MANAGER_VERSION		= 1.20.2
+ISTIO_VERSION 				= $(call extract-version,istio.io/client-go)
 
-KUBERNETES_VERSION			= 1.35.0
 KIND_IMAGE					= kindest/node:v$(KUBERNETES_VERSION)
 KIND_CLUSTER_NAME          ?= ztoperator
 KUBECONTEXT                ?= kind-$(KIND_CLUSTER_NAME)
-ISTIO_VERSION 				= $(call extract-version,istio.io/client-go)
-CERT_MANAGER_VERSION		= 1.19.2
 LOCAL_WEBHOOK_CERTS_DIR	   ?= webhook-certs
+
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p "$(LOCALBIN)"
+
+## Tool Binaries
+KUBECTL ?= $(LOCALBIN)/kubectl
+KIND ?= $(LOCALBIN)/kind
+KUSTOMIZE ?= $(LOCALBIN)/kustomize
+CHAINSAW ?= $(LOCALBIN)/chainsaw
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+HELM ?= $(LOCALBIN)/helm
+
+## Tool Versions
+KUSTOMIZE_VERSION ?= v5.8.1
+CHAINSAW_VERSION ?= v0.2.15
+CONTROLLER_TOOLS_VERSION ?= v0.21.0
+KUBECTL_VERSION ?= v$(KUBERNETES_VERSION)
+KIND_VERSION ?= v0.31.0
+GOLANGCI_LINT_VERSION ?= v2.10.1
+HELM_VERSION ?= v4.0.0
+
+#ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
+ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
+  [ -n "$$v" ] || { echo "Set ENVTEST_VERSION manually (controller-runtime replace has no tag)" >&2; exit 1; }; \
+  printf '%s\n' "$$v" | sed -E 's/^v?([0-9]+)\.([0-9]+).*/release-\1.\2/')
+
+#ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
+ENVTEST_K8S_VERSION ?= $(shell v='$(call gomodver,k8s.io/api)'; \
+  [ -n "$$v" ] || { echo "Set ENVTEST_K8S_VERSION manually (k8s.io/api replace has no tag)" >&2; exit 1; }; \
+  printf '%s\n' "$$v" | sed -E 's/^v?[0-9]+\.([0-9]+).*/1.\1/')
 
 .PHONY: help
 help: ## Display this help.
@@ -281,11 +312,32 @@ ensurelocal: kind kubectl ## Ensure local environment is set up with necessary t
 
 .PHONY: ensureztoperatornotdeployed
 ensureztoperatornotdeployed: kubectl ## Ensure ztoperator is NOT deployed in the kind cluster
-	"$(KUBECTL)" -n ztoperator-system get deployment ztoperator >/dev/null 2>&1 && (echo "❌ Ztoperator IS deployed to the cluster" && exit 1) || (echo "✅ Ztoperator IS NOT deployed to the cluster" && exit 0)
+	@if "$(KUBECTL)" -n ztoperator-system get deployment ztoperator >/dev/null 2>&1; then \
+		echo "❌ Ztoperator IS deployed to the cluster"; \
+		exit 1; \
+	else \
+		echo "✅ Ztoperator IS NOT deployed to the cluster"; \
+	fi
 
 .PHONY: ensureztoperatordeployed
 ensureztoperatordeployed: kubectl ensurelocal isnotrunning ## Ensure ztoperator is deployed in the kind cluster
 	@/bin/bash ./scripts/ensure-ztoperator-deployed.sh || (echo "❌ Ztoperator resources are not deployed correctly to the cluster. To fix it, run 'make deploy'." && exit 1)
+
+.PHONY: ensurerunningordeployed
+ensurerunningordeployed: ## Ensure ztoperator is running on host OR deployed in cluster, but not both
+	@$(MAKE) isrunning >/dev/null 2>&1 && running=1 || running=0; \
+	$(MAKE) ensureztoperatordeployed >/dev/null 2>&1 && deployed=1 || deployed=0; \
+	if [ "$$running" = "1" ] && [ "$$deployed" = "1" ]; then \
+		echo "❌ Ztoperator is both running on the host AND deployed in the cluster. Stop one before continuing."; \
+		exit 1; \
+	fi; \
+	if [ "$$running" = "0" ] && [ "$$deployed" = "0" ]; then \
+		echo "❌ Ztoperator is neither running on the host nor deployed in the cluster."; \
+		echo "   Start it in your IDE / with 'make run-local', or deploy it with 'make deploy'."; \
+		exit 1; \
+	fi; \
+	if [ "$$running" = "1" ]; then echo "✅ Ztoperator is running on the host."; fi; \
+	if [ "$$deployed" = "1" ]; then echo "✅ Ztoperator is deployed an running in the local cluster."; fi
 
 .PHONY: webhook-test-manifests
 webhook-test-manifests: kustomize ## Build webhook manifests for envtest into webhook-tests/
@@ -301,40 +353,6 @@ istiohelm: helm ## Fetch helm charts for Istio
 	# Make sure the requested ISTIO_VERSION is available; update index if not
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "Updating Helm repos to fetch Istio charts..." && "$(HELM)" repo update)
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "❌ Istio Helm chart version $(ISTIO_VERSION) not found in repo index." && echo "   Tip: check available versions with: helm search repo istio/gateway --versions" && exit 1)
-
-## Location to install dependencies to
-LOCALBIN ?= $(shell pwd)/bin
-$(LOCALBIN):
-	mkdir -p "$(LOCALBIN)"
-
-## Tool Binaries
-KUBECTL ?= $(LOCALBIN)/kubectl
-KIND ?= $(LOCALBIN)/kind
-KUSTOMIZE ?= $(LOCALBIN)/kustomize
-CHAINSAW ?= $(LOCALBIN)/chainsaw
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-ENVTEST ?= $(LOCALBIN)/setup-envtest
-GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
-HELM ?= $(LOCALBIN)/helm
-
-## Tool Versions
-KUSTOMIZE_VERSION ?= v5.7.1
-CHAINSAW_VERSION ?= v0.2.14
-CONTROLLER_TOOLS_VERSION ?= v0.19.0
-KUBECTL_VERSION ?= v1.34.2
-KIND_VERSION ?= v0.31.0
-GOLANGCI_LINT_VERSION ?= v2.10.1
-HELM_VERSION ?= v4.0.0
-
-#ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
-ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
-  [ -n "$$v" ] || { echo "Set ENVTEST_VERSION manually (controller-runtime replace has no tag)" >&2; exit 1; }; \
-  printf '%s\n' "$$v" | sed -E 's/^v?([0-9]+)\.([0-9]+).*/release-\1.\2/')
-
-#ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
-ENVTEST_K8S_VERSION ?= $(shell v='$(call gomodver,k8s.io/api)'; \
-  [ -n "$$v" ] || { echo "Set ENVTEST_K8S_VERSION manually (k8s.io/api replace has no tag)" >&2; exit 1; }; \
-  printf '%s\n' "$$v" | sed -E 's/^v?[0-9]+\.([0-9]+).*/1.\1/')
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -479,41 +497,34 @@ isingressready: ## Check if venv is activated and Istio ingress gateway is expos
 test: generate fmt vet setup-envtest ## Run go tests.
 	KUBEBUILDER_ASSETS="$(shell "$(ENVTEST)" use $(ENVTEST_K8S_VERSION) --bin-dir "$(LOCALBIN)" -p path)" go test $$(go list ./...) -coverprofile cover.out
 
-.PHONY: chainsaw-test-remote
-chainsaw-test-remote: chainsaw isnotrunning ensureztoperatordeployed isingressready ## Run chainsaw tests against local kind cluster with ztoperator running in the cluster
+.PHONY: chainsaw-test-all
+chainsaw-test-all: ## Run chainsaw tests against local kind cluster with ztoperator running in the cluster
 	@bash -ec ' \
 			for dir in test/chainsaw/authpolicy/*/ ; do \
 				echo "Running test in $$dir"; \
-				if ! $(MAKE) chainsaw-test-remote-single dir=$$dir; then \
+				if ! $(MAKE) chainsaw-test-single dir=$$dir; then \
 					echo "Test in $$dir failed."; \
 					exit 1; \
 				fi; \
 			done; \
 	' || (echo "Test(s) failed." && exit 1)
 
-.PHONY: chainsaw-test-remote-single
-chainsaw-test-remote-single: chainsaw isnotrunning ensureztoperatordeployed isingressready ## Run a specific chainsaw test against local kind cluster with ztoperator running in the cluster. Example usage: chainsaw-test-remote-single dir=<CHAINSAW_TEST_DIR>
+.PHONY: chainsaw-test-single
+chainsaw-test-single: chainsaw-ensure-dir chainsaw install ensurelocal ensurerunningordeployed isingressready ## Run a specific chainsaw test. Example usage: make chainsaw-test-single dir=<CHAINSAW_TEST_DIR>
 	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
     	echo "✅ Test succeeded" || (echo "❌ Test failed" && exit 1)
 
-.PHONY: chainsaw-test-host
-chainsaw-test-host: chainsaw install ensurelocal ensureztoperatornotdeployed isrunning isingressready ## Run chainsaw tests against local kind cluster with ztoperator running on host
-	@bash -ec ' \
-    		for dir in test/chainsaw/authpolicy/*/ ; do \
-    			echo "Running test in $$dir"; \
-    			if ! $(MAKE) chainsaw-test-host-single dir=$$dir; then \
-    				echo "Test in $$dir failed."; \
-    				exit 1; \
-    			fi; \
-    		done; \
-	' || (echo "Test(s) failed." && exit 1)
-
-.PHONY: chainsaw-test-host-single
-chainsaw-test-host-single: chainsaw install ensurelocal ensureztoperatornotdeployed isrunning isingressready ## Run a specific chainsaw test against local kind cluster with ztoperator running on host. Example usage: chainsaw-test-host-single dir=<CHAINSAW_TEST_DIR>
-	"$(CHAINSAW)" test --kube-context $(KUBECONTEXT) --config test/chainsaw/config.yaml --test-dir $(dir) && \
-    	echo "✅ Test succeeded" || (echo "❌ Test failed" && exit 1)
+.PHONY: chainsaw-ensure-dir
+chainsaw-ensure-dir: ## Ensure that the 'dir' variable is set when running 'make chainsaw-test-single' and that the dir exists
+	$(if $(strip $(dir)),,$(error dir is not set. Usage: make chainsaw-test-single dir=<CHAINSAW_TEST_DIR>))
+	@test -d $(dir) || { echo "❌ dir $(dir) is not a directory"; exit 1; }
 
 ##@ Custom targets
+
+# Extracts the version number for a given dependency found in go.mod.
+# Makes the test setup be in sync with what the operator itself uses.
+extract-version = $(shell cat go.mod | grep $(1) | awk '{$$1=$$1};1' | cut -d' ' -f2 | sed 's/^v//')
+
 ensureflox: ## Ensure Flox is installed and activated
 	@if ! command -v "flox" >/dev/null 2>&1; then \
 		echo -e "❌  Flox is not installed. Please install Flox (https://flox.dev/docs/install-flox/) and try again."; \

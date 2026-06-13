@@ -392,10 +392,6 @@ func GetAcceptedHTTPMethods() []string {
 	}
 }
 
-func init() {
-	SchemeBuilder.Register(&AuthPolicy{}, &AuthPolicyList{})
-}
-
 func (ap *AuthPolicy) InitializeStatus() {
 	if ap.Status.Conditions == nil {
 		ap.Status.Conditions = []metav1.Condition{}

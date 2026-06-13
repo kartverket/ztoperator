@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	skiperatorv1 "github.com/kartverket/skiperator/api/v1alpha1"
 	ztoperatorv1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
@@ -37,7 +36,6 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		scheme = runtime.NewScheme()
 		Expect(corev1.AddToScheme(scheme)).To(Succeed())
 		Expect(ztoperatorv1.AddToScheme(scheme)).To(Succeed())
-		Expect(skiperatorv1.AddToScheme(scheme)).To(Succeed())
 	})
 
 	Describe("SetupPodWebhookWithManager", func() {
