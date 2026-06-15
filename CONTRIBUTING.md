@@ -1,7 +1,7 @@
 # Contributing guides
 ## Getting started
 
-To run Ztoperator locally, you need to have go >= 1.25.7 installed on your machine.
+To run Ztoperator locally, you need to have Go installed at the version specified in `go.mod`.
 You also need some other tools to set up and interact with the local Kubernetes cluster. All these
 dependencies are bundled together with [Flox environment](https://flox.dev/), which is a tool that provides a consistent development environment across different machines.
 You can install Flox by following the instructions on their [website](https://flox.dev/docs/install-flox/install).
@@ -74,6 +74,35 @@ Documentation is generated using
 make docs
 ```
 The generated documentation will be a `api-docs.md` file in the root folder of the project.
+
+## Git Conventions
+
+### Commit Strategy
+- Separate features or bug fixes should be implemented in separate commits.
+- Each commit should represent one logical change that compiles and passes tests on its own.
+- Refactoring and/or improving code quality should be done in separate commits from feature changes.
+- Do not mix refactoring or unrelated changes with feature changes in the same commit.
+- Changes and corresponding tests for those changes should be in the same commit.
+
+### Commit Messages
+
+- Limit the subject line to 50 characters
+- Capitalize the subject line
+- Use the imperative mood in the subject line
+- Do not end the subject line with a period
+- Separate the subject from the body with a blank line
+- Wrap the body at 72 characters
+- Use the body to explain "what" and "why", not the "how" (unless the "how" is especially noteworthy or non-obvious). The code should show the "how".
+
+Example:
+```
+Add validation for overlapping auth rules
+
+Previously, overlapping paths between authRules and ignoreAuthRules
+were silently accepted and produced undefined Istio behavior. This
+change detects overlaps during validation and sets the AuthPolicy
+to Invalid with a descriptive error message.
+```
 
 ## Managing dependencies and patching vulnerabilities
 
