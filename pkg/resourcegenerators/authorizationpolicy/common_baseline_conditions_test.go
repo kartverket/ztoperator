@@ -30,11 +30,12 @@ func TestGetBaselineAuthConditionsForAllowPolicy_WithEmptyClaims_ReturnsEmptySli
 	assert.Empty(t, result)
 }
 
-func TestGetBaselineAuthConditionsForAllowPolicy_WithClaim_ReturnsIstioConditionWithValues(t *testing.T) {
+func TestGetBaselineAuthConditionsForAllowPolicy_WithMultipleClaims_ReturnsOneConditionPerClaim(t *testing.T) {
 	// 1. Arrange
 	baselineAuth := &ztoperatorv1alpha1.BaselineAuth{
 		Claims: []ztoperatorv1alpha1.Condition{
 			{Claim: "role", Values: []string{"admin"}},
+			{Claim: "tenant", Values: []string{"acme", "globex"}},
 		},
 	}
 
@@ -42,10 +43,13 @@ func TestGetBaselineAuthConditionsForAllowPolicy_WithClaim_ReturnsIstioCondition
 	result := authorizationpolicy.GetBaselineAuthConditionsForAllowPolicy(baselineAuth)
 
 	// 3. Assert
-	require.Len(t, result, 1)
+	require.Len(t, result, 2)
 	assert.Equal(t, "request.auth.claims[role]", result[0].Key)
 	assert.Equal(t, []string{"admin"}, result[0].Values)
 	assert.Empty(t, result[0].NotValues)
+	assert.Equal(t, "request.auth.claims[tenant]", result[1].Key)
+	assert.Equal(t, []string{"acme", "globex"}, result[1].Values)
+	assert.Empty(t, result[1].NotValues)
 }
 
 func TestGetBaselineAuthConditionsForDenyPolicy_WithNilBaselineAuth_ReturnsEmptySlice(t *testing.T) {
@@ -56,22 +60,17 @@ func TestGetBaselineAuthConditionsForDenyPolicy_WithNilBaselineAuth_ReturnsEmpty
 	assert.Empty(t, result)
 }
 
-func TestGetBaselineAuthConditionsForDenyPolicy_WithClaim_ReturnsIstioConditionWithNotValues(t *testing.T) {
+func TestGetBaselineAuthConditionsForDenyPolicy_WithEmptyClaims_ReturnsEmptySlice(t *testing.T) {
 	// 1. Arrange
 	baselineAuth := &ztoperatorv1alpha1.BaselineAuth{
-		Claims: []ztoperatorv1alpha1.Condition{
-			{Claim: "role", Values: []string{"admin"}},
-		},
+		Claims: []ztoperatorv1alpha1.Condition{},
 	}
 
 	// 2. Act
 	result := authorizationpolicy.GetBaselineAuthConditionsForDenyPolicy(baselineAuth)
 
 	// 3. Assert
-	require.Len(t, result, 1)
-	assert.Equal(t, "request.auth.claims[role]", result[0].Key)
-	assert.Equal(t, []string{"admin"}, result[0].NotValues)
-	assert.Empty(t, result[0].Values)
+	assert.Empty(t, result)
 }
 
 func TestGetBaselineAuthConditionsForDenyPolicy_WithMultipleClaims_ReturnsOneConditionPerClaim(t *testing.T) {
@@ -90,6 +89,8 @@ func TestGetBaselineAuthConditionsForDenyPolicy_WithMultipleClaims_ReturnsOneCon
 	require.Len(t, result, 2)
 	assert.Equal(t, "request.auth.claims[role]", result[0].Key)
 	assert.Equal(t, []string{"admin"}, result[0].NotValues)
+	assert.Empty(t, result[0].Values)
 	assert.Equal(t, "request.auth.claims[tenant]", result[1].Key)
 	assert.Equal(t, []string{"acme", "globex"}, result[1].NotValues)
+	assert.Empty(t, result[1].Values)
 }
