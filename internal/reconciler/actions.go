@@ -7,6 +7,7 @@ import (
 	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	"github.com/kartverket/ztoperator/pkg/labels"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/deny"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore"
@@ -18,6 +19,7 @@ import (
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ReconcileActions creates all reconcile actions for the given AuthPolicy scope.
@@ -39,10 +41,7 @@ secretReconcileAction reconciles a Secret resource containing a HMAC secret (coo
 func secretReconcileAction(scope *state.Scope) AuthPolicyAdapter[*v1.Secret] {
 	desiredResource := secret.GetDesired(
 		scope,
-		helperfunctions.BuildObjectMeta(
-			scope.AutoLoginConfig.EnvoySecretName,
-			scope.AuthPolicy.Namespace,
-		),
+		buildObjectMeta(scope.AutoLoginConfig.EnvoySecretName, scope.AuthPolicy.Namespace),
 	)
 
 	return AuthPolicyAdapter[*v1.Secret]{
@@ -62,11 +61,13 @@ func secretReconcileAction(scope *state.Scope) AuthPolicyAdapter[*v1.Secret] {
 func secretShouldUpdate(current, desired *v1.Secret) bool {
 	desiredTokenSecret, hasDesired := desired.Data[configpatch.TokenSecretFileName]
 	currentTokenSecret, hasCurrent := current.Data[configpatch.TokenSecretFileName]
-	return !hasDesired || !hasCurrent || !bytes.Equal(currentTokenSecret, desiredTokenSecret)
+	return !hasDesired || !hasCurrent || !bytes.Equal(currentTokenSecret, desiredTokenSecret) ||
+		labelsNeedUpdate(current, desired)
 }
 
 func secretUpdateFields(current, desired *v1.Secret) {
 	current.Data = desired.Data
+	current.Labels = desired.Labels
 }
 
 /*
@@ -77,7 +78,7 @@ func envoyFilterReconcileAction(scope *state.Scope) AuthPolicyAdapter[*v1alpha4.
 	autoLoginEnvoyFilterName := names.EnvoyFilter(scope.AuthPolicy.Name)
 	desiredResource := envoyfilter.GetDesired(
 		scope,
-		helperfunctions.BuildObjectMeta(autoLoginEnvoyFilterName, scope.AuthPolicy.Namespace),
+		buildObjectMeta(autoLoginEnvoyFilterName, scope.AuthPolicy.Namespace),
 	)
 
 	return AuthPolicyAdapter[*v1alpha4.EnvoyFilter]{
@@ -101,12 +102,14 @@ func envoyFilterShouldUpdate(current, desired *v1alpha4.EnvoyFilter) bool {
 	) || !reflect.DeepEqual(
 		current.Spec.GetConfigPatches(),
 		desired.Spec.GetConfigPatches(),
-	)
+	) ||
+		labelsNeedUpdate(current, desired)
 }
 
 func envoyFilterUpdateFields(current, desired *v1alpha4.EnvoyFilter) {
 	current.Spec.WorkloadSelector = desired.Spec.GetWorkloadSelector()
 	current.Spec.ConfigPatches = desired.Spec.GetConfigPatches()
+	current.Labels = desired.Labels
 }
 
 /*
@@ -119,7 +122,7 @@ func requestAuthenticationReconcileAction(
 	requestAuthenticationName := scope.AuthPolicy.Name
 	desiredResource := requestauthentication.GetDesired(
 		scope,
-		helperfunctions.BuildObjectMeta(requestAuthenticationName, scope.AuthPolicy.Namespace),
+		buildObjectMeta(requestAuthenticationName, scope.AuthPolicy.Namespace),
 	)
 
 	return AuthPolicyAdapter[*istioclientsecurityv1.RequestAuthentication]{
@@ -138,12 +141,14 @@ func requestAuthenticationReconcileAction(
 
 func requestAuthenticationShouldUpdate(current, desired *istioclientsecurityv1.RequestAuthentication) bool {
 	return !reflect.DeepEqual(current.Spec.GetSelector(), desired.Spec.GetSelector()) ||
-		!reflect.DeepEqual(current.Spec.GetJwtRules(), desired.Spec.GetJwtRules())
+		!reflect.DeepEqual(current.Spec.GetJwtRules(), desired.Spec.GetJwtRules()) ||
+		labelsNeedUpdate(current, desired)
 }
 
 func requestAuthenticationUpdateFields(current, desired *istioclientsecurityv1.RequestAuthentication) {
 	current.Spec.Selector = desired.Spec.GetSelector()
 	current.Spec.JwtRules = desired.Spec.GetJwtRules()
+	current.Labels = desired.Labels
 }
 
 /*
@@ -157,7 +162,7 @@ func denyAuthorizationPolicyReconcileAction(
 	denyAuthorizationPolicyName := names.DenyPolicy(scope.AuthPolicy.Name)
 	desiredResource := deny.GetDesired(
 		scope,
-		helperfunctions.BuildObjectMeta(denyAuthorizationPolicyName, scope.AuthPolicy.Namespace),
+		buildObjectMeta(denyAuthorizationPolicyName, scope.AuthPolicy.Namespace),
 	)
 
 	return AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
@@ -185,7 +190,7 @@ func ignoreAuthorizationPolicyReconcileAction(
 	ignoreAuthAuthorizationPolicyName := names.IgnorePolicy(scope.AuthPolicy.Name)
 	desiredResource := ignore.GetDesired(
 		scope,
-		helperfunctions.BuildObjectMeta(ignoreAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
+		buildObjectMeta(ignoreAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
 	)
 
 	return AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
@@ -213,7 +218,7 @@ func requireAuthorizationPolicyReconcileAction(
 	requireAuthAuthorizationPolicyName := names.RequirePolicy(scope.AuthPolicy.Name)
 	desiredResource := require.GetDesired(
 		scope,
-		helperfunctions.BuildObjectMeta(requireAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
+		buildObjectMeta(requireAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
 	)
 
 	return AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
@@ -232,10 +237,37 @@ func requireAuthorizationPolicyReconcileAction(
 
 func authorizationPolicyShouldUpdate(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
 	return !reflect.DeepEqual(current.Spec.GetSelector(), desired.Spec.GetSelector()) ||
-		!reflect.DeepEqual(current.Spec.GetRules(), desired.Spec.GetRules())
+		!reflect.DeepEqual(current.Spec.GetRules(), desired.Spec.GetRules()) ||
+		labelsNeedUpdate(current, desired)
 }
 
 func authorizationPolicyUpdateFields(current, desired *istioclientsecurityv1.AuthorizationPolicy) {
 	current.Spec.Selector = desired.Spec.GetSelector()
 	current.Spec.Rules = desired.Spec.GetRules()
+	current.Labels = desired.Labels
+}
+
+type LabeledObject interface {
+	GetLabels() map[string]string
+}
+
+// labelsNeedUpdate reports whether any of the desired labels are missing from current or have a
+// different value. Labels on current that are not part of the desired set are ignored.
+func labelsNeedUpdate(current, desired LabeledObject) bool {
+	desiredLabels := desired.GetLabels()
+	currentLabels := current.GetLabels()
+	for key, value := range desiredLabels {
+		if currentValue, ok := currentLabels[key]; !ok || currentValue != value {
+			return true
+		}
+	}
+	return false
+}
+
+func buildObjectMeta(name, namespace string) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      name,
+		Namespace: namespace,
+		Labels:    labels.AuthPolicyStandardLabels(),
+	}
 }

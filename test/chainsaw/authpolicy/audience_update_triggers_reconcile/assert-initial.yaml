@@ -2,6 +2,9 @@ apiVersion: security.istio.io/v1
 kind: RequestAuthentication
 metadata:
   name: auth-policy
+  labels:
+    ztoperator.kartverket.no/controller: authpolicy
+    app.kubernetes.io/managed-by: ztoperator
 spec:
   jwtRules:
     - audiences:
@@ -18,6 +21,9 @@ apiVersion: ztoperator.kartverket.no/v1alpha1
 kind: AuthPolicy
 metadata:
   name: auth-policy
+  labels:
+    ztoperator.kartverket.no/controller: authpolicy
+    app.kubernetes.io/managed-by: ztoperator
 status:
   phase: Ready
   ready: true

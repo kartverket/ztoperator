@@ -4,6 +4,9 @@ apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
   name: mixing-old-and-new-path-syntax-deny-auth-rules
+  labels:
+    ztoperator.kartverket.no/controller: authpolicy
+    app.kubernetes.io/managed-by: ztoperator
 spec:
   action: DENY
   rules:
