@@ -93,4 +93,3 @@ func TestGetBaselineAuthConditionsForDenyPolicy_WithMultipleClaims_ReturnsOneCon
 	assert.Equal(t, "request.auth.claims[tenant]", result[1].Key)
 	assert.Equal(t, []string{"acme", "globex"}, result[1].NotValues)
 }
-
