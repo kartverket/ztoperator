@@ -22,31 +22,31 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ReconcileActions creates all reconcile actions for the given AuthPolicy scope.
-func ReconcileActions(scope *state.Scope) []reconciliation.ReconcileAction {
-	return []reconciliation.ReconcileAction{
-		secretReconcileAction(scope),
-		envoyFilterReconcileAction(scope),
-		requestAuthenticationReconcileAction(scope),
-		denyAuthorizationPolicyReconcileAction(scope),
-		ignoreAuthorizationPolicyReconcileAction(scope),
-		requireAuthorizationPolicyReconcileAction(scope),
+// ControllerResources creates all reconcile actions for the given AuthPolicy scope.
+func ControllerResources(scope *state.Scope) []reconciliation.ControllerResource {
+	return []reconciliation.ControllerResource{
+		secretResource(scope),
+		envoyFilterResource(scope),
+		requestAuthenticationResource(scope),
+		denyAuthorizationPolicyResource(scope),
+		ignoreAuthorizationPolicyResource(scope),
+		requireAuthorizationPolicyResource(scope),
 	}
 }
 
 /*
-secretReconcileAction reconciles a Secret resource containing a HMAC secret (cookie signing key) and token secret
+secretResource reconciles a Secret resource containing a HMAC secret (cookie signing key) and token secret
 (OAuth client secret), if auto-login is enabled. The secrets are used by Envoy during Authorization Code Flow.
 */
-func secretReconcileAction(scope *state.Scope) AuthPolicyAdapter[*v1.Secret] {
+func secretResource(scope *state.Scope) ControllerResourceAdapter[*v1.Secret] {
 	desiredResource := secret.GetDesired(
 		scope,
 		buildObjectMeta(scope.AutoLoginConfig.EnvoySecretName, scope.AuthPolicy.Namespace),
 	)
 
-	return AuthPolicyAdapter[*v1.Secret]{
-		reconciliation.ReconcileFuncAdapter[*v1.Secret]{
-			Func: reconciliation.ReconcileFunc[*v1.Secret]{
+	return ControllerResourceAdapter[*v1.Secret]{
+		reconciliation.ReconcilerAdapter[*v1.Secret]{
+			Func: reconciliation.ResourceReconciler[*v1.Secret]{
 				ResourceKind:    "Secret",
 				ResourceName:    scope.AutoLoginConfig.EnvoySecretName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
@@ -71,19 +71,19 @@ func secretUpdateFields(current, desired *v1.Secret) {
 }
 
 /*
-envoyFilterReconcileAction reconciles an EnvoyFilter resource based on the configured AuthPolicy, enforcing auto-login
+envoyFilterResource reconciles an EnvoyFilter resource based on the configured AuthPolicy, enforcing auto-login
 behavior for unauthenticated requests when enabled. The EnvoyFilter handles OAuth2 Authorization Code Flow.
 */
-func envoyFilterReconcileAction(scope *state.Scope) AuthPolicyAdapter[*v1alpha4.EnvoyFilter] {
+func envoyFilterResource(scope *state.Scope) ControllerResourceAdapter[*v1alpha4.EnvoyFilter] {
 	autoLoginEnvoyFilterName := names.EnvoyFilter(scope.AuthPolicy.Name)
 	desiredResource := envoyfilter.GetDesired(
 		scope,
 		buildObjectMeta(autoLoginEnvoyFilterName, scope.AuthPolicy.Namespace),
 	)
 
-	return AuthPolicyAdapter[*v1alpha4.EnvoyFilter]{
-		reconciliation.ReconcileFuncAdapter[*v1alpha4.EnvoyFilter]{
-			Func: reconciliation.ReconcileFunc[*v1alpha4.EnvoyFilter]{
+	return ControllerResourceAdapter[*v1alpha4.EnvoyFilter]{
+		reconciliation.ReconcilerAdapter[*v1alpha4.EnvoyFilter]{
+			Func: reconciliation.ResourceReconciler[*v1alpha4.EnvoyFilter]{
 				ResourceKind:    "EnvoyFilter",
 				ResourceName:    autoLoginEnvoyFilterName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
@@ -113,21 +113,21 @@ func envoyFilterUpdateFields(current, desired *v1alpha4.EnvoyFilter) {
 }
 
 /*
-requestAuthenticationReconcileAction reconciles a RequestAuthentication resource based on the configured AuthPolicy,
+requestAuthenticationResource reconciles a RequestAuthentication resource based on the configured AuthPolicy,
 defining the JWT authentication requirements and how to forward the original token and output claims to http headers.
 */
-func requestAuthenticationReconcileAction(
+func requestAuthenticationResource(
 	scope *state.Scope,
-) AuthPolicyAdapter[*istioclientsecurityv1.RequestAuthentication] {
+) ControllerResourceAdapter[*istioclientsecurityv1.RequestAuthentication] {
 	requestAuthenticationName := scope.AuthPolicy.Name
 	desiredResource := requestauthentication.GetDesired(
 		scope,
 		buildObjectMeta(requestAuthenticationName, scope.AuthPolicy.Namespace),
 	)
 
-	return AuthPolicyAdapter[*istioclientsecurityv1.RequestAuthentication]{
-		reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.RequestAuthentication]{
-			Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.RequestAuthentication]{
+	return ControllerResourceAdapter[*istioclientsecurityv1.RequestAuthentication]{
+		reconciliation.ReconcilerAdapter[*istioclientsecurityv1.RequestAuthentication]{
+			Func: reconciliation.ResourceReconciler[*istioclientsecurityv1.RequestAuthentication]{
 				ResourceKind:    "RequestAuthentication",
 				ResourceName:    requestAuthenticationName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
@@ -152,22 +152,22 @@ func requestAuthenticationUpdateFields(current, desired *istioclientsecurityv1.R
 }
 
 /*
-denyAuthorizationPolicyReconcileAction reconciles DENY AuthorizationPolicy resources based on the configured AuthRules
+denyAuthorizationPolicyResource reconciles DENY AuthorizationPolicy resources based on the configured AuthRules
 and BaselineAuth, denying requests that do not satisfy the configured authentication requirements. DENY policies take
 precedence over ALLOW policies.
 */
-func denyAuthorizationPolicyReconcileAction(
+func denyAuthorizationPolicyResource(
 	scope *state.Scope,
-) AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
+) ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
 	denyAuthorizationPolicyName := names.DenyPolicy(scope.AuthPolicy.Name)
 	desiredResource := deny.GetDesired(
 		scope,
 		buildObjectMeta(denyAuthorizationPolicyName, scope.AuthPolicy.Namespace),
 	)
 
-	return AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
-		reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
-			Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
+	return ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
+		reconciliation.ReconcilerAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
+			Func: reconciliation.ResourceReconciler[*istioclientsecurityv1.AuthorizationPolicy]{
 				ResourceKind:    "AuthorizationPolicy",
 				ResourceName:    denyAuthorizationPolicyName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
@@ -180,22 +180,22 @@ func denyAuthorizationPolicyReconcileAction(
 }
 
 /*
-ignoreAuthorizationPolicyReconcileAction reconciles ALLOW AuthorizationPolicy resources based on the configured
+ignoreAuthorizationPolicyResource reconciles ALLOW AuthorizationPolicy resources based on the configured
 IgnoreAuthRules, allowing requests that satisfy the configured authentication requirements unless denied by any DENY
 policy.
 */
-func ignoreAuthorizationPolicyReconcileAction(
+func ignoreAuthorizationPolicyResource(
 	scope *state.Scope,
-) AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
+) ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
 	ignoreAuthAuthorizationPolicyName := names.IgnorePolicy(scope.AuthPolicy.Name)
 	desiredResource := ignore.GetDesired(
 		scope,
 		buildObjectMeta(ignoreAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
 	)
 
-	return AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
-		reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
-			Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
+	return ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
+		reconciliation.ReconcilerAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
+			Func: reconciliation.ResourceReconciler[*istioclientsecurityv1.AuthorizationPolicy]{
 				ResourceKind:    "AuthorizationPolicy",
 				ResourceName:    ignoreAuthAuthorizationPolicyName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
@@ -208,22 +208,22 @@ func ignoreAuthorizationPolicyReconcileAction(
 }
 
 /*
-requireAuthorizationPolicyReconcileAction reconciles ALLOW AuthorizationPolicy resources based on the configured
+requireAuthorizationPolicyResource reconciles ALLOW AuthorizationPolicy resources based on the configured
 AuthRules, BaselineAuth and IgnoreAuthRules, allowing requests that satisfy the configured authentication requirements
 unless denied by any DENY policy.
 */
-func requireAuthorizationPolicyReconcileAction(
+func requireAuthorizationPolicyResource(
 	scope *state.Scope,
-) AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
+) ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
 	requireAuthAuthorizationPolicyName := names.RequirePolicy(scope.AuthPolicy.Name)
 	desiredResource := require.GetDesired(
 		scope,
 		buildObjectMeta(requireAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
 	)
 
-	return AuthPolicyAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
-		reconciliation.ReconcileFuncAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
-			Func: reconciliation.ReconcileFunc[*istioclientsecurityv1.AuthorizationPolicy]{
+	return ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
+		reconciliation.ReconcilerAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
+			Func: reconciliation.ResourceReconciler[*istioclientsecurityv1.AuthorizationPolicy]{
 				ResourceKind:    "AuthorizationPolicy",
 				ResourceName:    requireAuthAuthorizationPolicyName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),

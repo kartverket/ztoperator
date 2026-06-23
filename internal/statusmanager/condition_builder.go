@@ -18,7 +18,7 @@ func BuildConditions(
 	reconciliationState ReconciliationState,
 	validationErrorMessage *string,
 	descendants []state.Descendant[client.Object],
-	reconcileFuncs []reconciliation.ReconcileAction,
+	reconcileFuncs []reconciliation.ControllerResource,
 	existingConditions []metav1.Condition,
 ) []metav1.Condition {
 	authPolicyCondition := BuildAuthPolicyCondition(
@@ -125,7 +125,7 @@ func BuildDescendantConditions(
 // BuildMissingResourceConditions builds conditions for resources that were expected but not found.
 func BuildMissingResourceConditions(
 	descendants []state.Descendant[client.Object],
-	reconcileFuncs []reconciliation.ReconcileAction,
+	reconcileFuncs []reconciliation.ControllerResource,
 	existingConditions []metav1.Condition,
 ) []metav1.Condition {
 	var conditions []metav1.Condition

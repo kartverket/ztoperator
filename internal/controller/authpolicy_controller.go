@@ -133,18 +133,18 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	scope = validateAuthPolicy(ctx, scope)
 
-	reconcileActions := reconciler.ReconcileActions(scope)
+	controllerResources := reconciler.ControllerResources(scope)
 
 	defer func() {
-		statusmanager.UpdateAuthPolicyStatus(ctx, r.Client, r.Recorder, scope, originalAuthPolicy, reconcileActions)
+		statusmanager.UpdateAuthPolicyStatus(ctx, r.Client, r.Recorder, scope, originalAuthPolicy, controllerResources)
 	}()
 
-	return r.doReconcile(ctx, reconcileActions, scope)
+	return r.doReconcile(ctx, controllerResources, scope)
 }
 
 func (r *AuthPolicyReconciler) doReconcile(
 	ctx context.Context,
-	reconcileFuncs []reconciliation.ReconcileAction,
+	reconcileFuncs []reconciliation.ControllerResource,
 	scope *state.Scope,
 ) (ctrl.Result, error) {
 	result := ctrl.Result{}

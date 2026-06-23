@@ -46,7 +46,7 @@ Controller.Reconcile()
   ├─ validateAuthPolicy()        ← Validators (pkg/validation/)
   │   ├─ Path validation           (RFC 3986 pchar, template syntax {*}, {**})
   │   └─ Pod annotation validation (sidecar.istio.io/userVolume + userVolumeMount must reference the envoy secret)
-  ├─ ReconcileActions()           ← Builds list of 6 reconcile actions (internal/reconciler/actions.go)
+  ├─ ControllerResources()        ← Builds list of 6 controller resources (internal/reconciler/resources.go)
   │   ├─ Secret
   │   ├─ EnvoyFilter
   │   ├─ RequestAuthentication
@@ -64,7 +64,7 @@ Controller.Reconcile()
 | `api/v1alpha1/` | CRD type definitions with kubebuilder markers; `AuthPolicy`, `AuthPolicySpec`, status, conditions |
 | `cmd/main.go` | Entrypoint; scheme registration (Istio + K8s + ztoperator), manager setup |
 | `internal/controller/` | Reconciler loop; resolves, validates, reconciles, updates status |
-| `internal/reconciler/` | Generic adapter pattern for reconciling any `client.Object`. `actions.go` defines the 6 reconcile actions |
+| `internal/reconciler/` | Generic adapter pattern for reconciling any `client.Object`. `resources.go` defines the 6 reconcile resources |
 | `internal/names/` | Centralised child resource name generation functions (e.g. `EnvoyFilter`, `DenyPolicy`) |
 | `internal/resolver/` | Resolvers: audience, OAuth credentials, discovery document, auto-login config |
 | `internal/state/` | `Scope` struct — the resolved state bag passed through reconciliation (AuthPolicy + resolved values + descendants) |
@@ -81,7 +81,7 @@ Controller.Reconcile()
 | `pkg/resourcegenerators/secret/` | Envoy Secret generation (HMAC + token secret) |
 | `pkg/luascript/` | Lua script templating (`ztoperator.lua` embedded via `//go:embed`); handles login/logout/redirect/deny-redirect logic |
 | `pkg/validation/` | Path validation (RFC 3986, template patterns `{*}` / `{**}`), pod annotation validation; `path_classifier.go` distinguishes exact/prefix/template paths, `path_transformation.go` normalises them before matching |
-| `pkg/reconciliation/` | `ReconcileAction` interface and generic `ReconcileFunc` / `ReconcileFuncAdapter` types |
+| `pkg/reconciliation/` | `ControllerResource` interface and generic `ReconcilerAdapter[T]` / `ResourceReconciler[T]` types |
 | `pkg/metrics/` | Prometheus gauge `ztoperator_authpolicy_info` with labels: name, namespace, state, owner, issuer, enabled, auto_login_enabled, protected_pod |
 | `pkg/rest/` | OIDC discovery document HTTP client (uses resty); `DiscoveryDocumentResolver` interface in `client.go` is the main test seam injected into the controller; pre-seeded static map of known providers in `dto.go` |
 | `pkg/config/` | Env-based config via `envconfig` (currently just `ZTOPERATOR_GIT_REF`) |
@@ -93,10 +93,10 @@ Controller.Reconcile()
 The reconciler uses a **generic adapter pattern** with Go generics:
 
 ```go
-AuthPolicyAdapter[T client.Object]  →  ReconcileFuncAdapter[T]  →  ReconcileFunc[T]
+ReconcilerAdapter[T client.Object]  →  ResourceReconciler[T]
 ```
 
-Each `ReconcileFunc[T]` specifies:
+Each `ResourceReconciler[T]` specifies:
 - `DesiredResource`: the desired state (or nil to trigger deletion)
 - `ShouldUpdate(current, desired T) bool`: comparison function
 - `UpdateFields(current, desired T)`: field-level update function

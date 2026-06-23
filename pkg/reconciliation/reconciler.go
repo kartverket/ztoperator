@@ -9,18 +9,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ReconcileAction interface {
+type ControllerResource interface {
 	Reconcile(ctx context.Context, k8sClient client.Client, scheme *runtime.Scheme) (ctrl.Result, error)
 	GetResourceKind() string
 	GetResourceName() string
 	IsResourceNil() bool
 }
 
-type ReconcileFuncAdapter[T client.Object] struct {
-	Func ReconcileFunc[T]
+type ReconcilerAdapter[T client.Object] struct {
+	Func ResourceReconciler[T]
 }
 
-type ReconcileFunc[T client.Object] struct {
+type ResourceReconciler[T client.Object] struct {
 	ResourceKind    string
 	ResourceName    string
 	DesiredResource *T
@@ -29,7 +29,7 @@ type ReconcileFunc[T client.Object] struct {
 	UpdateFields    func(current T, desired T)
 }
 
-func CountReconciledResources(rfs []ReconcileAction) int {
+func CountNonNilResources(rfs []ControllerResource) int {
 	count := 0
 	for _, rf := range rfs {
 		if !rf.IsResourceNil() {

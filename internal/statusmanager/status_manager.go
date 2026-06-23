@@ -30,7 +30,7 @@ func UpdateAuthPolicyStatus(
 	recorder events.EventRecorder,
 	scope *state.Scope,
 	originalAuthPolicy *ztoperatorv1alpha1.AuthPolicy,
-	reconcileActions []reconciliation.ReconcileAction,
+	controllerResources []reconciliation.ControllerResource,
 ) {
 	ap := &scope.AuthPolicy
 	rLog := log.GetLogger(ctx)
@@ -43,7 +43,7 @@ func UpdateAuthPolicyStatus(
 		"Reconcile",
 		"Status update of AuthPolicy started.")
 
-	reconciliationState := DetermineReconciliationState(scope, reconcileActions)
+	reconciliationState := DetermineReconciliationState(scope, controllerResources)
 
 	ap.Status.ObservedGeneration = ap.GetGeneration()
 	ap.Status.Phase = determinePhase(reconciliationState)
@@ -54,7 +54,7 @@ func UpdateAuthPolicyStatus(
 		reconciliationState,
 		scope.ValidationErrorMessage,
 		scope.Descendants,
-		reconcileActions,
+		controllerResources,
 		originalAuthPolicy.Status.Conditions,
 	)
 
@@ -74,12 +74,12 @@ func UpdateAuthPolicyStatus(
 
 func DetermineReconciliationState(
 	scope *state.Scope,
-	reconcileActions []reconciliation.ReconcileAction,
+	controllerResources []reconciliation.ControllerResource,
 ) ReconciliationState {
 	switch {
 	case scope.InvalidConfig:
 		return StateInvalid
-	case len(scope.Descendants) != reconciliation.CountReconciledResources(reconcileActions):
+	case len(scope.Descendants) != reconciliation.CountNonNilResources(controllerResources):
 		return StatePending
 	case len(scope.GetErrors()) > 0:
 		return StateFailed
