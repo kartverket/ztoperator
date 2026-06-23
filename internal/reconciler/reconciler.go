@@ -14,12 +14,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// AuthPolicyAdapter implements the ReconcileAction interface.
-type AuthPolicyAdapter[T client.Object] struct {
-	reconciliation.ReconcileFuncAdapter[T]
+// ControllerResourceAdapter implements the ControllerResource interface.
+type ControllerResourceAdapter[T client.Object] struct {
+	reconciliation.ReconcilerAdapter[T]
 }
 
-func (a AuthPolicyAdapter[T]) Reconcile(
+func (a ControllerResourceAdapter[T]) Reconcile(
 	ctx context.Context,
 	k8sClient client.Client,
 	scheme *runtime.Scheme,
@@ -37,15 +37,15 @@ func (a AuthPolicyAdapter[T]) Reconcile(
 	)
 }
 
-func (a AuthPolicyAdapter[T]) GetResourceKind() string {
+func (a ControllerResourceAdapter[T]) GetResourceKind() string {
 	return a.Func.ResourceKind
 }
 
-func (a AuthPolicyAdapter[T]) GetResourceName() string {
+func (a ControllerResourceAdapter[T]) GetResourceName() string {
 	return a.Func.ResourceName
 }
 
-func (a AuthPolicyAdapter[T]) IsResourceNil() bool {
+func (a ControllerResourceAdapter[T]) IsResourceNil() bool {
 	return a.Func.DesiredResource == nil || reflect.ValueOf(*a.Func.DesiredResource).IsNil()
 }
 

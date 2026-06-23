@@ -9,7 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// mockReconcileAction implements the reconciliation.ReconcileAction interface.
+// mockReconcileAction implements the reconciliation.ControllerResource interface.
 type mockReconcileAction struct {
 	resourceKind string
 	resourceName string
@@ -36,7 +36,7 @@ func (m *mockReconcileAction) Reconcile(
 	return ctrl.Result{}, nil
 }
 
-func createMockReconcileAction(kind, name string, isNil bool) reconciliation.ReconcileAction {
+func createMockReconcileAction(kind, name string, isNil bool) reconciliation.ControllerResource {
 	return &mockReconcileAction{
 		resourceKind: kind,
 		resourceName: name,

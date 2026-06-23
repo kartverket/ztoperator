@@ -371,7 +371,7 @@ func TestBuildMissingResourceConditions_WithNoMissingResources_ReturnsEmptySlice
 	descendants := []state.Descendant[client.Object]{
 		{ID: "Secret-my-secret", Object: &v1.Secret{}},
 	}
-	reconcileFuncs := []reconciliation.ReconcileAction{
+	reconcileFuncs := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "my-secret", false),
 	}
 
@@ -385,7 +385,7 @@ func TestBuildMissingResourceConditions_WithNoMissingResources_ReturnsEmptySlice
 func TestBuildMissingResourceConditions_WithMissingResource_ReturnsFalseCondition(t *testing.T) {
 	// 1. Arrange
 	descendants := []state.Descendant[client.Object]{}
-	reconcileFuncs := []reconciliation.ReconcileAction{
+	reconcileFuncs := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "expected-secret", false),
 	}
 
@@ -403,7 +403,7 @@ func TestBuildMissingResourceConditions_WithMissingResource_ReturnsFalseConditio
 func TestBuildMissingResourceConditions_WithNilResource_IgnoresIt(t *testing.T) {
 	// 1. Arrange
 	descendants := []state.Descendant[client.Object]{}
-	reconcileFuncs := []reconciliation.ReconcileAction{
+	reconcileFuncs := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "some-secret", true),
 	}
 
@@ -419,7 +419,7 @@ func TestBuildMissingResourceConditions_WithPartiallyMissingResources_ReturnsOnl
 	descendants := []state.Descendant[client.Object]{
 		{ID: "Secret-present-secret", Object: &v1.Secret{}},
 	}
-	reconcileFuncs := []reconciliation.ReconcileAction{
+	reconcileFuncs := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "present-secret", false),
 		createMockReconcileAction("ConfigMap", "missing-config", false),
 		createMockReconcileAction("Secret", "missing-secret", false),
@@ -437,7 +437,7 @@ func TestBuildMissingResourceConditions_WithPartiallyMissingResources_ReturnsOnl
 func TestBuildMissingResourceConditions_WithNoExistingConditions_SetsNewLastTransitionTime(t *testing.T) {
 	// 1. Arrange
 	var descendants []state.Descendant[client.Object]
-	reconcileFuncs := []reconciliation.ReconcileAction{
+	reconcileFuncs := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "expected-secret", false),
 	}
 
@@ -453,7 +453,7 @@ func TestBuildMissingResourceConditions_WithNoExistingConditions_SetsNewLastTran
 func TestBuildMissingResourceConditions_WithIdenticalExistingCondition_PreservesLastTransitionTime(t *testing.T) {
 	// 1. Arrange
 	var descendants []state.Descendant[client.Object]
-	reconcileFuncs := []reconciliation.ReconcileAction{
+	reconcileFuncs := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "expected-secret", false),
 	}
 
@@ -483,7 +483,7 @@ func TestBuildMissingResourceConditions_WithIdenticalExistingCondition_Preserves
 func TestBuildMissingResourceConditions_WithDifferentExistingCondition_UpdatesLastTransitionTime(t *testing.T) {
 	// 1. Arrange
 	var descendants []state.Descendant[client.Object]
-	reconcileFuncs := []reconciliation.ReconcileAction{
+	reconcileFuncs := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "expected-secret", false),
 	}
 
@@ -525,7 +525,7 @@ func TestBuildConditions_IncludesAllConditionTypes(t *testing.T) {
 		},
 	}
 
-	reconcileFuncs := []reconciliation.ReconcileAction{
+	reconcileFuncs := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "oauth-secret", false),
 		createMockReconcileAction("RequestAuthentication", "my-auth", false),
 	}

@@ -26,10 +26,10 @@ func TestDetermineReconciliationState_WithInvalidConfig_ReturnsStateInvalid(t *t
 		ValidationErrorMessage: helperfunctions.Ptr("Invalid configuration"),
 		Descendants:            []state.Descendant[client.Object]{},
 	}
-	var reconcileActions []reconciliation.ReconcileAction
+	var controllerResources []reconciliation.ControllerResource
 
 	// 2. Act
-	result := statusmanager.DetermineReconciliationState(scope, reconcileActions)
+	result := statusmanager.DetermineReconciliationState(scope, controllerResources)
 
 	// 3. Assert
 	assert.Equal(t, statusmanager.StateInvalid, result)
@@ -43,13 +43,13 @@ func TestDetermineReconciliationState_WithMissingDescendants_ReturnsStatePending
 			{ID: "Secret-oauth-secret", Object: &v1.Secret{}},
 		},
 	}
-	reconcileActions := []reconciliation.ReconcileAction{
+	controllerResources := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "oauth-secret", false),           // Exists
 		createMockReconcileAction("RequestAuthentication", "my-auth", false), // Missing
 	}
 
 	// 2. Act
-	result := statusmanager.DetermineReconciliationState(scope, reconcileActions)
+	result := statusmanager.DetermineReconciliationState(scope, controllerResources)
 
 	// 3. Assert
 	assert.Equal(t, statusmanager.StatePending, result)
@@ -68,12 +68,12 @@ func TestDetermineReconciliationState_WithErrors_ReturnsStateFailed(t *testing.T
 			},
 		},
 	}
-	reconcileActions := []reconciliation.ReconcileAction{
+	controllerResources := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "oauth-secret", false),
 	}
 
 	// 2. Act
-	result := statusmanager.DetermineReconciliationState(scope, reconcileActions)
+	result := statusmanager.DetermineReconciliationState(scope, controllerResources)
 
 	// 3. Assert
 	assert.Equal(t, statusmanager.StateFailed, result)
@@ -92,12 +92,12 @@ func TestDetermineReconciliationState_WithValidConfigAndDescendantsAndNoErrors_R
 			},
 		},
 	}
-	reconcileActions := []reconciliation.ReconcileAction{
+	controllerResources := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "oauth-secret", false),
 	}
 
 	// 2. Act
-	result := statusmanager.DetermineReconciliationState(scope, reconcileActions)
+	result := statusmanager.DetermineReconciliationState(scope, controllerResources)
 
 	// 3. Assert
 	assert.Equal(t, statusmanager.StateReady, result)
@@ -119,13 +119,13 @@ func TestDetermineReconciliationState_InvalidConfigTakesPrecedenceOverPendingAnd
 			},
 		},
 	}
-	reconcileActions := []reconciliation.ReconcileAction{
+	controllerResources := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "oauth-secret", false),
 		createMockReconcileAction("RequestAuthentication", "my-auth", false),
 	}
 
 	// 2. Act
-	result := statusmanager.DetermineReconciliationState(scope, reconcileActions)
+	result := statusmanager.DetermineReconciliationState(scope, controllerResources)
 
 	// 3. Assert
 	assert.Equal(t, statusmanager.StateInvalid, result, "Invalid config should take precedence over other states")
@@ -144,13 +144,13 @@ func TestDetermineReconciliationState_PendingTakesPrecedenceOverFailed(t *testin
 			},
 		},
 	}
-	reconcileActions := []reconciliation.ReconcileAction{
+	controllerResources := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "oauth-secret", false),           // Exists
 		createMockReconcileAction("RequestAuthentication", "my-auth", false), // Missing
 	}
 
 	// 2. Act
-	result := statusmanager.DetermineReconciliationState(scope, reconcileActions)
+	result := statusmanager.DetermineReconciliationState(scope, controllerResources)
 
 	// 3. Assert
 	assert.Equal(t, statusmanager.StatePending, result, "Pending state should take precedence over failed state")
@@ -189,10 +189,10 @@ func TestUpdateAuthPolicyStatus_WithNoStatusChange_DoesNotUpdate(t *testing.T) {
 		InvalidConfig: false,
 		Descendants:   []state.Descendant[client.Object]{},
 	}
-	reconcileActions := []reconciliation.ReconcileAction{}
+	controllerResources := []reconciliation.ControllerResource{}
 
 	// 2. Act
-	statusmanager.UpdateAuthPolicyStatus(ctx, k8sClient, fakeRecorder, scope, originalAuthPolicy, reconcileActions)
+	statusmanager.UpdateAuthPolicyStatus(ctx, k8sClient, fakeRecorder, scope, originalAuthPolicy, controllerResources)
 
 	// 3. Assert
 	// Verify no status update recordedEvents were recorded (only StatusUpdateStarted)
@@ -239,12 +239,12 @@ func TestUpdateAuthPolicyStatus_WithSuccessfulStatusChange_RecordsNormalEvent(t 
 			},
 		},
 	}
-	reconcileActions := []reconciliation.ReconcileAction{
+	controllerResources := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "test", false),
 	}
 
 	// 2. Act
-	statusmanager.UpdateAuthPolicyStatus(ctx, k8sClient, fakeRecorder, scope, originalAuthPolicy, reconcileActions)
+	statusmanager.UpdateAuthPolicyStatus(ctx, k8sClient, fakeRecorder, scope, originalAuthPolicy, controllerResources)
 
 	// 3. Assert
 	close(fakeRecorder.Events)
@@ -287,10 +287,10 @@ func TestUpdateAuthPolicyStatus_WithFailedStatusUpdate_RecordsWarningEvent(t *te
 		InvalidConfig: false,
 		Descendants:   []state.Descendant[client.Object]{},
 	}
-	reconcileActions := []reconciliation.ReconcileAction{}
+	controllerResources := []reconciliation.ControllerResource{}
 
 	// 2. Act
-	statusmanager.UpdateAuthPolicyStatus(ctx, k8sClient, fakeRecorder, scope, originalAuthPolicy, reconcileActions)
+	statusmanager.UpdateAuthPolicyStatus(ctx, k8sClient, fakeRecorder, scope, originalAuthPolicy, controllerResources)
 
 	// 3. Assert
 	close(fakeRecorder.Events)
