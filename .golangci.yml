@@ -39,6 +39,9 @@ linters:
       - linters:
           - goconst
         path: _test\.go
+      - linters:
+          - goconst
+        path: pkg/resourcegenerators/envoyfilter/configpatch
     paths:
       - third_party$
       - builtin$
