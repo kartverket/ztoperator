@@ -42,6 +42,10 @@ linters:
       - linters:
           - goconst
         path: pkg/resourcegenerators/envoyfilter/configpatch
+      - linters:
+          - goconst
+        path: internal/reconciler/resources.go
+        text: AuthorizationPolicy
     paths:
       - third_party$
       - builtin$
