@@ -1,0 +1,13 @@
+# With autoLogin.enabled: false, desired state for the EnvoyFilter is nil. The pre-existing, unowned EnvoyFilter
+# is ignored rather than deleted, so this is NOT an error: the AuthPolicy is Ready.
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+  labels:
+    ztoperator.kartverket.no/controller: authpolicy
+    app.kubernetes.io/managed-by: ztoperator
+status:
+  phase: Ready
+  ready: true
+  message: AuthPolicy ready.
