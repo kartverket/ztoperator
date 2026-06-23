@@ -64,7 +64,7 @@ CHAINSAW_VERSION ?= v0.2.15
 CONTROLLER_TOOLS_VERSION ?= v0.21.0
 KUBECTL_VERSION ?= v$(KUBERNETES_VERSION)
 KIND_VERSION ?= v0.31.0
-GOLANGCI_LINT_VERSION ?= v2.10.1
+GOLANGCI_LINT_VERSION ?= v2.12.2
 HELM_VERSION ?= v4.0.0
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
