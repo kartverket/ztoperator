@@ -1,0 +1,17 @@
+# The AuthPolicy cannot fully reconcile because the RequestAuthentication it wants to manage is owned by someone
+# else, so it must report a failed, not-ready status, and the descendant condition for that RequestAuthentication
+# must spell out the ownership conflict.
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+  labels:
+    ztoperator.kartverket.no/controller: authpolicy
+    app.kubernetes.io/managed-by: ztoperator
+status:
+  phase: Failed
+  ready: false
+  message: AuthPolicy failed.
+  (length(conditions[?type == 'RequestAuthentication-auth-policy'])): 1
+  (length(conditions[?type == 'RequestAuthentication-auth-policy' && status == 'False' && reason == 'Error'])): 1
+  (length(conditions[?type == 'RequestAuthentication-auth-policy' && contains(message, 'not owned by AuthPolicy')])): 1

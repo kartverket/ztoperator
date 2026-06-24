@@ -51,21 +51,21 @@ func secretResource(scope *state.Scope) ControllerResourceAdapter[*v1.Secret] {
 				ResourceName:    scope.AutoLoginConfig.EnvoySecretName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate:    secretShouldUpdate,
-				UpdateFields:    secretUpdateFields,
+				ShouldUpdate:    SecretShouldUpdate,
+				UpdateFields:    SecretUpdateFields,
 			},
 		},
 	}
 }
 
-func secretShouldUpdate(current, desired *v1.Secret) bool {
+func SecretShouldUpdate(current, desired *v1.Secret) bool {
 	desiredTokenSecret, hasDesired := desired.Data[configpatch.TokenSecretFileName]
 	currentTokenSecret, hasCurrent := current.Data[configpatch.TokenSecretFileName]
 	return !hasDesired || !hasCurrent || !bytes.Equal(currentTokenSecret, desiredTokenSecret) ||
 		labelsNeedUpdate(current, desired)
 }
 
-func secretUpdateFields(current, desired *v1.Secret) {
+func SecretUpdateFields(current, desired *v1.Secret) {
 	current.Data = desired.Data
 	current.Labels = desired.Labels
 }
@@ -88,14 +88,14 @@ func envoyFilterResource(scope *state.Scope) ControllerResourceAdapter[*v1alpha4
 				ResourceName:    autoLoginEnvoyFilterName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate:    envoyFilterShouldUpdate,
-				UpdateFields:    envoyFilterUpdateFields,
+				ShouldUpdate:    EnvoyFilterShouldUpdate,
+				UpdateFields:    EnvoyFilterUpdateFields,
 			},
 		},
 	}
 }
 
-func envoyFilterShouldUpdate(current, desired *v1alpha4.EnvoyFilter) bool {
+func EnvoyFilterShouldUpdate(current, desired *v1alpha4.EnvoyFilter) bool {
 	return !reflect.DeepEqual(
 		current.Spec.GetWorkloadSelector(),
 		desired.Spec.GetWorkloadSelector(),
@@ -106,7 +106,7 @@ func envoyFilterShouldUpdate(current, desired *v1alpha4.EnvoyFilter) bool {
 		labelsNeedUpdate(current, desired)
 }
 
-func envoyFilterUpdateFields(current, desired *v1alpha4.EnvoyFilter) {
+func EnvoyFilterUpdateFields(current, desired *v1alpha4.EnvoyFilter) {
 	current.Spec.WorkloadSelector = desired.Spec.GetWorkloadSelector()
 	current.Spec.ConfigPatches = desired.Spec.GetConfigPatches()
 	current.Labels = desired.Labels
@@ -132,20 +132,20 @@ func requestAuthenticationResource(
 				ResourceName:    requestAuthenticationName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate:    requestAuthenticationShouldUpdate,
-				UpdateFields:    requestAuthenticationUpdateFields,
+				ShouldUpdate:    RequestAuthenticationShouldUpdate,
+				UpdateFields:    RequestAuthenticationUpdateFields,
 			},
 		},
 	}
 }
 
-func requestAuthenticationShouldUpdate(current, desired *istioclientsecurityv1.RequestAuthentication) bool {
+func RequestAuthenticationShouldUpdate(current, desired *istioclientsecurityv1.RequestAuthentication) bool {
 	return !reflect.DeepEqual(current.Spec.GetSelector(), desired.Spec.GetSelector()) ||
 		!reflect.DeepEqual(current.Spec.GetJwtRules(), desired.Spec.GetJwtRules()) ||
 		labelsNeedUpdate(current, desired)
 }
 
-func requestAuthenticationUpdateFields(current, desired *istioclientsecurityv1.RequestAuthentication) {
+func RequestAuthenticationUpdateFields(current, desired *istioclientsecurityv1.RequestAuthentication) {
 	current.Spec.Selector = desired.Spec.GetSelector()
 	current.Spec.JwtRules = desired.Spec.GetJwtRules()
 	current.Labels = desired.Labels
@@ -172,8 +172,8 @@ func denyAuthorizationPolicyResource(
 				ResourceName:    denyAuthorizationPolicyName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate:    authorizationPolicyShouldUpdate,
-				UpdateFields:    authorizationPolicyUpdateFields,
+				ShouldUpdate:    AuthorizationPolicyShouldUpdate,
+				UpdateFields:    AuthorizationPolicyUpdateFields,
 			},
 		},
 	}
@@ -200,8 +200,8 @@ func ignoreAuthorizationPolicyResource(
 				ResourceName:    ignoreAuthAuthorizationPolicyName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate:    authorizationPolicyShouldUpdate,
-				UpdateFields:    authorizationPolicyUpdateFields,
+				ShouldUpdate:    AuthorizationPolicyShouldUpdate,
+				UpdateFields:    AuthorizationPolicyUpdateFields,
 			},
 		},
 	}
@@ -228,20 +228,20 @@ func requireAuthorizationPolicyResource(
 				ResourceName:    requireAuthAuthorizationPolicyName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
 				Scope:           scope,
-				ShouldUpdate:    authorizationPolicyShouldUpdate,
-				UpdateFields:    authorizationPolicyUpdateFields,
+				ShouldUpdate:    AuthorizationPolicyShouldUpdate,
+				UpdateFields:    AuthorizationPolicyUpdateFields,
 			},
 		},
 	}
 }
 
-func authorizationPolicyShouldUpdate(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
+func AuthorizationPolicyShouldUpdate(current, desired *istioclientsecurityv1.AuthorizationPolicy) bool {
 	return !reflect.DeepEqual(current.Spec.GetSelector(), desired.Spec.GetSelector()) ||
 		!reflect.DeepEqual(current.Spec.GetRules(), desired.Spec.GetRules()) ||
 		labelsNeedUpdate(current, desired)
 }
 
-func authorizationPolicyUpdateFields(current, desired *istioclientsecurityv1.AuthorizationPolicy) {
+func AuthorizationPolicyUpdateFields(current, desired *istioclientsecurityv1.AuthorizationPolicy) {
 	current.Spec.Selector = desired.Spec.GetSelector()
 	current.Spec.Rules = desired.Spec.GetRules()
 	current.Labels = desired.Labels

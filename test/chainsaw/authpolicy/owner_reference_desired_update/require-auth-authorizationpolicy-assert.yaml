@@ -1,0 +1,13 @@
+# Resources that do not collide with a foreign resource are still created and owned by Ztoperator. The presence of
+# this AuthorizationPolicy proves reconciliation progressed past resolution and reached the resource step.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-policy-require-auth
+  labels:
+    ztoperator.kartverket.no/controller: authpolicy
+    app.kubernetes.io/managed-by: ztoperator
+spec:
+  selector:
+    matchLabels:
+      app: application

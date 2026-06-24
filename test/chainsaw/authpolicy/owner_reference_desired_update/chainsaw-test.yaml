@@ -1,0 +1,29 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: owner-reference-desired-update
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        # Pre-create a RequestAuthentication with the same name the operator generates for the AuthPolicy
+        - apply:
+            file: foreign-request-authentication.yaml
+        # Try create authpolicy
+        - create:
+            file: authpolicy.yaml
+        # The ownership conflict on the RequestAuthentication must surface as a reconciliation failure.
+        - assert:
+            file: authpolicy-failed-assert.yaml
+        # Other resources are still created
+        - assert:
+            file: require-auth-authorizationpolicy-assert.yaml
+        # The foreign RequestAuthentication must be left as it was
+        - assert:
+            file: foreign-request-authentication.yaml

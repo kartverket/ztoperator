@@ -1,0 +1,29 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: owner-reference-desired-nil
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - try:
+        # Pre-create an EnvoyFilter with the same name the operator generates for the AuthPolicy login filter
+        - apply:
+            file: foreign-envoy-filter.yaml
+        # Try create authpolicy with autoLogin.enabled: false
+        - create:
+            file: authpolicy.yaml
+        # Should succeed and become ready
+        - assert:
+            file: authpolicy-ready-assert.yaml
+        # The operator must have created the RequestAuthentication (autoLogin disabled, not the whole policy)
+        - assert:
+            file: request-authentication-assert.yaml
+        # The foreign EnvoyFilter (desired is nil when autoLogin disabled) must be left untouched
+        - assert:
+            file: foreign-envoy-filter.yaml

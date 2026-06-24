@@ -1,0 +1,11 @@
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: auth-policy
+spec:
+  selector:
+    matchLabels:
+      app: foreign-app
+  jwtRules:
+    - issuer: https://foreign-issuer.example.com
+      jwksUri: https://foreign-issuer.example.com/.well-known/jwks.json
