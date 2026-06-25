@@ -12,13 +12,14 @@ func ResolveAutoLoginConfig(
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
 	identityProviderUris state.IdentityProviderUris,
 ) state.AutoLoginConfig {
+	envoySecretName := names.EnvoySecret(authPolicy.Name)
+
 	if authPolicy.Spec.AutoLogin == nil || !authPolicy.Spec.AutoLogin.Enabled {
 		return state.AutoLoginConfig{
-			Enabled: false,
+			Enabled:         false,
+			EnvoySecretName: envoySecretName,
 		}
 	}
-
-	envoySecretName := names.EnvoySecret(authPolicy.Name)
 
 	autoLoginConfig := state.AutoLoginConfig{
 		Enabled:               authPolicy.Spec.AutoLogin.Enabled,
