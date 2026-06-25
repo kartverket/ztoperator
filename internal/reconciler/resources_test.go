@@ -7,6 +7,7 @@ import (
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/internal/reconciler"
+	"github.com/kartverket/ztoperator/internal/resolver"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
@@ -82,6 +83,42 @@ var _ = Describe("ControllerResources", func() {
 			),
 		)
 	})
+
+	DescribeTable(
+		"Secret resource produced by ControllerResources has a non-empty name when autologin is",
+		func(autoLogin *ztoperatorv1alpha1.AutoLogin) {
+			authPolicy := &ztoperatorv1alpha1.AuthPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      authPolicyName,
+					Namespace: "some-namespace",
+				},
+				Spec: ztoperatorv1alpha1.AuthPolicySpec{
+					AutoLogin: autoLogin,
+				},
+			}
+			scope := &state.Scope{
+				AuthPolicy: *authPolicy,
+				AutoLoginConfig: resolver.ResolveAutoLoginConfig(
+					authPolicy,
+					state.IdentityProviderUris{},
+				),
+			}
+
+			resources := reconciler.ControllerResources(scope)
+
+			var secretName string
+			for _, r := range resources {
+				if r.GetResourceKind() == "Secret" {
+					secretName = r.GetResourceName()
+					break
+				}
+			}
+			Expect(secretName).NotTo(BeEmpty(), "Secret resource name must not be empty")
+			Expect(secretName).To(Equal(names.EnvoySecret(authPolicyName)))
+		},
+		Entry("explicitly disabled", &ztoperatorv1alpha1.AutoLogin{Enabled: false}),
+		Entry("nil", nil),
+	)
 })
 
 var _ = Describe("auto-login Secret reconciliation", func() {

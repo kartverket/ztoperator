@@ -22,7 +22,12 @@ func TestResolveAutoLoginConfig_WithAutoLoginDisabled_ReturnsDisabledConfig(t *t
 
 	// 3. Assert
 	assert.False(t, result.Enabled, "AutoLogin should be disabled")
-	assert.Empty(t, result.EnvoySecretName, "EnvoySecretName should be empty when disabled")
+	assert.Equal(
+		t,
+		"test-policy-envoy-secret",
+		result.EnvoySecretName,
+		"EnvoySecretName should always be set, even when auto-login is disabled",
+	)
 	assert.Empty(t, result.LuaScriptConfig.LuaScript, "LuaScript should be empty when disabled")
 }
 
@@ -36,6 +41,15 @@ func TestResolveAutoLoginConfig_WithAutoLoginNil_ReturnsDisabledConfig(t *testin
 
 	// 3. Assert
 	assert.False(t, result.Enabled, "AutoLogin should be disabled when nil")
+	// Regression: same as the disabled case — EnvoySecretName must be populated even when AutoLogin
+	// is nil so that the Secret reconciler does not operate on an empty resource name.
+	assert.Equal(
+		t,
+		"test-policy-envoy-secret",
+		result.EnvoySecretName,
+		"EnvoySecretName should always be set, even when AutoLogin is nil",
+	)
+	assert.Empty(t, result.LuaScriptConfig.LuaScript, "LuaScript should be empty when AutoLogin is nil")
 }
 
 func TestResolveAutoLoginConfig_WithBasicAutoLogin_ReturnsConfigWithDefaults(t *testing.T) {
