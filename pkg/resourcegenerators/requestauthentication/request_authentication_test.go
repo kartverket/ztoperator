@@ -181,4 +181,3 @@ func defaultScope() state.Scope {
 func defaultObjectMeta() metav1.ObjectMeta {
 	return metav1.ObjectMeta{Name: "my-policy", Namespace: "default"}
 }
-
