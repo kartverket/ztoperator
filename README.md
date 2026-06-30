@@ -2,6 +2,8 @@
   <img src="ztoperator_logo.png" alt="Ztoperator Logo" width="600"/>
 </p>
 
+This is diff v2
+
 **Ztoperator** is a Kubernetes Operator that simplifies and enforces Zero Trust security for workloads by integrating with **Istio** and **OAuth 2.0**.
 
 At the heart of Ztoperator is the custom resource definition (**CRD**) `AuthPolicy`, which provides a high-level abstraction for configuring authentication and authorization rules using **OAuth 2.0** and **OpenID Connect (OIDC)**.
@@ -184,3 +186,6 @@ as well as a **custom metric** called `ztoperator_authpolicy_info`.
 - `auto_login_enabled`: Whether auto-login is enabled
 - `protected_pod`: The name of the pod protected by the `AuthPolicy`
 - `protected_deployment`: The name of the deployment the protected pod belongs to
+
+på bånn
+
