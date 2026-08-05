@@ -68,6 +68,7 @@ func TestAuthPolicyReconcileHappyPathWithoutAutoLogin(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       apName,
 			Namespace:  namespace,
+			UID:        types.UID("test-uid-12345"),
 			Generation: 1,
 		},
 		Spec: ztoperatorv1alpha1.AuthPolicySpec{
