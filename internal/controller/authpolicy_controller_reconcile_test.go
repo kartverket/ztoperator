@@ -97,7 +97,7 @@ func TestAuthPolicyReconcileHappyPathWithoutAutoLogin(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Zero(t, result.RequeueAfter)
-	assert.False(t, result.Requeue)
+	assert.Equal(t, ctrl.Result{}, result)
 	ra := &securityv1.RequestAuthentication{}
 	require.NoError(t, k8sClient.Get(ctx, types.NamespacedName{Name: apName, Namespace: namespace}, ra))
 	require.Len(t, ra.Spec.GetJwtRules(), 1)
