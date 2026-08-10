@@ -126,6 +126,31 @@ func TestGetOAuthSidecarConfigPatch_PassThroughAndDenyRedirectMatchers(t *testin
 	assert.Equal(t, luascript.DenyRedirectHeaderName, denyHeader["name"])
 }
 
+func TestGetOAuthSidecarConfigPatch_CookieConfigs_SameSiteLax(t *testing.T) {
+	scope := defaultScope()
+
+	result := configpatch.GetOAuthSidecarConfigPatchValue(scope)
+
+	inner := oauthInnerConfig(t, result)
+	cookieConfigs, ok := inner["cookie_configs"].(map[string]interface{})
+	require.True(t, ok, "cookie_configs must be present")
+
+	expectedCookies := []string{
+		"bearer_token_cookie_config",
+		"oauth_hmac_cookie_config",
+		"oauth_expires_cookie_config",
+		"id_token_cookie_config",
+		"refresh_token_cookie_config",
+		"oauth_nonce_cookie_config",
+		"code_verifier_cookie_config",
+	}
+	for _, key := range expectedCookies {
+		cfg, present := cookieConfigs[key].(map[string]interface{})
+		require.Truef(t, present, "%s must be present in cookie_configs", key)
+		assert.Equalf(t, "LAX", cfg["same_site"], "%s.same_site must be LAX", key)
+	}
+}
+
 func oauthInnerConfig(t *testing.T, patch map[string]interface{}) map[string]interface{} {
 	t.Helper()
 	typed, ok := patch["typed_config"].(map[string]interface{})

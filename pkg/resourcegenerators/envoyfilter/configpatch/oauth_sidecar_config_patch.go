@@ -103,6 +103,15 @@ func GetOAuthSidecarConfigPatchValue(
 			},
 		},
 		"auth_scopes": authScopesInterface,
+		"cookie_configs": map[string]interface{}{
+			"bearer_token_cookie_config":  map[string]interface{}{"same_site": "LAX"},
+			"oauth_hmac_cookie_config":    map[string]interface{}{"same_site": "LAX"},
+			"oauth_expires_cookie_config": map[string]interface{}{"same_site": "LAX"},
+			"id_token_cookie_config":      map[string]interface{}{"same_site": "LAX"},
+			"refresh_token_cookie_config": map[string]interface{}{"same_site": "LAX"},
+			"oauth_nonce_cookie_config":   map[string]interface{}{"same_site": "LAX"},
+			"code_verifier_cookie_config": map[string]interface{}{"same_site": "LAX"},
+		},
 	}
 
 	if scope.AuthPolicy.Spec.AcceptedResources != nil && len(*scope.AuthPolicy.Spec.AcceptedResources) > 0 {
