@@ -2,6 +2,7 @@ package controller_test
 
 import (
 	"context"
+	"errors"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/controller"
@@ -148,6 +149,40 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseReady))
 			Expect(updatedPolicy.Status.Ready).To(BeTrue())
 			Expect(updatedPolicy.Status.ObservedGeneration).To(Equal(int64(1)))
+		})
+	})
+
+	Context("when the discovery document resolver returns an error", func() {
+		It("returns the error, sets status to Failed, and does not create child resources", func() {
+			By("configuring the resolver to return an error")
+			resolveErr := errors.New("discovery resolver failed")
+			reconciler.DiscoveryDocumentResolver = &fakeDiscoveryDocumentResolver{err: resolveErr}
+
+			By("reconciling the AuthPolicy")
+			result, err := reconciler.Reconcile(testCtx, ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: appName, Namespace: namespace},
+			})
+			Expect(err).To(MatchError(ContainSubstring(resolveErr.Error())))
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			By("verifying status is set to Failed")
+			updatedPolicy := &ztoperatorv1alpha1.AuthPolicy{}
+			Expect(fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, updatedPolicy)).To(Succeed())
+			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseFailed))
+			Expect(updatedPolicy.Status.Ready).To(BeFalse())
+			Expect(updatedPolicy.Status.Message).To(ContainSubstring(resolveErr.Error()))
+			Expect(updatedPolicy.Status.ObservedGeneration).To(Equal(int64(1)))
+
+			By("verifying no child resources were created")
+			ra := &securityv1.RequestAuthentication{}
+			Expect(apierrors.IsNotFound(
+				fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, ra),
+			)).To(BeTrue())
+
+			requirePolicy := &securityv1.AuthorizationPolicy{}
+			Expect(apierrors.IsNotFound(
+				fakeClient.Get(testCtx, types.NamespacedName{Name: names.RequirePolicy(appName), Namespace: namespace}, requirePolicy),
+			)).To(BeTrue())
 		})
 	})
 })
