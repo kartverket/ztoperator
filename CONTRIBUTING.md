@@ -134,7 +134,7 @@ updating Go version).
 
 #### Updating Golang base image version
 1. Find a Golang docker image [on Docker Hub](https://hub.docker.com/_/golang/tags) corresponding to the Go version you
-   updated to previously. As of June 2026, this is called "1.26.4-alpine3.23".
+   updated to previously. As of August 2026, this is called "1.26.5-alpine3.24".
 2. Copy the "index digest" (top left), and paste into all relevant Dockerfiles:
     1. [Dockerfile](Dockerfile)
     2. [Dockerfile.goreleaser](Dockerfile.goreleaser)
