@@ -8,6 +8,7 @@ import (
 //
 // +kubebuilder:validation:XValidation:message="acceptedResources must be non-empty when using Ansattporten or ID-Porten",rule="!(self.wellKnownURI in ['https://test.idporten.no/.well-known/openid-configuration', 'https://idporten.no/.well-known/openid-configuration', 'https://test.ansattporten.no/.well-known/openid-configuration', 'https://ansattporten.no/.well-known/openid-configuration']) || (has(self.acceptedResources) && self.acceptedResources.size() > 0)"
 // +kubebuilder:validation:XValidation:message="oAuthCredentials must be set when autoLogin is enabled",rule="!has(self.autoLogin) || !self.autoLogin.enabled || has(self.oAuthCredentials)"
+// +kubebuilder:validation:XValidation:message="oAuthCredentials cannot be set unless autoLogin is configured",rule="!has(self.oAuthCredentials) || has(self.autoLogin)"
 type AuthPolicySpec struct {
 	// Whether to enable JWT validation.
 	// If enabled, incoming JWTs will be validated against the issuer specified in the app registration and the generated audience.
