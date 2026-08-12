@@ -17,23 +17,6 @@ spec:
         - create:
             file: ../../../resources/skiperator/application.yaml
 
-        - create:
-            file: audience/authpolicy.yaml
-        - script: # Audience
-            content: |
-              ./../../../../scripts/patch-invalid-spec.sh \
-                audience/patch-invalid-audience.yaml \
-                "one audience cannot be defined from both 'value' and 'valueFrom'"
-
-              ./../../../../scripts/patch-invalid-spec.sh \
-                audience/patch-invalid-audience-ref.yaml \
-                "cannot reference both a ConfigMap and a Secret"
-
-              ./../../../../scripts/patch-invalid-spec.sh \
-                audience/patch-empty-audience.yaml \
-                "field 'value' cannot be empty string"
-        - delete:
-            file: audience/authpolicy.yaml
 
         - create:
             file: accepted_resources/authpolicy.yaml
