@@ -87,18 +87,16 @@ docker_signs:
     cmd: cosign
     args:
       - "sign"
-      - "--oidc-issuer=https://token.actions.githubusercontent.com"
       - "${artifact}"
       - "--yes"
 
 signs:
   - artifacts: all
     cmd: cosign
-    signature: "${artifact}.sig"
+    signature: "${artifact}.sigstore.json"
     args:
       - "sign-blob"
-      - "--oidc-issuer=https://token.actions.githubusercontent.com"
-      - "--output-signature=${signature}"
+      - "--bundle=${signature}"
       - "${artifact}"
       - "--yes"
 
