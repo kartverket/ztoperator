@@ -11,11 +11,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func getValidAuthPolicy(namespace, name string) *ztoperatorv1alpha1.AuthPolicy {
+func getValidAuthPolicy() *ztoperatorv1alpha1.AuthPolicy {
 	return &ztoperatorv1alpha1.AuthPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:      "auth-policy",
+			Namespace: "default",
 		},
 		Spec: ztoperatorv1alpha1.AuthPolicySpec{
 			Enabled:      true,
@@ -29,10 +29,7 @@ func getValidAuthPolicy(namespace, name string) *ztoperatorv1alpha1.AuthPolicy {
 
 var _ = Describe("AuthPolicy CRD", func() {
 	Context("When applying an AuthPolicy resource", func() {
-		const (
-			authPolicyName = "auth-policy"
-			namespaceName  = "default"
-		)
+		const namespaceName = "default"
 
 		testCtx := context.Background()
 
@@ -46,7 +43,7 @@ var _ = Describe("AuthPolicy CRD", func() {
 		})
 
 		It("should reject updates when audience has both value and valueFrom", func() {
-			authPolicy := getValidAuthPolicy(namespaceName, authPolicyName)
+			authPolicy := getValidAuthPolicy()
 			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
 
 			inlineValue := "inline-value"
@@ -66,7 +63,7 @@ var _ = Describe("AuthPolicy CRD", func() {
 		})
 
 		It("should reject updates when audience valueFrom references both ConfigMap and Secret", func() {
-			authPolicy := getValidAuthPolicy(namespaceName, authPolicyName)
+			authPolicy := getValidAuthPolicy()
 			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
 
 			authPolicy.Spec.AllowedAudiences = []ztoperatorv1alpha1.AllowedAudience{
@@ -85,7 +82,7 @@ var _ = Describe("AuthPolicy CRD", func() {
 		})
 
 		It("should reject updates when audience value is an empty string", func() {
-			authPolicy := getValidAuthPolicy(namespaceName, authPolicyName)
+			authPolicy := getValidAuthPolicy()
 			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
 
 			authPolicy.Spec.AllowedAudiences = []ztoperatorv1alpha1.AllowedAudience{
@@ -96,6 +93,122 @@ var _ = Describe("AuthPolicy CRD", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(apierrors.IsInvalid(err)).To(BeTrue())
 			Expect(err.Error()).To(ContainSubstring("field 'value' cannot be empty string"))
+		})
+
+		It("should reject updates when acceptedResources is missing for idporten test wellKnownURI", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			authPolicy.Spec.WellKnownURI = "https://test.idporten.no/.well-known/openid-configuration"
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("acceptedResources must be non-empty when using Ansattporten or ID-Porten"))
+		})
+
+		It("should reject updates when acceptedResources is missing for idporten prod wellKnownURI", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			authPolicy.Spec.WellKnownURI = "https://idporten.no/.well-known/openid-configuration"
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("acceptedResources must be non-empty when using Ansattporten or ID-Porten"))
+		})
+
+		It("should reject updates when acceptedResources is missing for ansattporten test wellKnownURI", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			authPolicy.Spec.WellKnownURI = "https://test.ansattporten.no/.well-known/openid-configuration"
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("acceptedResources must be non-empty when using Ansattporten or ID-Porten"))
+		})
+
+		It("should reject updates when acceptedResources is missing for ansattporten prod wellKnownURI", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			authPolicy.Spec.WellKnownURI = "https://ansattporten.no/.well-known/openid-configuration"
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("acceptedResources must be non-empty when using Ansattporten or ID-Porten"))
+		})
+
+		It("should reject updates when baselineAuth claims is an empty list", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			authPolicy.Spec.BaselineAuth = &ztoperatorv1alpha1.BaselineAuth{
+				Claims: []ztoperatorv1alpha1.Condition{},
+			}
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("claims must be a non-empty list"))
+		})
+
+		It("should reject updates when autoLogin is enabled without oAuthCredentials", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			authPolicy.Spec.AutoLogin = &ztoperatorv1alpha1.AutoLogin{
+				Enabled: true,
+				Scopes:  []string{"scope1", "scope2"},
+			}
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("oAuthCredentials must be set when autoLogin is enabled"))
+		})
+
+		It("should reject updates when oAuthCredentials is set without autoLogin", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			authPolicy.Spec.OAuthCredentials = &ztoperatorv1alpha1.OAuthCredentials{
+				SecretRef:       "oauth-secret",
+				ClientIDKey:     "client-id",
+				ClientSecretKey: "client-secret",
+			}
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("oAuthCredentials cannot be set unless autoLogin is configured"))
+		})
+
+		It("should reject updates when autoLogin loginParams contains an invalid key", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			authPolicy.Spec.AutoLogin = &ztoperatorv1alpha1.AutoLogin{
+				Enabled: true,
+				Scopes:  []string{"openid"},
+				LoginParams: map[string]string{
+					"invalid-key!": "value",
+				},
+			}
+			authPolicy.Spec.OAuthCredentials = &ztoperatorv1alpha1.OAuthCredentials{
+				SecretRef:       "oauth-secret",
+				ClientIDKey:     "client-id",
+				ClientSecretKey: "client-secret",
+			}
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("loginParams keys must match ^[a-zA-Z_][a-zA-Z0-9_]*$"))
 		})
 	})
 })

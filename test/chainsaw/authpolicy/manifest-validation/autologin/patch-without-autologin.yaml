@@ -1,7 +1,0 @@
-spec:
-  oAuthCredentials:
-    secretRef: oauth-secret
-    clientIDKey: client-id
-    clientSecretKey: client-secret
-  autoLogin: null
-
