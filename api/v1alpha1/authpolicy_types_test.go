@@ -210,5 +210,44 @@ var _ = Describe("AuthPolicy CRD", func() {
 			Expect(apierrors.IsInvalid(err)).To(BeTrue())
 			Expect(err.Error()).To(ContainSubstring("loginParams keys must match ^[a-zA-Z_][a-zA-Z0-9_]*$"))
 		})
+
+		It("should reject updates when authRules contains an invalid HTTP method", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			authPolicy.Spec.AuthRules = &[]ztoperatorv1alpha1.RequestAuthRule{
+				{
+					RequestMatcher: ztoperatorv1alpha1.RequestMatcher{
+						Paths:   []string{"/secure"},
+						Methods: []string{"INVALID_METHOD"},
+					},
+					When: &[]ztoperatorv1alpha1.Condition{
+						{Claim: "role", Values: []string{"entra_user_role"}},
+					},
+				},
+			}
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring(`Unsupported value: "INVALID_METHOD"`))
+		})
+
+		It("should reject updates when ignoreAuthRules contains an invalid HTTP method", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			authPolicy.Spec.IgnoreAuthRules = &[]ztoperatorv1alpha1.RequestMatcher{
+				{
+					Paths:   []string{"/public"},
+					Methods: []string{"INVALID_METHOD"},
+				},
+			}
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring(`Unsupported value: "INVALID_METHOD"`))
+		})
 	})
 })
