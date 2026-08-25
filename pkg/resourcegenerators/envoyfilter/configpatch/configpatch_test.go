@@ -49,7 +49,9 @@ func TestGetOAuthSidecarConfigPatch_EndSessionEndpoint_AbsentWhenNil(t *testing.
 	assert.False(t, present, "end_session_endpoint must be absent when EndSessionURI is nil")
 }
 
-func TestGetOAuthSidecarConfigPatch_Scopes_OpenIDAlwaysPresent(t *testing.T) {
+func TestGetOAuthSidecarConfigPatch_Scopes_ForwardedAsIs(t *testing.T) {
+	// Defaulting of "openid" is handled upstream in state.AutoLoginConfig.SetSaneDefaults,
+	// so the config patch generator must forward whatever scopes it receives verbatim.
 	scope := defaultScope()
 	scope.AutoLoginConfig.Scopes = []string{"offline_access"} // openid deliberately omitted
 
@@ -61,7 +63,7 @@ func TestGetOAuthSidecarConfigPatch_Scopes_OpenIDAlwaysPresent(t *testing.T) {
 	for _, s := range scopes {
 		scopeStrs = append(scopeStrs, s.(string))
 	}
-	assert.Contains(t, scopeStrs, "openid")
+	assert.Equal(t, []string{"offline_access"}, scopeStrs)
 }
 
 func TestGetOAuthSidecarConfigPatch_Scopes_CustomScopesPreserved(t *testing.T) {

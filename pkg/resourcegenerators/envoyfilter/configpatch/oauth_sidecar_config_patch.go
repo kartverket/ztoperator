@@ -1,8 +1,6 @@
 package configpatch
 
 import (
-	"slices"
-
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/luascript"
 )
@@ -23,10 +21,6 @@ func GetOAuthSidecarConfigPatchValue(
 		for _, resource := range *scope.AuthPolicy.Spec.AcceptedResources {
 			resourcesInterface = append(resourcesInterface, resource)
 		}
-	}
-
-	if !slices.Contains(scope.AutoLoginConfig.Scopes, "openid") {
-		scope.AutoLoginConfig.Scopes = append(scope.AutoLoginConfig.Scopes, "openid")
 	}
 
 	authScopesInterface := make([]interface{}, len(scope.AutoLoginConfig.Scopes))

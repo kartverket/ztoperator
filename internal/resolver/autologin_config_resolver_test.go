@@ -123,6 +123,21 @@ func TestResolveAutoLoginConfig_WithCustomConfiguration_PreservesAllValues(t *te
 	)
 }
 
+func TestResolveAutoLoginConfig_DefaultsOpenIDIntoScopesWhenMissing(t *testing.T) {
+	// 1. Arrange
+	authPolicy := createTestAuthPolicy("my-policy", &ztoperatorv1alpha1.AutoLogin{
+		Enabled: true,
+		Scopes:  []string{"profile", "email"},
+	})
+	identityProviderUris := createTestIdentityProviderUris()
+
+	// 2. Act
+	result := resolver.ResolveAutoLoginConfig(authPolicy, identityProviderUris)
+
+	// 3. Assert
+	assert.Equal(t, []string{"profile", "email", "openid"}, result.Scopes)
+}
+
 func createTestAuthPolicy(name string, autoLogin *ztoperatorv1alpha1.AutoLogin) *ztoperatorv1alpha1.AuthPolicy {
 	return &ztoperatorv1alpha1.AuthPolicy{
 		ObjectMeta: metav1.ObjectMeta{

@@ -107,6 +107,34 @@ func TestSetSaneDefaults_PreservesExplicitPaths(t *testing.T) {
 	assert.Equal(t, logout, autoLoginConfig.LogoutPath)
 }
 
+func TestSetSaneDefaults_AddsOpenIDToScopesWhenMissing(t *testing.T) {
+	autoLoginConfig := state.AutoLoginConfig{
+		Scopes: []string{"profile", "email"},
+	}
+
+	autoLoginConfig.SetSaneDefaults(ztoperatorv1alpha1.AutoLogin{})
+
+	assert.Equal(t, []string{"profile", "email", "openid"}, autoLoginConfig.Scopes)
+}
+
+func TestSetSaneDefaults_AddsOpenIDToScopesWhenNil(t *testing.T) {
+	autoLoginConfig := state.AutoLoginConfig{}
+
+	autoLoginConfig.SetSaneDefaults(ztoperatorv1alpha1.AutoLogin{})
+
+	assert.Equal(t, []string{"openid"}, autoLoginConfig.Scopes)
+}
+
+func TestSetSaneDefaults_DoesNotDuplicateOpenIDInScopes(t *testing.T) {
+	autoLoginConfig := state.AutoLoginConfig{
+		Scopes: []string{"openid", "profile"},
+	}
+
+	autoLoginConfig.SetSaneDefaults(ztoperatorv1alpha1.AutoLogin{})
+
+	assert.Equal(t, []string{"openid", "profile"}, autoLoginConfig.Scopes)
+}
+
 func newSecret(name string) *v1.Secret {
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
