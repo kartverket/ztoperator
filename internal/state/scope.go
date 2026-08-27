@@ -2,10 +2,13 @@ package state
 
 import (
 	"fmt"
+	"slices"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const openIDScope = "openid"
 
 type Scope struct {
 	AuthPolicy             ztoperatorv1alpha1.AuthPolicy
@@ -108,5 +111,8 @@ func (a *AutoLoginConfig) SetSaneDefaults(autoLogin ztoperatorv1alpha1.AutoLogin
 		a.LogoutPath = "/logout"
 	} else {
 		a.LogoutPath = *autoLogin.LogoutPath
+	}
+	if !slices.Contains(a.Scopes, openIDScope) {
+		a.Scopes = append(a.Scopes, openIDScope)
 	}
 }

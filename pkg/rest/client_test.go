@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	ztlog "github.com/kartverket/ztoperator/pkg/log"
+	"github.com/stretchr/testify/require"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -17,12 +18,8 @@ func TestGetOAuthDiscoveryDocument_ReturnsCachedDocumentForKnownURI(t *testing.T
 	uri := "https://idporten.no/.well-known/openid-configuration"
 
 	doc, err := resolver.GetOAuthDiscoveryDocument(uri, testLogger())
-	if err != nil {
-		t.Fatalf("expected no error for cached URI, got: %v", err)
-	}
-	if doc == nil {
-		t.Fatal("expected discovery document, got nil")
-	}
+	require.NoError(t, err, "expected no error for cached URI")
+	require.NotNil(t, doc, "expected discovery document, got nil")
 
 	want := GetWellknownURIToDiscoveryDocument()[uri]
 	assertStringPtrEqual(t, "issuer", doc.Issuer, want.Issuer)
@@ -50,12 +47,8 @@ func TestGetOAuthDiscoveryDocument_FetchesUnknownURIOverHTTP(t *testing.T) {
 	resolver := NewDefaultDiscoveryDocumentResolver()
 
 	doc, err := resolver.GetOAuthDiscoveryDocument(server.URL+"/.well-known/openid-configuration", testLogger())
-	if err != nil {
-		t.Fatalf("expected no error when fetching discovery document, got: %v", err)
-	}
-	if doc == nil {
-		t.Fatal("expected discovery document, got nil")
-	}
+	require.NoError(t, err, "expected no error when fetching discovery document")
+	require.NotNil(t, doc, "expected discovery document, got nil")
 
 	assertStringPtrValue(t, "issuer", doc.Issuer, "https://issuer.example.com")
 	assertStringPtrValue(t, "authorization_endpoint", doc.AuthorizationEndpoint, "https://issuer.example.com/authorize")
@@ -107,9 +100,7 @@ func assertStringPtrEqual(t *testing.T, field string, got, want *string) {
 func assertStringPtrValue(t *testing.T, field string, got *string, want string) {
 	t.Helper()
 
-	if got == nil {
-		t.Fatalf("field %q was nil, wanted %q", field, want)
-	}
+	require.NotNilf(t, got, "field %q was nil, wanted %q", field, want)
 	if *got != want {
 		t.Fatalf("field %q mismatch: got=%q want=%q", field, *got, want)
 	}
