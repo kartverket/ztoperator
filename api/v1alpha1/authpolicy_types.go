@@ -286,6 +286,7 @@ type BaselineAuth struct {
 	// including those covered by other specified AuthRules.
 	//
 	// The request is permitted if all the specified conditions are satisfied.
+	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=16
 	// +kubebuilder:validation:Required
 	Claims []Condition `json:"claims"`
