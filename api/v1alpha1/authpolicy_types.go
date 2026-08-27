@@ -28,6 +28,7 @@ type AuthPolicySpec struct {
 
 	// WellKnownURI specifies the URi to the identity provider's discovery document (also known as well-known endpoint).
 	//
+	// +kubebuilder:validation:MaxLength=2048
 	// +kubebuilder:validation:Required
 	WellKnownURI string `json:"wellKnownURI"`
 
@@ -36,6 +37,8 @@ type AuthPolicySpec struct {
 	//
 	// The normative behaviour for an OAuth / OIDC-compliant identity provider is to validate the presence of one or more client IDs as allowed audiences.
 	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=32
 	// +kubebuilder:validation:Optional
 	AllowedAudiences []AllowedAudience `json:"allowedAudiences,omitempty"`
 
@@ -48,6 +51,8 @@ type AuthPolicySpec struct {
 	// The header specified in each operation in the list must be unique. Nested claims of type string/int/bool is supported as well.
 	// If the claim is an object or array, it will be added to the header as a base64-encoded JSON string.
 	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=32
 	// +kubebuilder:validation:Optional
 	OutputClaimToHeaders *[]ClaimToHeader `json:"outputClaimToHeaders,omitempty"`
 
@@ -64,6 +69,9 @@ type AuthPolicySpec struct {
 	//
 	// +listType=set
 	// +kubebuilder:validation:Items.Pattern=`^(https?):\/\/[^\s\/$.?#].[^\s]*$`
+	// +kubebuilder:validation:Items:MaxLength=2048
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=32
 	// +kubebuilder:validation:Optional
 	AcceptedResources *[]string `json:"acceptedResources,omitempty"`
 
@@ -78,6 +86,8 @@ type AuthPolicySpec struct {
 	//
 	// API endpoints not covered by AuthRules and/or IgnoreAuthRules requires an authenticated JWT by default.
 	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
 	// +kubebuilder:validation:Optional
 	AuthRules *[]RequestAuthRule `json:"authRules,omitempty"`
 
@@ -85,6 +95,8 @@ type AuthPolicySpec struct {
 	//
 	// API endpoints not covered by AuthRules or IgnoreAuthRules require an authenticated JWT by default.
 	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
 	// +kubebuilder:validation:Optional
 	IgnoreAuthRules *[]RequestMatcher `json:"ignoreAuthRules,omitempty"`
 
@@ -103,6 +115,8 @@ type AuthPolicySpec struct {
 type AllowedAudience struct {
 	// Value specifies a static audience value.
 	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=1024
 	// +kubebuilder:validation:Optional
 	Value *string `json:"value,omitempty"`
 
@@ -136,6 +150,7 @@ type KeyRef struct {
 	// Name specifies the name of the ConfigMap/Secret; must satisfy DNS-1123 subdomain naming.
 	//
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
@@ -143,6 +158,7 @@ type KeyRef struct {
 	// Key specifies the data entry name within the ConfigMap/Secret; must follow key naming rules.
 	//
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$`
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
@@ -162,12 +178,14 @@ type AutoLogin struct {
 	// When a request matches any of these paths, the user will be redirected to log in if not already authenticated.
 	//
 	// +kubebuilder:validation:Pattern=`^/.*$`
+	// +kubebuilder:validation:MaxLength=1024
 	// +kubebuilder:validation:Optional
 	LoginPath *string `json:"loginPath,omitempty"`
 
 	// RedirectPath specifies which path to redirect the user to after completing the OIDC flow.
 	// If omitted, a default path of /oauth2/callback is used.
 	//
+	// +kubebuilder:validation:MaxLength=1024
 	// +kubebuilder:validation:Optional
 	RedirectPath *string `json:"redirectPath,omitempty"`
 
@@ -176,6 +194,7 @@ type AutoLogin struct {
 	// to log out towards the configured identity provider (RP-initiated logout).
 	// If omitted, a default path of /logout is used.
 	//
+	// +kubebuilder:validation:MaxLength=1024
 	// +kubebuilder:validation:Optional
 	LogoutPath *string `json:"logoutPath,omitempty"`
 
@@ -183,11 +202,15 @@ type AutoLogin struct {
 	// successfully signed out towards the configured identity provider (RP-initiated logout).
 	// If omitted, no post_logout_redirect_uri will be used.
 	//
+	// +kubebuilder:validation:MaxLength=2048
 	// +kubebuilder:validation:Optional
 	PostLogoutRedirectURI *string `json:"postLogoutRedirectUri,omitempty"`
 
 	// Scopes specifies the OAuth2 scopes used during authorization code flow.
 	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=32
+	// +kubebuilder:validation:Items:MaxLength=128
 	// +kubebuilder:validation:Required
 	Scopes []string `json:"scopes"`
 
@@ -206,16 +229,19 @@ type AutoLogin struct {
 type OAuthCredentials struct {
 	// SecretRef specifies the name of the kubernetes secret.
 	//
+	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:Required
 	SecretRef string `json:"secretRef"`
 
 	// ClientSecretKey specifies the data key to access the client secret.
 	//
+	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:Required
 	ClientSecretKey string `json:"clientSecretKey"`
 
 	// ClientIDKey specifies the data key to access the client ID.
 	//
+	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:Required
 	ClientIDKey string `json:"clientIDKey"`
 }
@@ -261,6 +287,8 @@ type BaselineAuth struct {
 	// including those covered by other specified AuthRules.
 	//
 	// The request is permitted if all the specified conditions are satisfied.
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=16
 	// +kubebuilder:validation:Required
 	Claims []Condition `json:"claims"`
 }
@@ -274,6 +302,8 @@ type RequestAuthRule struct {
 	// When defines additional conditions based on JWT claims that must be met.
 	//
 	// The request is permitted if all the specified conditions are satisfied.
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=16
 	// +kubebuilder:validation:Optional
 	When *[]Condition `json:"when,omitempty"`
 
@@ -293,6 +323,9 @@ type RequestMatcher struct {
 	//
 	// +listType=set
 	// +kubebuilder:validation:Items:Pattern=`^/.*$`
+	// +kubebuilder:validation:Items:MaxLength=1024
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
 	// +kubebuilder:validation:Required
 	Paths []string `json:"paths"`
 
@@ -328,6 +361,8 @@ type RequestMatcher struct {
 type Condition struct {
 	// Claim specifies the name of the JWT claim to check.
 	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=128
 	// +kubebuilder:validation:Required
 	Claim string `json:"claim"`
 
@@ -335,6 +370,9 @@ type Condition struct {
 	// If the claim in the JWT contains any of these values (OR logic), the condition is met.
 	//
 	// +listType=set
+	// +kubebuilder:validation:Items:MaxLength=1024
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=64
 	// +kubebuilder:validation:Required
 	Values []string `json:"values"`
 }
