@@ -2,6 +2,7 @@ package v1alpha1_test
 
 import (
 	"context"
+	"strings"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -248,6 +249,57 @@ var _ = Describe("AuthPolicy CRD", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(apierrors.IsInvalid(err)).To(BeTrue())
 			Expect(err.Error()).To(ContainSubstring(`Unsupported value: "INVALID_METHOD"`))
+		})
+
+		It("should reject updates when authRules contains a rule with empty paths (MinItems)", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			authPolicy.Spec.AuthRules = &[]ztoperatorv1alpha1.RequestAuthRule{
+				{
+					RequestMatcher: ztoperatorv1alpha1.RequestMatcher{
+						Paths: []string{},
+					},
+				},
+			}
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("should have at least 1 items"))
+		})
+
+		It("should reject updates when authRules exceeds MaxItems", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			tooManyRules := make([]ztoperatorv1alpha1.RequestAuthRule, 65)
+			for i := range tooManyRules {
+				tooManyRules[i] = ztoperatorv1alpha1.RequestAuthRule{
+					RequestMatcher: ztoperatorv1alpha1.RequestMatcher{
+						Paths: []string{"/secure"},
+					},
+				}
+			}
+			authPolicy.Spec.AuthRules = &tooManyRules
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("must have at most 64 items"))
+		})
+
+		It("should reject updates when wellKnownURI exceeds MaxLength", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			longURI := "https://example.com/" + strings.Repeat("a", 2100)
+			authPolicy.Spec.WellKnownURI = longURI
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("may not be more than 2048 bytes"))
 		})
 	})
 })

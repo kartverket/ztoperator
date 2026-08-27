@@ -57,6 +57,8 @@ spec:
                   Use .allowedAudiences to specify one or more allowed client IDs.
                 items:
                   type: string
+                maxItems: 32
+                minItems: 1
                 type: array
                 x-kubernetes-list-type: set
               allowedAudiences:
@@ -72,6 +74,7 @@ spec:
                   properties:
                     value:
                       description: Value specifies a static audience value.
+                      maxLength: 1024
                       type: string
                     valueFrom:
                       description: ValueFrom specifies a reference to a kubernetes
@@ -84,12 +87,14 @@ spec:
                             key:
                               description: Key specifies the data entry name within
                                 the ConfigMap/Secret; must follow key naming rules.
+                              maxLength: 253
                               minLength: 1
                               pattern: ^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$
                               type: string
                             name:
                               description: Name specifies the name of the ConfigMap/Secret;
                                 must satisfy DNS-1123 subdomain naming.
+                              maxLength: 253
                               minLength: 1
                               pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                               type: string
@@ -104,12 +109,14 @@ spec:
                             key:
                               description: Key specifies the data entry name within
                                 the ConfigMap/Secret; must follow key naming rules.
+                              maxLength: 253
                               minLength: 1
                               pattern: ^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$
                               type: string
                             name:
                               description: Name specifies the name of the ConfigMap/Secret;
                                 must satisfy DNS-1123 subdomain naming.
+                              maxLength: 253
                               minLength: 1
                               pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                               type: string
@@ -133,6 +140,8 @@ spec:
                     rule: '!(has(self.value) && has(self.valueFrom))'
                   - message: field 'value' cannot be empty string
                     rule: '!has(self.value) || size(self.value) > 0'
+                maxItems: 32
+                minItems: 1
                 type: array
               authRules:
                 description: |-
@@ -185,6 +194,8 @@ spec:
                         Each path must be a valid URI path, starting with '/' and not ending with '/'.
                       items:
                         type: string
+                      maxItems: 64
+                      minItems: 1
                       type: array
                       x-kubernetes-list-type: set
                     when:
@@ -204,6 +215,7 @@ spec:
                           claim:
                             description: Claim specifies the name of the JWT claim
                               to check.
+                            maxLength: 128
                             type: string
                           values:
                             description: |-
@@ -211,16 +223,22 @@ spec:
                               If the claim in the JWT contains any of these values (OR logic), the condition is met.
                             items:
                               type: string
+                            maxItems: 64
+                            minItems: 1
                             type: array
                             x-kubernetes-list-type: set
                         required:
                         - claim
                         - values
                         type: object
+                      maxItems: 16
+                      minItems: 1
                       type: array
                   required:
                   - paths
                   type: object
+                maxItems: 64
+                minItems: 1
                 type: array
               autoLogin:
                 description: AutoLogin specifies the required configuration needed
@@ -246,6 +264,7 @@ spec:
                     description: |-
                       LoginPath specifies a list of URI paths that should trigger the auto-login behavior.
                       When a request matches any of these paths, the user will be redirected to log in if not already authenticated.
+                    maxLength: 1024
                     pattern: ^/.*$
                     type: string
                   logoutPath:
@@ -254,23 +273,28 @@ spec:
                       This will end the session for the application and also redirect the user
                       to log out towards the configured identity provider (RP-initiated logout).
                       If omitted, a default path of /logout is used.
+                    maxLength: 1024
                     type: string
                   postLogoutRedirectUri:
                     description: |-
                       PostLogoutRedirectURI specifies which URI to redirect the user to after
                       successfully signed out towards the configured identity provider (RP-initiated logout).
                       If omitted, no post_logout_redirect_uri will be used.
+                    maxLength: 2048
                     type: string
                   redirectPath:
                     description: |-
                       RedirectPath specifies which path to redirect the user to after completing the OIDC flow.
                       If omitted, a default path of /oauth2/callback is used.
+                    maxLength: 1024
                     type: string
                   scopes:
                     description: Scopes specifies the OAuth2 scopes used during authorization
                       code flow.
                     items:
                       type: string
+                    maxItems: 32
+                    minItems: 1
                     type: array
                 required:
                 - enabled
@@ -300,6 +324,7 @@ spec:
                         claim:
                           description: Claim specifies the name of the JWT claim to
                             check.
+                          maxLength: 128
                           type: string
                         values:
                           description: |-
@@ -307,12 +332,15 @@ spec:
                             If the claim in the JWT contains any of these values (OR logic), the condition is met.
                           items:
                             type: string
+                          maxItems: 64
+                          minItems: 1
                           type: array
                           x-kubernetes-list-type: set
                       required:
                       - claim
                       - values
                       type: object
+                    maxItems: 16
                     type: array
                 required:
                 - claims
@@ -374,11 +402,15 @@ spec:
                         Each path must be a valid URI path, starting with '/' and not ending with '/'.
                       items:
                         type: string
+                      maxItems: 64
+                      minItems: 1
                       type: array
                       x-kubernetes-list-type: set
                   required:
                   - paths
                   type: object
+                maxItems: 64
+                minItems: 1
                 type: array
               oAuthCredentials:
                 description: OAuthCredentials specifies a reference to a kubernetes
@@ -388,13 +420,16 @@ spec:
                   clientIDKey:
                     description: ClientIDKey specifies the data key to access the
                       client ID.
+                    maxLength: 253
                     type: string
                   clientSecretKey:
                     description: ClientSecretKey specifies the data key to access
                       the client secret.
+                    maxLength: 253
                     type: string
                   secretRef:
                     description: SecretRef specifies the name of the kubernetes secret.
+                    maxLength: 253
                     type: string
                 required:
                 - clientIDKey
@@ -427,6 +462,8 @@ spec:
                   - claim
                   - header
                   type: object
+                maxItems: 32
+                minItems: 1
                 type: array
               selector:
                 description: The Selector specifies which workload the defined auth
@@ -452,6 +489,7 @@ spec:
               wellKnownURI:
                 description: WellKnownURI specifies the URi to the identity provider's
                   discovery document (also known as well-known endpoint).
+                maxLength: 2048
                 type: string
             required:
             - enabled
