@@ -75,6 +75,7 @@ spec:
                     value:
                       description: Value specifies a static audience value.
                       maxLength: 1024
+                      minLength: 1
                       type: string
                     valueFrom:
                       description: ValueFrom specifies a reference to a kubernetes
@@ -216,6 +217,7 @@ spec:
                             description: Claim specifies the name of the JWT claim
                               to check.
                             maxLength: 128
+                            minLength: 1
                             type: string
                           values:
                             description: |-
@@ -325,6 +327,7 @@ spec:
                           description: Claim specifies the name of the JWT claim to
                             check.
                           maxLength: 128
+                          minLength: 1
                           type: string
                         values:
                           description: |-

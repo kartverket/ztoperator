@@ -115,6 +115,7 @@ type AuthPolicySpec struct {
 type AllowedAudience struct {
 	// Value specifies a static audience value.
 	//
+	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=1024
 	// +kubebuilder:validation:Optional
 	Value *string `json:"value,omitempty"`
@@ -360,6 +361,7 @@ type RequestMatcher struct {
 type Condition struct {
 	// Claim specifies the name of the JWT claim to check.
 	//
+	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=128
 	// +kubebuilder:validation:Required
 	Claim string `json:"claim"`
