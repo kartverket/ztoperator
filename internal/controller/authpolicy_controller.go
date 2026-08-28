@@ -119,6 +119,21 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
+	if err := validation.ValidateWellKnownURI(authPolicy.Spec.WellKnownURI); err != nil {
+		rLog.Info(
+			"AuthPolicy has invalid wellKnownURI",
+			"namespace", authPolicy.Namespace,
+			"name", authPolicy.Name,
+			"error", err.Error(),
+		)
+		authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseInvalid
+		authPolicy.Status.Message = err.Error()
+		if updateErr := statusmanager.UpdateStatus(ctx, r.Client, *authPolicy); updateErr != nil {
+			return ctrl.Result{}, updateErr
+		}
+		return reconcile.Result{}, nil
+	}
+
 	scope, err := resolveAuthPolicy(ctx, r.Client, authPolicy, r.DiscoveryDocumentResolver)
 	if err != nil {
 		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))

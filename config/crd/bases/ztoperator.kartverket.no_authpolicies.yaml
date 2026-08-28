@@ -491,9 +491,11 @@ spec:
                 - matchLabels
                 type: object
               wellKnownURI:
-                description: WellKnownURI specifies the URi to the identity provider's
-                  discovery document (also known as well-known endpoint).
+                description: |-
+                  WellKnownURI specifies the URi to the identity provider's discovery document (also known as well-known endpoint).
+                  The value must be a well-formed http or https URL.
                 maxLength: 2048
+                pattern: ^https?://.+
                 type: string
             required:
             - enabled

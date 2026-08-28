@@ -301,5 +301,39 @@ var _ = Describe("AuthPolicy CRD", func() {
 			Expect(apierrors.IsInvalid(err)).To(BeTrue())
 			Expect(err.Error()).To(ContainSubstring("may not be more than 2048 bytes"))
 		})
+
+		It("should reject updates when wellKnownURI is not a valid URL", func() {
+			authPolicy := getValidAuthPolicy()
+			Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+			authPolicy.Spec.WellKnownURI = "not-a-url"
+
+			err := k8sClient.Update(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("spec.wellKnownURI"))
+		})
+
+		DescribeTable("wellKnownURI pattern validation",
+			func(uri string, shouldSucceed bool) {
+				authPolicy := getValidAuthPolicy()
+				Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+				authPolicy.Spec.WellKnownURI = uri
+
+				err := k8sClient.Update(testCtx, authPolicy)
+				if shouldSucceed {
+					Expect(err).NotTo(HaveOccurred(), "expected uri %q to be accepted", uri)
+				} else {
+					Expect(err).To(HaveOccurred(), "expected uri %q to be rejected", uri)
+					Expect(apierrors.IsInvalid(err)).To(BeTrue())
+					Expect(err.Error()).To(ContainSubstring("spec.wellKnownURI"))
+				}
+			},
+			Entry("accepts a well-formed https URL",
+				"https://example.com/.well-known/openid-configuration", true),
+			Entry("rejects unsupported scheme",
+				"ftp://example.com/.well-known/openid-configuration", false),
+		)
 	})
 })
