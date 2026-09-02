@@ -53,11 +53,9 @@ function envoy_on_request(request_handle)
     local p = string.match(raw_p, "^[^?]*")
 
     local bypass = should_bypass(p, m)
-    request_handle:logCritical("Login bypassed?: " .. tostring(bypass))
     request_handle:headers():add("%s", tostring(bypass))
 
     local deny_redirect = should_deny_redirect(p, m)
-    request_handle:logCritical("Deny redirect?: " .. tostring(deny_redirect))
     request_handle:headers():add("%s", tostring(deny_redirect))
 end
 
