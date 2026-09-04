@@ -43,3 +43,24 @@ func SecretContentOrLabelsChanged() predicate.Predicate {
 		},
 	}
 }
+
+// ConfigMapContentOrLabelsChanged passes update events only when a ConfigMap's data or labels
+// changed. Create, delete and generic events always pass.
+func ConfigMapContentOrLabelsChanged() predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldConfigMap, oldOk := e.ObjectOld.(*corev1.ConfigMap)
+			newConfigMap, newOk := e.ObjectNew.(*corev1.ConfigMap)
+			if !oldOk || !newOk {
+				return true
+			}
+			if !maps.Equal(oldConfigMap.Labels, newConfigMap.Labels) {
+				return true
+			}
+			if !maps.Equal(oldConfigMap.Data, newConfigMap.Data) {
+				return true
+			}
+			return !maps.EqualFunc(oldConfigMap.BinaryData, newConfigMap.BinaryData, bytes.Equal)
+		},
+	}
+}

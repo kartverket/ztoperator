@@ -72,6 +72,38 @@ func TestSecretContentOrLabelsChanged_WithChangedLabels_PassesEvent(t *testing.T
 	assert.True(t, predicates.SecretContentOrLabelsChanged().Update(updateEvent(old, updated)))
 }
 
+func TestConfigMapContentOrLabelsChanged_WithAnnotationOnlyUpdate_DropsEvent(t *testing.T) {
+	old := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-configmap", Namespace: "default"},
+		Data:       map[string]string{"AUDIENCE": "some-audience"},
+	}
+	updated := old.DeepCopy()
+	updated.Annotations = map[string]string{"some.controller/last-seen": "now"}
+
+	assert.False(t, predicates.ConfigMapContentOrLabelsChanged().Update(updateEvent(old, updated)))
+}
+
+func TestConfigMapContentOrLabelsChanged_WithChangedData_PassesEvent(t *testing.T) {
+	old := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-configmap", Namespace: "default"},
+		Data:       map[string]string{"AUDIENCE": "some-audience"},
+	}
+	updated := old.DeepCopy()
+	updated.Data["AUDIENCE"] = "some-other-audience"
+
+	assert.True(t, predicates.ConfigMapContentOrLabelsChanged().Update(updateEvent(old, updated)))
+}
+
+func TestConfigMapContentOrLabelsChanged_WithChangedLabels_PassesEvent(t *testing.T) {
+	old := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-configmap", Namespace: "default", Labels: map[string]string{"app": "some-app"}},
+		Data:       map[string]string{"AUDIENCE": "some-audience"},
+	}
+	updated := old.DeepCopy()
+	updated.Labels["app"] = "some-other-app"
+
+	assert.True(t, predicates.ConfigMapContentOrLabelsChanged().Update(updateEvent(old, updated)))
+}
 
 func istioLikeObject(generation int64, labels map[string]string, resourceVersion string) client.Object {
 	return &corev1.Pod{
