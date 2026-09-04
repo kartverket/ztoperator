@@ -128,16 +128,16 @@ var _ = Describe("AuthPolicy Controller Owns", Ordered, func() {
 			raAfter := &securityv1.RequestAuthentication{}
 			Expect(k8sClient.Get(ctx, requestAuthKey, raAfter)).To(Succeed())
 			Expect(raAfter.GetGeneration()).To(Equal(raBefore.GetGeneration()),
-				"predicates.SpecOrLabelsChanged relies on the API server not bumping generation "+
-					"for metadata-only updates; if this fails, the vendored Istio CRD's status "+
+				"the API server is expected to leave metadata.generation unchanged for a "+
+					"metadata-only update; if this fails, the vendored Istio CRD's status "+
 					"subresource is not correctly configured (see hack/crd/bases)")
 
 			By("asserting no reconcile is enqueued for the annotation change")
 			Consistently(func() float64 {
 				return reconcileTotal() - before
 			}, 2*time.Second, 200*time.Millisecond).Should(BeZero(),
-				"annotation-only update on an owned RequestAuthentication should be filtered by "+
-					"predicates.SpecOrLabelsChanged (generation unchanged, labels unchanged)")
+				"an annotation-only update on an owned RequestAuthentication should not "+
+					"enqueue a reconcile")
 		})
 
 		It("enqueues a reconcile when an owned Istio resource has a label change", func() {
@@ -156,8 +156,7 @@ var _ = Describe("AuthPolicy Controller Owns", Ordered, func() {
 			Eventually(func() float64 {
 				return reconcileTotal() - before
 			}, 5*time.Second, 100*time.Millisecond).Should(BeNumerically(">=", 1.0),
-				"label change on an owned RequestAuthentication should pass "+
-					"predicates.SpecOrLabelsChanged and enqueue a reconcile")
+				"a label change on an owned RequestAuthentication should enqueue a reconcile")
 		})
 
 		It("enqueues a reconcile when an owned Istio resource has a spec change", func() {
@@ -185,16 +184,15 @@ var _ = Describe("AuthPolicy Controller Owns", Ordered, func() {
 			raAfter := &securityv1.RequestAuthentication{}
 			Expect(k8sClient.Get(ctx, requestAuthKey, raAfter)).To(Succeed())
 			Expect(raAfter.GetGeneration()).To(BeNumerically(">", raBefore.GetGeneration()),
-				"the spec change must actually bump generation for the generation branch of "+
-					"SpecOrLabelsChanged to be exercised")
+				"the spec change must actually bump generation, otherwise this case is not "+
+					"exercising the behavior it claims to")
 
 			By("asserting at least one reconcile fires because generation changed")
 			Eventually(func() float64 {
 				return reconcileTotal() - before
 			}, 5*time.Second, 100*time.Millisecond).Should(BeNumerically(">=", 1.0),
-				"spec change on an owned RequestAuthentication should pass "+
-					"predicates.SpecOrLabelsChanged and enqueue a reconcile so the operator "+
-					"can drive the child back to its desired state")
+				"a spec change on an owned RequestAuthentication should enqueue a reconcile so "+
+					"the operator can drive the child back to its desired state")
 		})
 
 		It("enqueues a reconcile when the owned require-AuthorizationPolicy has a label change", func() {
@@ -217,10 +215,9 @@ var _ = Describe("AuthPolicy Controller Owns", Ordered, func() {
 			Eventually(func() float64 {
 				return reconcileTotal() - before
 			}, 5*time.Second, 100*time.Millisecond).Should(BeNumerically(">=", 1.0),
-				"label change on the owned require-AuthorizationPolicy should pass "+
-					"predicates.SpecOrLabelsChanged and enqueue a reconcile - if this fails but "+
-					"the RequestAuthentication cases pass, the AuthorizationPolicy Owns(...) "+
-					"binding in SetupWithManager is likely missing or has the wrong predicate")
+				"a label change on the owned require-AuthorizationPolicy should enqueue a "+
+					"reconcile - if this fails but the RequestAuthentication cases pass, the "+
+					"AuthorizationPolicy binding is likely broken")
 		})
 	})
 
@@ -306,9 +303,9 @@ var _ = Describe("AuthPolicy Controller Owns", Ordered, func() {
 			Eventually(func() float64 {
 				return reconcileTotal() - before
 			}, 5*time.Second, 100*time.Millisecond).Should(BeNumerically(">=", 1.0),
-				"label change on the owned EnvoyFilter should pass predicates.SpecOrLabelsChanged "+
-					"and enqueue a reconcile - if this fails but RequestAuthentication cases pass, "+
-					"the EnvoyFilter Owns(...) binding is likely missing or has the wrong predicate")
+				"a label change on the owned EnvoyFilter should enqueue a reconcile - if this "+
+					"fails but the RequestAuthentication cases pass, the EnvoyFilter binding is "+
+					"likely broken")
 		})
 
 		It("does not enqueue a reconcile when the owned envoy-secret has an annotation-only update", func() {
@@ -329,8 +326,7 @@ var _ = Describe("AuthPolicy Controller Owns", Ordered, func() {
 			Consistently(func() float64 {
 				return reconcileTotal() - before
 			}, 2*time.Second, 200*time.Millisecond).Should(BeZero(),
-				"annotation-only update on the owned envoy-secret should be filtered by "+
-					"predicates.SecretContentOrLabelsChanged (data unchanged, labels unchanged)")
+				"an annotation-only update on the owned envoy-secret should not enqueue a reconcile")
 		})
 
 		It("enqueues a reconcile when the owned envoy-secret has a data change", func() {
@@ -353,9 +349,8 @@ var _ = Describe("AuthPolicy Controller Owns", Ordered, func() {
 			Eventually(func() float64 {
 				return reconcileTotal() - before
 			}, 5*time.Second, 100*time.Millisecond).Should(BeNumerically(">=", 1.0),
-				"data change on the owned envoy-secret should pass predicates.SecretContentOrLabelsChanged "+
-					"and enqueue a reconcile - if this fails but the other cases pass, the Secret "+
-					"Owns(...) binding is likely missing or has the wrong predicate")
+				"a data change on the owned envoy-secret should enqueue a reconcile - if this "+
+					"fails but the other cases pass, the Secret binding is likely broken")
 		})
 	})
 })

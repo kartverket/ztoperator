@@ -134,9 +134,8 @@ var _ = Describe("AuthPolicy Controller Watches", Ordered, func() {
 			Consistently(func() float64 {
 				return reconcileTotal() - before
 			}, 2*time.Second, 200*time.Millisecond).Should(BeZero(),
-				"annotation-only update on an unrelated Secret should be filtered by "+
-					"predicates.SecretContentOrLabelsChanged before it ever reaches "+
-					"eventhandler.EnqueueAuthPoliciesInNamespace")
+				"an annotation-only update on an unrelated Secret should not reconcile any "+
+					"AuthPolicy in the namespace")
 		})
 
 		It("enqueues a reconcile when the Secret's data changes", func() {
@@ -153,8 +152,8 @@ var _ = Describe("AuthPolicy Controller Watches", Ordered, func() {
 			Eventually(func() float64 {
 				return reconcileTotal() - before
 			}, 5*time.Second, 100*time.Millisecond).Should(BeNumerically(">=", 1.0),
-				"a data change on an unrelated Secret should pass predicates.SecretContentOrLabelsChanged "+
-					"and fan out to a reconcile of the AuthPolicy in the namespace")
+				"a data change on an unrelated Secret should reconcile the AuthPolicy in the "+
+					"namespace")
 		})
 	})
 
@@ -192,9 +191,8 @@ var _ = Describe("AuthPolicy Controller Watches", Ordered, func() {
 			Consistently(func() float64 {
 				return reconcileTotal() - before
 			}, 2*time.Second, 200*time.Millisecond).Should(BeZero(),
-				"annotation-only update on an unrelated ConfigMap should be filtered by "+
-					"predicates.ConfigMapContentOrLabelsChanged before it ever reaches "+
-					"eventhandler.EnqueueAuthPoliciesInNamespace")
+				"an annotation-only update on an unrelated ConfigMap should not reconcile any "+
+					"AuthPolicy in the namespace")
 		})
 
 		It("enqueues a reconcile when the ConfigMap's data changes", func() {
@@ -211,9 +209,8 @@ var _ = Describe("AuthPolicy Controller Watches", Ordered, func() {
 			Eventually(func() float64 {
 				return reconcileTotal() - before
 			}, 5*time.Second, 100*time.Millisecond).Should(BeNumerically(">=", 1.0),
-				"a data change on an unrelated ConfigMap should pass "+
-					"predicates.ConfigMapContentOrLabelsChanged and fan out to a reconcile of the "+
-					"AuthPolicy in the namespace")
+				"a data change on an unrelated ConfigMap should reconcile the AuthPolicy in the "+
+					"namespace")
 		})
 	})
 })
