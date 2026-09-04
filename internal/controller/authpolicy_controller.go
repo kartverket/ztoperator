@@ -50,12 +50,12 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&ztoperatorv1alpha1.AuthPolicy{},
 			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
 		).
-		Owns(&v1.Secret{}).
 		Watches(&v1.Secret{}, secret.EventHandler(r.Client)).
 		Watches(&v1.ConfigMap{}, configmap.EventHandler(r.Client)).
 		Owns(&istioclientsecurityv1.RequestAuthentication{}, builder.WithPredicates(predicates.SpecOrLabelsChanged())).
 		Owns(&istioclientsecurityv1.AuthorizationPolicy{}, builder.WithPredicates(predicates.SpecOrLabelsChanged())).
 		Owns(&v1alpha4.EnvoyFilter{}, builder.WithPredicates(predicates.SpecOrLabelsChanged())).
+		Owns(&v1.Secret{}, builder.WithPredicates(predicates.SecretContentOrLabelsChanged())).
 		Complete(r)
 }
 

@@ -25,3 +25,21 @@ func SpecOrLabelsChanged() predicate.Predicate {
 		},
 	}
 }
+
+// SecretContentOrLabelsChanged passes update events only when a Secret's data or labels
+// changed. Create, delete and generic events always pass.
+func SecretContentOrLabelsChanged() predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldSecret, oldOk := e.ObjectOld.(*corev1.Secret)
+			newSecret, newOk := e.ObjectNew.(*corev1.Secret)
+			if !oldOk || !newOk {
+				return true
+			}
+			if !maps.Equal(oldSecret.Labels, newSecret.Labels) {
+				return true
+			}
+			return !maps.EqualFunc(oldSecret.Data, newSecret.Data, bytes.Equal)
+		},
+	}
+}

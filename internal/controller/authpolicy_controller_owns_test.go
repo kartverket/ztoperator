@@ -310,6 +310,53 @@ var _ = Describe("AuthPolicy Controller Owns", Ordered, func() {
 					"and enqueue a reconcile - if this fails but RequestAuthentication cases pass, "+
 					"the EnvoyFilter Owns(...) binding is likely missing or has the wrong predicate")
 		})
+
+		It("does not enqueue a reconcile when the owned envoy-secret has an annotation-only update", func() {
+			By("re-settling reconciles from the previous case before sampling the baseline")
+			waitForReconcilesToSettle()
+			before := reconcileTotal()
+
+			By("patching only an annotation on the owned envoy-secret (metadata-only RawPatch)")
+			envoySecret := &corev1.Secret{}
+			Expect(k8sClient.Get(ctx, envoySecretKey, envoySecret)).To(Succeed())
+			annotationPatch := client.RawPatch(types.MergePatchType, []byte(fmt.Sprintf(
+				`{"metadata":{"annotations":{"ztoperator.test/marker":"%d"}}}`,
+				time.Now().UnixNano(),
+			)))
+			Expect(k8sClient.Patch(ctx, envoySecret, annotationPatch)).To(Succeed())
+
+			By("asserting no reconcile is enqueued for the annotation change")
+			Consistently(func() float64 {
+				return reconcileTotal() - before
+			}, 2*time.Second, 200*time.Millisecond).Should(BeZero(),
+				"annotation-only update on the owned envoy-secret should be filtered by "+
+					"predicates.SecretContentOrLabelsChanged (data unchanged, labels unchanged)")
+		})
+
+		It("enqueues a reconcile when the owned envoy-secret has a data change", func() {
+			By("re-settling reconciles from the previous case before sampling the baseline")
+			waitForReconcilesToSettle()
+			before := reconcileTotal()
+
+			By("adding an unrelated data key on the owned envoy-secret")
+			envoySecret := &corev1.Secret{}
+			Expect(k8sClient.Get(ctx, envoySecretKey, envoySecret)).To(Succeed())
+			modified := envoySecret.DeepCopy()
+			if modified.Data == nil {
+				modified.Data = map[string][]byte{}
+			}
+
+			modified.Data["ztoperator-test-drift"] = []byte("yes")
+			Expect(k8sClient.Update(ctx, modified)).To(Succeed())
+
+			By("asserting at least one reconcile fires because secret data changed")
+			Eventually(func() float64 {
+				return reconcileTotal() - before
+			}, 5*time.Second, 100*time.Millisecond).Should(BeNumerically(">=", 1.0),
+				"data change on the owned envoy-secret should pass predicates.SecretContentOrLabelsChanged "+
+					"and enqueue a reconcile - if this fails but the other cases pass, the Secret "+
+					"Owns(...) binding is likely missing or has the wrong predicate")
+		})
 	})
 })
 

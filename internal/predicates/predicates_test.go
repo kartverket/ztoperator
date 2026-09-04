@@ -39,6 +39,39 @@ func TestSpecOrLabelsChanged_WithCreateOrDelete_PassesEvent(t *testing.T) {
 	assert.True(t, predicates.SpecOrLabelsChanged().Delete(event.DeleteEvent{Object: obj}))
 }
 
+func TestSecretContentOrLabelsChanged_WithAnnotationOnlyUpdate_DropsEvent(t *testing.T) {
+	old := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-secret", Namespace: "default"},
+		Data:       map[string][]byte{"client-secret": []byte("hunter2")},
+	}
+	updated := old.DeepCopy()
+	updated.Annotations = map[string]string{"some.controller/last-seen": "now"}
+
+	assert.False(t, predicates.SecretContentOrLabelsChanged().Update(updateEvent(old, updated)))
+}
+
+func TestSecretContentOrLabelsChanged_WithChangedData_PassesEvent(t *testing.T) {
+	old := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-secret", Namespace: "default"},
+		Data:       map[string][]byte{"client-secret": []byte("hunter2")},
+	}
+	updated := old.DeepCopy()
+	updated.Data["client-secret"] = []byte("rotated")
+
+	assert.True(t, predicates.SecretContentOrLabelsChanged().Update(updateEvent(old, updated)))
+}
+
+func TestSecretContentOrLabelsChanged_WithChangedLabels_PassesEvent(t *testing.T) {
+	old := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-secret", Namespace: "default", Labels: map[string]string{"app": "some-app"}},
+		Data:       map[string][]byte{"client-secret": []byte("hunter2")},
+	}
+	updated := old.DeepCopy()
+	updated.Labels["app"] = "some-other-app"
+
+	assert.True(t, predicates.SecretContentOrLabelsChanged().Update(updateEvent(old, updated)))
+}
+
 
 func istioLikeObject(generation int64, labels map[string]string, resourceVersion string) client.Object {
 	return &corev1.Pod{
