@@ -40,9 +40,11 @@ func (f *fakeDiscoveryDocumentResolver) GetOAuthDiscoveryDocument(
 func newBasicDiscoveryResolver() *fakeDiscoveryDocumentResolver {
 	return &fakeDiscoveryDocumentResolver{
 		document: &rest.DiscoveryDocument{
-			Issuer:        helperfunctions.Ptr("https://idp.example.com"),
-			JwksURI:       helperfunctions.Ptr("https://idp.example.com/jwks"),
-			TokenEndpoint: helperfunctions.Ptr("https://idp.example.com/token"),
+			Issuer:                helperfunctions.Ptr("https://idp.example.com"),
+			JwksURI:               helperfunctions.Ptr("https://idp.example.com/jwks"),
+			TokenEndpoint:         helperfunctions.Ptr("https://idp.example.com/token"),
+			AuthorizationEndpoint: helperfunctions.Ptr("https://idp.example.com/authorize"),
+			EndSessionEndpoint:    helperfunctions.Ptr("https://idp.example.com/endsession"),
 		},
 	}
 }
