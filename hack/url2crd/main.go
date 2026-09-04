@@ -8,13 +8,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	pathpkg "path"
 
 	"go.yaml.in/yaml/v4"
 )
@@ -42,12 +39,18 @@ type objectMeta struct {
 var (
 	flagOutDir = flag.String("outdir", "./bases", "directory where downloaded CRD manifests will be written")
 	flagURLs   multiFlag
+	flagKinds  multiFlag
 
 	invalid = regexp.MustCompile(`[^a-zA-Z0-9_.-]+`)
 )
 
 func main() {
 	flag.Var(&flagURLs, "url", "URL to a CRD YAML (repeatable)")
+	flag.Var(
+		&flagKinds,
+		"kind",
+		"only write the CRD for this kind name (repeatable); required when a URL contains multiple CRDs",
+	)
 	flag.Parse()
 
 	if len(flagURLs) == 0 {
@@ -97,23 +100,35 @@ func fetchURLBytes(u string) []byte {
 	return body
 }
 
-func baseFilenameFromURL(raw string) string {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return ""
+// crdFileName returns the canonical filename for a CRD document:
+// <spec.group>_<spec.names.plural>.yaml  (e.g. skiperator.kartverket.no_applications.yaml)
+func crdFileName(raw map[string]any) string {
+	spec, _ := raw["spec"].(map[string]any)
+	group, _ := spec["group"].(string)
+	names, _ := spec["names"].(map[string]any)
+	plural, _ := names["plural"].(string)
+
+	if group == "" || plural == "" {
+		// Fallback: use metadata.name which is already "<plural>.<group>"
+		meta, _ := raw["metadata"].(map[string]any)
+		name, _ := meta["name"].(string)
+		if name == "" {
+			name = "crd"
+		}
+		return strings.ToLower(sanitize(name)) + ".yaml"
 	}
-	base := pathpkg.Base(u.Path)
-	if base == "." || base == "/" {
-		return ""
-	}
-	return base
+	return strings.ToLower(group) + "_" + strings.ToLower(plural) + ".yaml"
 }
 
 func writeCRDsFromYAML(src []byte, label, outDir string) error {
 	dec := yaml.NewDecoder(bytes.NewReader(src))
-	written := 0
 
-	baseFromURL := baseFilenameFromURL(label)
+	// Collect all CRD documents first so we can check cardinality before writing.
+	type crdEntry struct {
+		raw  map[string]any
+		meta objectMeta
+	}
+	var crds []crdEntry
 
 	for {
 		var raw map[string]any
@@ -126,51 +141,58 @@ func writeCRDsFromYAML(src []byte, label, outDir string) error {
 		if len(raw) == 0 {
 			continue
 		}
-
 		b, err := yaml.Marshal(raw)
 		if err != nil {
 			return fmt.Errorf("%s: marshal doc: %w", label, err)
 		}
-
 		var meta objectMeta
 		_ = yaml.Unmarshal(b, &meta)
 		if meta.Kind != "CustomResourceDefinition" {
 			continue
 		}
+		crds = append(crds, crdEntry{raw: raw, meta: meta})
+	}
 
-		ensureVersionedStatusSubresource(raw)
+	if len(crds) == 0 {
+		return fmt.Errorf("%s: no CustomResourceDefinition documents found", label)
+	}
 
-		b, err = yaml.Marshal(raw)
+	// If the URL has multiple CRDs, -kind is required so the caller is explicit
+	// about which one(s) should be written.
+	if len(crds) > 1 && len(flagKinds) == 0 {
+		kinds := make([]string, 0, len(crds))
+		for _, c := range crds {
+			kinds = append(kinds, crdDefinedKind(c.raw))
+		}
+		return fmt.Errorf(
+			"%s: contains %d CRDs (%s); use -kind to specify which one(s) to write",
+			label, len(crds), strings.Join(kinds, ", "),
+		)
+	}
+
+	// Build a lookup set for the requested kinds (case-insensitive).
+	kindFilter := make(map[string]bool, len(flagKinds))
+	for _, k := range flagKinds {
+		kindFilter[strings.ToLower(k)] = true
+	}
+
+	written := 0
+	for _, c := range crds {
+		definedKind := crdDefinedKind(c.raw)
+		if len(kindFilter) > 0 && !kindFilter[strings.ToLower(definedKind)] {
+			continue
+		}
+
+		ensureVersionedStatusSubresource(c.raw)
+
+		b, err := yaml.Marshal(c.raw)
 		if err != nil {
 			return fmt.Errorf("%s: marshal doc: %w", label, err)
 		}
 
-		name := strings.TrimSpace(meta.Metadata.Name)
-		if name == "" {
-			// Fall back to a generic filename if name is missing.
-			name = "crd"
-		}
+		fname := crdFileName(c.raw)
+		path := filepath.Join(outDir, fname)
 
-		fname := ""
-		if baseFromURL != "" {
-			// Use the same filename as the URL path.
-			fname = baseFromURL
-			// If the URL file contains multiple CRDs, disambiguate with CRD name.
-			if written > 0 {
-				ext := filepath.Ext(fname)
-				stem := strings.TrimSuffix(fname, ext)
-				if ext == "" {
-					ext = ".yaml"
-				}
-				fname = fmt.Sprintf("%s-%s%s", stem, sanitize(name), ext)
-			}
-		} else {
-			// Fallback if label isn't a URL.
-			fname = sanitize(name) + ".yaml"
-		}
-		path := filepath.Join(outDir, strings.ToLower(fname))
-
-		// Ensure each file ends with a newline.
 		if len(b) == 0 || b[len(b)-1] != '\n' {
 			b = append(b, '\n')
 		}
@@ -180,13 +202,28 @@ func writeCRDsFromYAML(src []byte, label, outDir string) error {
 			return fmt.Errorf("write %s: %w", path, werr)
 		}
 		written++
-		fmt.Printf("wrote CRD %s -> %s\n", name, path)
+		fmt.Printf("wrote CRD %s -> %s\n", fname, path)
 	}
 
 	if written == 0 {
-		return fmt.Errorf("%s: no CustomResourceDefinition documents found", label)
+		requested := strings.Join(flagKinds, ", ")
+		return fmt.Errorf("%s: no CRDs matched -kind=%s", label, requested)
 	}
 	return nil
+}
+
+// crdDefinedKind returns the kind name defined by a CRD document (spec.names.kind).
+func crdDefinedKind(raw map[string]any) string {
+	spec, ok := raw["spec"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	names, ok := spec["names"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	kind, _ := names["kind"].(string)
+	return kind
 }
 
 func ensureVersionedStatusSubresource(raw map[string]any) {
