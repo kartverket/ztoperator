@@ -1,0 +1,27 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: invalid-well-known-uri
+status:
+  phase: Invalid
+  ready: false
+  message: 'wellKnownURI "https:///path" must include a host'
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: invalid-well-known-uri-deny-auth-rules
+  labels:
+    ztoperator.kartverket.no/controller: authpolicy
+    app.kubernetes.io/managed-by: ztoperator
+spec:
+  action: DENY
+  rules:
+    - to:
+        - operation:
+            paths:
+              - '*'
+  selector:
+    matchLabels:
+      app: application
+

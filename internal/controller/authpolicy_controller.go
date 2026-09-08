@@ -119,34 +119,28 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	if err := validation.ValidateWellKnownURI(authPolicy.Spec.WellKnownURI); err != nil {
-		rLog.Info(
-			"AuthPolicy has invalid wellKnownURI",
-			"namespace", authPolicy.Namespace,
-			"name", authPolicy.Name,
-			"error", err.Error(),
-		)
-		authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseInvalid
-		authPolicy.Status.Message = err.Error()
-		if updateErr := statusmanager.UpdateStatus(ctx, r.Client, *authPolicy); updateErr != nil {
-			return ctrl.Result{}, updateErr
+	var scope *state.Scope
+	if validationErr := validateAuthPolicy(ctx, authPolicy); validationErr != nil {
+		validationErrorMessage := validationErr.Error()
+		scope = &state.Scope{
+			AuthPolicy:             *authPolicy,
+			InvalidConfig:          true,
+			ValidationErrorMessage: &validationErrorMessage,
 		}
-		return reconcile.Result{}, nil
-	}
-
-	scope, err := resolveAuthPolicy(ctx, r.Client, authPolicy, r.DiscoveryDocumentResolver)
-	if err != nil {
-		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))
-		authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
-		authPolicy.Status.Message = err.Error()
-		updateStatusOnResolveFailedErr := statusmanager.UpdateStatus(ctx, r.Client, *authPolicy)
-		if updateStatusOnResolveFailedErr != nil {
-			return ctrl.Result{}, updateStatusOnResolveFailedErr
+	} else {
+		resolvedScope, err := resolveAuthPolicy(ctx, r.Client, authPolicy, r.DiscoveryDocumentResolver)
+		if err != nil {
+			rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))
+			authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
+			authPolicy.Status.Message = err.Error()
+			updateStatusOnResolveFailedErr := statusmanager.UpdateStatus(ctx, r.Client, *authPolicy)
+			if updateStatusOnResolveFailedErr != nil {
+				return ctrl.Result{}, updateStatusOnResolveFailedErr
+			}
+			return reconcile.Result{}, err
 		}
-		return reconcile.Result{}, err
+		scope = resolvedScope
 	}
-
-	scope = validateAuthPolicy(ctx, scope)
 
 	controllerResources := reconciler.ControllerResources(scope)
 
@@ -271,23 +265,32 @@ func resolveAuthPolicy(
 	}, nil
 }
 
-func validateAuthPolicy(ctx context.Context, scope *state.Scope) *state.Scope {
+// validateAuthPolicy performs domain-level validation on the AuthPolicy spec that cannot
+// be expressed by CRD markers alone. It returns nil when the spec is valid.
+func validateAuthPolicy(ctx context.Context, authPolicy *ztoperatorv1alpha1.AuthPolicy) error {
 	rLog := log.GetLogger(ctx)
 
-	rLog.Debug("Validating paths for AuthPolicy", "namespace", scope.AuthPolicy.Namespace, "name", scope.AuthPolicy.Name)
-	if err := validation.ValidatePaths(scope.AuthPolicy.GetPaths()); err != nil {
+	rLog.Debug("Validating WellKnownURI for AuthPolicy", "namespace", authPolicy.Namespace, "name", authPolicy.Name)
+	if err := validation.ValidateWellKnownURI(authPolicy.Spec.WellKnownURI); err != nil {
+		rLog.Error(
+			err,
+			"wellKnownURI validation failed for AuthPolicy",
+			"namespace", authPolicy.Namespace,
+			"name", authPolicy.Name,
+		)
+		return err
+	}
+
+	rLog.Debug("Validating paths for AuthPolicy", "namespace", authPolicy.Namespace, "name", authPolicy.Name)
+	if err := validation.ValidatePaths(authPolicy.GetPaths()); err != nil {
 		rLog.Error(
 			err,
 			"path validation failed for AuthPolicy",
-			"namespace", scope.AuthPolicy.Namespace,
-			"name", scope.AuthPolicy.Name,
+			"namespace", authPolicy.Namespace,
+			"name", authPolicy.Name,
 		)
-		scope.InvalidConfig = true
-		validationErrorMessage := err.Error()
-		scope.ValidationErrorMessage = &validationErrorMessage
-		return scope
+		return err
 	}
 
-	scope.InvalidConfig = false
-	return scope
+	return nil
 }
