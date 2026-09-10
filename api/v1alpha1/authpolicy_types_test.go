@@ -320,6 +320,8 @@ var _ = Describe("AuthPolicy CRD", func() {
 			},
 			Entry("accepts a well-formed https URL",
 				"https://example.com/.well-known/openid-configuration", true),
+			Entry("accepts a well-formed http URL",
+				"http://example.com/.well-known/openid-configuration", true),
 			Entry("rejects unsupported scheme",
 				"ftp://example.com/.well-known/openid-configuration", false),
 			Entry("rejects value that is not a URL",
