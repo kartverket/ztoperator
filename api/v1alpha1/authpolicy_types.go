@@ -27,7 +27,9 @@ type AuthPolicySpec struct {
 	OAuthCredentials *OAuthCredentials `json:"oAuthCredentials,omitempty"`
 
 	// WellKnownURI specifies the URi to the identity provider's discovery document (also known as well-known endpoint).
+	// The value must be a well-formed http or https URL.
 	//
+	// +kubebuilder:validation:Pattern=`^https?://.+`
 	// +kubebuilder:validation:MaxLength=2048
 	// +kubebuilder:validation:Required
 	WellKnownURI string `json:"wellKnownURI"`

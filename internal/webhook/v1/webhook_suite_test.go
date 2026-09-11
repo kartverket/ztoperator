@@ -37,6 +37,7 @@ import (
 const (
 	authPolicyName    = "auth-policy"
 	skiperatorAppName = "skiperator-app"
+	testWellKnownURI  = "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration"
 )
 
 var (
@@ -248,6 +249,7 @@ var _ = Describe("Pod validating webhook", func() {
 				Namespace: ns.GetName(),
 			},
 			Spec: ztoperatorv1.AuthPolicySpec{
+				WellKnownURI: testWellKnownURI,
 				Selector: ztoperatorv1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": skiperatorAppName},
 				},
@@ -322,6 +324,7 @@ var _ = Describe("Pod validating webhook", func() {
 				Namespace: ns.GetName(),
 			},
 			Spec: ztoperatorv1.AuthPolicySpec{
+				WellKnownURI: testWellKnownURI,
 				Selector: ztoperatorv1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": skiperatorAppName},
 				},
@@ -367,6 +370,7 @@ var _ = Describe("Pod validating webhook", func() {
 				Namespace: ns.GetName(),
 			},
 			Spec: ztoperatorv1.AuthPolicySpec{
+				WellKnownURI: testWellKnownURI,
 				Selector: ztoperatorv1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": skiperatorAppName + "not"},
 				},
@@ -412,6 +416,7 @@ var _ = Describe("Pod validating webhook", func() {
 				Namespace: ns.GetName(),
 			},
 			Spec: ztoperatorv1.AuthPolicySpec{
+				WellKnownURI: testWellKnownURI,
 				Selector: ztoperatorv1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": skiperatorAppName},
 				},
