@@ -187,4 +187,67 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			)).To(BeTrue())
 		})
 	})
+
+	Context("when a discovery cache is configured", func() {
+		It("uses the cache and does not call the fallback resolver during reconciliation", func() {
+			wellKnownURI := "https://idp.example.com/.well-known/openid-configuration"
+			reconciler.DiscoveryDocumentCache = rest.NewDiscoveryDocumentCache(
+				[]string{wellKnownURI},
+				map[string]rest.DiscoveryDocument{
+					wellKnownURI: {
+						Issuer:                helperfunctions.Ptr("https://idp.example.com"),
+						JwksURI:               helperfunctions.Ptr("https://idp.example.com/jwks"),
+						TokenEndpoint:         helperfunctions.Ptr("https://idp.example.com/token"),
+						AuthorizationEndpoint: helperfunctions.Ptr("https://idp.example.com/authorize"),
+						EndSessionEndpoint:    helperfunctions.Ptr("https://idp.example.com/endsession"),
+					},
+				},
+			)
+			reconciler.DiscoveryDocumentResolver = &fakeDiscoveryDocumentResolver{
+				err: errors.New("fallback resolver must not be called"),
+			}
+
+			result, err := reconciler.Reconcile(testCtx, ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: appName, Namespace: namespace},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			updatedPolicy := &ztoperatorv1alpha1.AuthPolicy{}
+			Expect(fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, updatedPolicy)).To(Succeed())
+			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseReady))
+		})
+	})
+
+	Context("when an existing AuthPolicy is outside the configured allowlist", func() {
+		It("keeps the Invalid status and default deny behavior", func() {
+			reconciler.DiscoveryDocumentCache = rest.NewDiscoveryDocumentCache(
+				[]string{
+					"https://another-idp.example.com/.well-known/openid-configuration",
+				},
+				nil,
+			)
+
+			result, err := reconciler.Reconcile(testCtx, ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: appName, Namespace: namespace},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			updatedPolicy := &ztoperatorv1alpha1.AuthPolicy{}
+			Expect(fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, updatedPolicy)).To(Succeed())
+			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseInvalid))
+			Expect(updatedPolicy.Status.Ready).To(BeFalse())
+			Expect(updatedPolicy.Status.Message).To(ContainSubstring("is not in the configured allowlist"))
+
+			denyPolicy := &securityv1.AuthorizationPolicy{}
+			Expect(fakeClient.Get(testCtx, types.NamespacedName{
+				Name:      names.DenyPolicy(appName),
+				Namespace: namespace,
+			}, denyPolicy)).To(Succeed())
+			Expect(denyPolicy.Spec.Rules).To(HaveLen(1))
+			Expect(denyPolicy.Spec.Rules[0].To).To(HaveLen(1))
+			Expect(denyPolicy.Spec.Rules[0].To[0].Operation.Paths).To(Equal([]string{"*"}))
+		})
+	})
 })

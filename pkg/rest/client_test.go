@@ -44,7 +44,7 @@ func TestGetOAuthDiscoveryDocument_FetchesUnknownURIOverHTTP(t *testing.T) {
 	}))
 	defer server.Close()
 
-	resolver := NewDefaultDiscoveryDocumentResolver()
+	resolver := NewHTTPDiscoveryDocumentResolver()
 
 	doc, err := resolver.GetOAuthDiscoveryDocument(server.URL+"/.well-known/openid-configuration", testLogger())
 	require.NoError(t, err, "expected no error when fetching discovery document")
@@ -57,6 +57,56 @@ func TestGetOAuthDiscoveryDocument_FetchesUnknownURIOverHTTP(t *testing.T) {
 	assertStringPtrValue(t, "end_session_endpoint", doc.EndSessionEndpoint, "https://issuer.example.com/logout")
 }
 
+func TestDiscoveryDocumentCache_DoesNotFetchUnknownURI(t *testing.T) {
+	t.Parallel()
+
+	requested := false
+	cache := NewDiscoveryDocumentCache(
+		[]string{"https://cached.example.com/.well-known/openid-configuration"},
+		map[string]DiscoveryDocument{
+			"https://cached.example.com/.well-known/openid-configuration": {
+				Issuer: stringPtr("https://cached.example.com"),
+			},
+		},
+	)
+
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		requested = true
+	}))
+	defer server.Close()
+
+	document, err := cache.GetOAuthDiscoveryDocument(server.URL, testLogger())
+	require.Error(t, err)
+	require.Nil(t, document)
+	require.False(t, requested)
+}
+
+func TestDiscoveryDocumentCache_ReturnsDefensiveDocumentCopy(t *testing.T) {
+	t.Parallel()
+
+	uri := "https://cached.example.com/.well-known/openid-configuration"
+	cache := NewDiscoveryDocumentCache(
+		[]string{uri},
+		map[string]DiscoveryDocument{
+			uri: {
+				Issuer: stringPtr("https://cached.example.com"),
+			},
+		},
+	)
+
+	first, err := cache.GetOAuthDiscoveryDocument(uri, testLogger())
+	require.NoError(t, err)
+	*first.Issuer = "https://mutated.example.com"
+
+	second, err := cache.GetOAuthDiscoveryDocument(uri, testLogger())
+	require.NoError(t, err)
+	require.Equal(t, "https://cached.example.com", *second.Issuer)
+}
+
+func stringPtr(value string) *string {
+	return &value
+}
+
 func TestGetOAuthDiscoveryDocument_ReturnsErrorForNon200Response(t *testing.T) {
 	t.Parallel()
 
@@ -65,7 +115,7 @@ func TestGetOAuthDiscoveryDocument_ReturnsErrorForNon200Response(t *testing.T) {
 	}))
 	defer server.Close()
 
-	resolver := NewDefaultDiscoveryDocumentResolver()
+	resolver := NewHTTPDiscoveryDocumentResolver()
 
 	doc, err := resolver.GetOAuthDiscoveryDocument(server.URL+"/.well-known/openid-configuration", testLogger())
 	if err == nil {

@@ -14,6 +14,7 @@ import (
 	ztoperatorv1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
+	restclient "github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -120,6 +121,14 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = v1.SetupPodWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
+	err = v1.SetupAuthPolicyWebhookWithManager(
+		mgr,
+		restclient.NewDiscoveryDocumentCache(
+			[]string{testWellKnownURI},
+			restclient.GetWellknownURIToDiscoveryDocument(),
+		),
+	)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:webhook
@@ -467,3 +476,71 @@ var _ = Describe("Pod validating webhook", func() {
 		)))
 	})
 })
+
+var _ = Describe("AuthPolicy validating webhook", func() {
+	It("allows a valid AuthPolicy on create", func() {
+		authPolicy := newWebhookAuthPolicy("authpolicy-webhook-valid-create", testWellKnownURI)
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, authPolicy) })
+
+		Expect(k8sClient.Create(ctx, authPolicy)).To(Succeed())
+	})
+
+	It("rejects an AuthPolicy whose wellKnownURI is not in the allowlist on create", func() {
+		authPolicy := newWebhookAuthPolicy(
+			"authpolicy-webhook-disallowed-create",
+			"https://not-configured.example.com/.well-known/openid-configuration",
+		)
+
+		err := k8sClient.Create(ctx, authPolicy)
+
+		Expect(err).To(MatchError(ContainSubstring("is not in the configured allowlist")))
+	})
+
+	It("rejects an AuthPolicy with invalid paths on create", func() {
+		authPolicy := newWebhookAuthPolicy("authpolicy-webhook-invalid-path-create", testWellKnownURI)
+		authPolicy.Spec.AuthRules = &[]ztoperatorv1.RequestAuthRule{{
+			RequestMatcher: ztoperatorv1.RequestMatcher{Paths: []string{"/api?query"}},
+		}}
+
+		err := k8sClient.Create(ctx, authPolicy)
+
+		Expect(err).To(MatchError(ContainSubstring("invalid string literal")))
+	})
+
+	It("rejects an invalid wellKnownURI on update", func() {
+		authPolicy := newWebhookAuthPolicy("authpolicy-webhook-invalid-update", testWellKnownURI)
+		Expect(k8sClient.Create(ctx, authPolicy)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, authPolicy) })
+
+		authPolicy.Spec.WellKnownURI = "https://not-configured.example.com/.well-known/openid-configuration"
+
+		err := k8sClient.Update(ctx, authPolicy)
+
+		Expect(err).To(MatchError(ContainSubstring("is not in the configured allowlist")))
+	})
+
+	It("allows a valid AuthPolicy update", func() {
+		authPolicy := newWebhookAuthPolicy("authpolicy-webhook-valid-update", testWellKnownURI)
+		Expect(k8sClient.Create(ctx, authPolicy)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, authPolicy) })
+
+		authPolicy.Spec.AuthRules = &[]ztoperatorv1.RequestAuthRule{{
+			RequestMatcher: ztoperatorv1.RequestMatcher{Paths: []string{"/admin"}},
+		}}
+
+		Expect(k8sClient.Update(ctx, authPolicy)).To(Succeed())
+	})
+})
+
+func newWebhookAuthPolicy(name, wellKnownURI string) *ztoperatorv1.AuthPolicy {
+	return &ztoperatorv1.AuthPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+		Spec: ztoperatorv1.AuthPolicySpec{
+			Enabled:      true,
+			WellKnownURI: wellKnownURI,
+			Selector: ztoperatorv1.WorkloadSelector{
+				MatchLabels: map[string]string{"app": "application"},
+			},
+		},
+	}
+}
