@@ -26,7 +26,6 @@ import (
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/metrics"
-	"github.com/kartverket/ztoperator/pkg/rest"
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -95,6 +94,19 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	kubeconfig := ctrl.GetConfigOrDie()
+	if !*isDeployment && !strings.Contains(kubeconfig.Host, "https://127.0.0.1") {
+		setupLog.Info("Tried to start ztoperator with non-local kubecontext. Exiting to prevent havoc.")
+		os.Exit(1)
+	}
+	setupLog.Info(fmt.Sprintf("Starting ztoperator using kube-apiserver at %s", kubeconfig.Host))
+
+	if configLoadErr := config.Load(); configLoadErr != nil {
+		setupLog.Error(configLoadErr, "unable to load config")
+		os.Exit(1)
+	}
+	operatorConfig := config.Get()
+
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
 	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
@@ -159,14 +171,6 @@ func main() {
 		metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
 	}
 
-	kubeconfig := ctrl.GetConfigOrDie()
-
-	if !*isDeployment && !strings.Contains(kubeconfig.Host, "https://127.0.0.1") {
-		setupLog.Info("Tried to start ztoperator with non-local kubecontext. Exiting to prevent havoc.")
-		os.Exit(1)
-	}
-	setupLog.Info(fmt.Sprintf("Starting ztoperator using kube-apiserver at %s", kubeconfig.Host))
-
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
@@ -191,16 +195,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if configLoadErr := config.Load(); configLoadErr != nil {
-		setupLog.Error(configLoadErr, "unable to load config")
-		os.Exit(1)
-	}
-
 	if err = (&controller.AuthPolicyReconciler{
-		Client:                    mgr.GetClient(),
-		Scheme:                    mgr.GetScheme(),
-		Recorder:                  mgr.GetEventRecorder("authpolicy-controller"),
-		DiscoveryDocumentResolver: rest.NewDefaultDiscoveryDocumentResolver(),
+		Client:                 mgr.GetClient(),
+		Scheme:                 mgr.GetScheme(),
+		Recorder:               mgr.GetEventRecorder("authpolicy-controller"),
+		DiscoveryDocumentCache: operatorConfig.DiscoveryDocumentCache,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthPolicy")
 		os.Exit(1)
@@ -209,6 +208,13 @@ func main() {
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err := v1.SetupPodWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Pod")
+			os.Exit(1)
+		}
+		if err := v1.SetupAuthPolicyWebhookWithManager(
+			mgr,
+			operatorConfig.DiscoveryDocumentCache,
+		); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "AuthPolicy")
 			os.Exit(1)
 		}
 	}

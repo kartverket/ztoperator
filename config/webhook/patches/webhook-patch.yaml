@@ -5,6 +5,11 @@ metadata:
   annotations:
     cert-manager.io/inject-ca-from: "ztoperator-system/webhook-cert"
 webhooks:
+  - name: vauthpolicy-v1alpha1.kb.io
+    clientConfig:
+      service:
+        name: webhook-service
+        namespace: ztoperator-system
   - name: vpod-v1.kb.io
     clientConfig:
       service:

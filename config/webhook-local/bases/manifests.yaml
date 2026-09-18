@@ -8,6 +8,23 @@ webhooks:
   - admissionReviewVersions:
       - v1
     clientConfig:
+      url: https://host.docker.internal:9443/validate-ztoperator-kartverket-no-v1alpha1-authpolicy
+    name: vauthpolicy-v1alpha1.kb.io
+    failurePolicy: Fail
+    rules:
+      - apiGroups:
+          - ztoperator.kartverket.no
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - authpolicies
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
       url: https://host.docker.internal:9443/validate--v1-pod
     name: vpod-v1.kb.io
     failurePolicy: Fail
