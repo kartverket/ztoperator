@@ -57,7 +57,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Load environment variables
-	err = config.Load()
+	err = os.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", "https://idp.example.com/.well-known/openid-configuration")
+	Expect(err).NotTo(HaveOccurred())
+	err = config.LoadWithResolver(newBasicDiscoveryResolver())
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
@@ -115,4 +117,8 @@ func getFirstFoundEnvTestBinaryDir() string {
 		}
 	}
 	return ""
+}
+
+func discoveryDocumentCache() *config.DiscoveryDocumentCache {
+	return config.Get().DiscoveryDocumentCache
 }

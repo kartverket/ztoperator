@@ -2,11 +2,11 @@ package controller_test
 
 import (
 	"context"
-	"errors"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/controller"
 	"github.com/kartverket/ztoperator/internal/names"
+	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/rest"
@@ -47,6 +47,16 @@ func newBasicDiscoveryResolver() *fakeDiscoveryDocumentResolver {
 			EndSessionEndpoint:    helperfunctions.Ptr("https://idp.example.com/endsession"),
 		},
 	}
+}
+
+func newBasicDiscoveryCache() *config.DiscoveryDocumentCache {
+	const wellKnownURI = "https://idp.example.com/.well-known/openid-configuration"
+	return config.NewDiscoveryDocumentCache(
+		[]string{wellKnownURI},
+		map[string]rest.DiscoveryDocument{
+			wellKnownURI: *newBasicDiscoveryResolver().document,
+		},
+	)
 }
 
 var _ = Describe("AuthPolicy Controller Reconcile", func() {
@@ -93,10 +103,10 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			Build()
 
 		reconciler = &controller.AuthPolicyReconciler{
-			Client:                    fakeClient,
-			Scheme:                    testScheme,
-			Recorder:                  k8sevents.NewFakeRecorder(100),
-			DiscoveryDocumentResolver: newBasicDiscoveryResolver(),
+			Client:                 fakeClient,
+			Scheme:                 testScheme,
+			Recorder:               k8sevents.NewFakeRecorder(100),
+			DiscoveryDocumentCache: newBasicDiscoveryCache(),
 		}
 	})
 
@@ -154,17 +164,19 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 		})
 	})
 
-	Context("when the discovery document resolver returns an error", func() {
+	Context("when the discovery document is not cached", func() {
 		It("returns the error, sets status to Failed, and does not create child resources", func() {
-			By("configuring the resolver to return an error")
-			resolveErr := errors.New("discovery resolver failed")
-			reconciler.DiscoveryDocumentResolver = &fakeDiscoveryDocumentResolver{err: resolveErr}
+			By("configuring an allowlisted URI without a cached document")
+			reconciler.DiscoveryDocumentCache = config.NewDiscoveryDocumentCache(
+				[]string{"https://idp.example.com/.well-known/openid-configuration"},
+				nil,
+			)
 
 			By("reconciling the AuthPolicy")
 			result, err := reconciler.Reconcile(testCtx, ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: appName, Namespace: namespace},
 			})
-			Expect(err).To(MatchError(ContainSubstring(resolveErr.Error())))
+			Expect(err).To(MatchError(ContainSubstring("discovery document")))
 			Expect(result).To(Equal(ctrl.Result{}))
 
 			By("verifying status is set to Failed")
@@ -172,7 +184,7 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			Expect(fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, updatedPolicy)).To(Succeed())
 			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseFailed))
 			Expect(updatedPolicy.Status.Ready).To(BeFalse())
-			Expect(updatedPolicy.Status.Message).To(ContainSubstring(resolveErr.Error()))
+			Expect(updatedPolicy.Status.Message).To(ContainSubstring("discovery document"))
 			Expect(updatedPolicy.Status.ObservedGeneration).To(Equal(int64(1)))
 
 			By("verifying no child resources were created")
@@ -188,40 +200,9 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 		})
 	})
 
-	Context("when a discovery cache is configured", func() {
-		It("uses the cache and does not call the fallback resolver during reconciliation", func() {
-			wellKnownURI := "https://idp.example.com/.well-known/openid-configuration"
-			reconciler.DiscoveryDocumentCache = rest.NewDiscoveryDocumentCache(
-				[]string{wellKnownURI},
-				map[string]rest.DiscoveryDocument{
-					wellKnownURI: {
-						Issuer:                helperfunctions.Ptr("https://idp.example.com"),
-						JwksURI:               helperfunctions.Ptr("https://idp.example.com/jwks"),
-						TokenEndpoint:         helperfunctions.Ptr("https://idp.example.com/token"),
-						AuthorizationEndpoint: helperfunctions.Ptr("https://idp.example.com/authorize"),
-						EndSessionEndpoint:    helperfunctions.Ptr("https://idp.example.com/endsession"),
-					},
-				},
-			)
-			reconciler.DiscoveryDocumentResolver = &fakeDiscoveryDocumentResolver{
-				err: errors.New("fallback resolver must not be called"),
-			}
-
-			result, err := reconciler.Reconcile(testCtx, ctrl.Request{
-				NamespacedName: types.NamespacedName{Name: appName, Namespace: namespace},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
-
-			updatedPolicy := &ztoperatorv1alpha1.AuthPolicy{}
-			Expect(fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, updatedPolicy)).To(Succeed())
-			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseReady))
-		})
-	})
-
 	Context("when an existing AuthPolicy is outside the configured allowlist", func() {
 		It("keeps the Invalid status and default deny behavior", func() {
-			reconciler.DiscoveryDocumentCache = rest.NewDiscoveryDocumentCache(
+			reconciler.DiscoveryDocumentCache = config.NewDiscoveryDocumentCache(
 				[]string{
 					"https://another-idp.example.com/.well-known/openid-configuration",
 				},

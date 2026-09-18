@@ -53,6 +53,7 @@ func TestLoadWithResolverCachesAllConfiguredDiscoveryDocuments(t *testing.T) {
 
 	require.NoError(t, config.LoadWithResolver(resolver))
 	loaded := config.Get()
+	require.NotNil(t, loaded.DiscoveryDocumentCache)
 	require.Equal(t, []string{configTestURI1, configTestURI2}, loaded.AllowedWellKnownURIs)
 	require.Equal(t, []string{configTestURI1, configTestURI2}, resolver.calls)
 	require.True(t, loaded.DiscoveryDocumentCache.IsAllowed(configTestURI1))
@@ -121,6 +122,6 @@ func TestLoadWithResolverFailsWhenConfiguredEndpointCannotBeFetched(t *testing.T
 func TestLoadRequiresConfiguredWellKnownEndpoints(t *testing.T) {
 	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", "")
 
-	err := config.LoadWithResolver(&configTestResolver{})
+	err := config.Load()
 	require.Error(t, err)
 }

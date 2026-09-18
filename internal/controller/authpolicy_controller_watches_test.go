@@ -55,8 +55,8 @@ var _ = Describe("AuthPolicy Controller Watches", Ordered, func() {
 			Client: mgr.GetClient(),
 			Scheme: mgr.GetScheme(),
 			// Large buffer so Eventf never blocks the reconcile
-			Recorder:                  k8sevents.NewFakeRecorder(10000),
-			DiscoveryDocumentResolver: newBasicDiscoveryResolver(),
+			Recorder:               k8sevents.NewFakeRecorder(10000),
+			DiscoveryDocumentCache: discoveryDocumentCache(),
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed())
 

@@ -14,6 +14,7 @@ import (
 	"github.com/kartverket/ztoperator/internal/resolver"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/internal/statusmanager"
+	operatorconfig "github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
 	"github.com/kartverket/ztoperator/pkg/log"
@@ -38,17 +39,9 @@ import (
 // AuthPolicyReconciler reconciles a AuthPolicy object.
 type AuthPolicyReconciler struct {
 	client.Client
-	Scheme                    *runtime.Scheme
-	Recorder                  events.EventRecorder
-	DiscoveryDocumentResolver rest.DiscoveryDocumentResolver
-	DiscoveryDocumentCache    *rest.DiscoveryDocumentCache
-}
-
-func (r *AuthPolicyReconciler) discoveryDocumentResolver() rest.DiscoveryDocumentResolver {
-	if r.DiscoveryDocumentCache != nil {
-		return r.DiscoveryDocumentCache
-	}
-	return r.DiscoveryDocumentResolver
+	Scheme                 *runtime.Scheme
+	Recorder               events.EventRecorder
+	DiscoveryDocumentCache *operatorconfig.DiscoveryDocumentCache
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -135,7 +128,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			ValidationErrorMessage: &validationErrorMessage,
 		}
 	} else {
-		resolvedScope, err := resolveAuthPolicy(ctx, r.Client, authPolicy, r.discoveryDocumentResolver())
+		resolvedScope, err := resolveAuthPolicy(ctx, r.Client, authPolicy, r.DiscoveryDocumentCache)
 		if err != nil {
 			rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))
 			authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
@@ -277,7 +270,7 @@ func resolveAuthPolicy(
 func validateAuthPolicy(
 	ctx context.Context,
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
-	discoveryCache *rest.DiscoveryDocumentCache,
+	discoveryCache *operatorconfig.DiscoveryDocumentCache,
 ) error {
 	rLog := log.GetLogger(ctx)
 
@@ -291,18 +284,16 @@ func validateAuthPolicy(
 		)
 		return err
 	}
-	if discoveryCache != nil {
-		rLog.Debug("Validating AuthPolicy wellKnownURI against configured allowlist", "namespace", authPolicy.Namespace, "name", authPolicy.Name)
-		if !discoveryCache.IsAllowed(authPolicy.Spec.WellKnownURI) {
-			err := fmt.Errorf("wellKnownURI %q is not in the configured allowlist", authPolicy.Spec.WellKnownURI)
-			rLog.Error(
-				err,
-				"wellKnownURI allowlist validation failed for AuthPolicy",
-				"namespace", authPolicy.Namespace,
-				"name", authPolicy.Name,
-			)
-			return err
-		}
+	rLog.Debug("Validating AuthPolicy wellKnownURI against configured allowlist", "namespace", authPolicy.Namespace, "name", authPolicy.Name)
+	if !discoveryCache.IsAllowed(authPolicy.Spec.WellKnownURI) {
+		err := fmt.Errorf("wellKnownURI %q is not in the configured allowlist", authPolicy.Spec.WellKnownURI)
+		rLog.Error(
+			err,
+			"wellKnownURI allowlist validation failed for AuthPolicy",
+			"namespace", authPolicy.Namespace,
+			"name", authPolicy.Name,
+		)
+		return err
 	}
 
 	rLog.Debug("Validating paths for AuthPolicy", "namespace", authPolicy.Namespace, "name", authPolicy.Name)

@@ -106,10 +106,6 @@ func main() {
 		os.Exit(1)
 	}
 	operatorConfig := config.Get()
-	if operatorConfig.DiscoveryDocumentCache == nil {
-		setupLog.Error(fmt.Errorf("discovery document cache is not configured"), "unable to load config")
-		os.Exit(1)
-	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -200,11 +196,10 @@ func main() {
 	}
 
 	if err = (&controller.AuthPolicyReconciler{
-		Client:                    mgr.GetClient(),
-		Scheme:                    mgr.GetScheme(),
-		Recorder:                  mgr.GetEventRecorder("authpolicy-controller"),
-		DiscoveryDocumentResolver: operatorConfig.DiscoveryDocumentCache,
-		DiscoveryDocumentCache:    operatorConfig.DiscoveryDocumentCache,
+		Client:                 mgr.GetClient(),
+		Scheme:                 mgr.GetScheme(),
+		Recorder:               mgr.GetEventRecorder("authpolicy-controller"),
+		DiscoveryDocumentCache: operatorConfig.DiscoveryDocumentCache,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthPolicy")
 		os.Exit(1)

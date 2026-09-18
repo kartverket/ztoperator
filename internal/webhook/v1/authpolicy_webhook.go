@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/pkg/rest"
+	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -17,14 +17,14 @@ import (
 // AuthPolicyCustomValidator validates AuthPolicy objects before they are
 // persisted by the Kubernetes API server.
 type AuthPolicyCustomValidator struct {
-	DiscoveryDocumentCache *rest.DiscoveryDocumentCache
+	DiscoveryDocumentCache *config.DiscoveryDocumentCache
 }
 
 var _ admission.Validator[*ztoperatorv1alpha1.AuthPolicy] = &AuthPolicyCustomValidator{}
 
 // SetupAuthPolicyWebhookWithManager registers the AuthPolicy validating
 // webhook with the configured well-known URI cache.
-func SetupAuthPolicyWebhookWithManager(mgr ctrl.Manager, discoveryCache *rest.DiscoveryDocumentCache) error {
+func SetupAuthPolicyWebhookWithManager(mgr ctrl.Manager, discoveryCache *config.DiscoveryDocumentCache) error {
 	return ctrl.NewWebhookManagedBy(mgr, &ztoperatorv1alpha1.AuthPolicy{}).
 		WithValidator(&AuthPolicyCustomValidator{DiscoveryDocumentCache: discoveryCache}).
 		Complete()
@@ -53,7 +53,7 @@ func (v *AuthPolicyCustomValidator) ValidateDelete(
 
 func validateAuthPolicy(
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
-	discoveryCache *rest.DiscoveryDocumentCache,
+	discoveryCache *config.DiscoveryDocumentCache,
 ) error {
 	if authPolicy == nil {
 		return errors.New("AuthPolicy must not be nil")
@@ -62,7 +62,7 @@ func validateAuthPolicy(
 	if err := validation.ValidateWellKnownURI(authPolicy.Spec.WellKnownURI); err != nil {
 		return err
 	}
-	if discoveryCache == nil || !discoveryCache.IsAllowed(authPolicy.Spec.WellKnownURI) {
+	if !discoveryCache.IsAllowed(authPolicy.Spec.WellKnownURI) {
 		return fmt.Errorf("wellKnownURI %q is not in the configured allowlist", authPolicy.Spec.WellKnownURI)
 	}
 	return validation.ValidatePaths(authPolicy.GetPaths())

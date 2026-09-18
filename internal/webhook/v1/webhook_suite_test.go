@@ -71,7 +71,9 @@ var _ = BeforeSuite(func() {
 	// Load environment variables
 	err = os.Setenv("ZTOPERATOR_CLUSTER_NAME", "test-cluster")
 	Expect(err).NotTo(HaveOccurred())
-	err = config.Load()
+	err = os.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", testWellKnownURI)
+	Expect(err).NotTo(HaveOccurred())
+	err = config.LoadWithResolver(restclient.NewDefaultDiscoveryDocumentResolver())
 	Expect(err).NotTo(HaveOccurred())
 
 	webhookManifestsDir, err = buildWebhookManifestsWithKustomize()
@@ -122,13 +124,7 @@ var _ = BeforeSuite(func() {
 
 	err = v1.SetupPodWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
-	err = v1.SetupAuthPolicyWebhookWithManager(
-		mgr,
-		restclient.NewDiscoveryDocumentCache(
-			[]string{testWellKnownURI},
-			restclient.GetWellknownURIToDiscoveryDocument(),
-		),
-	)
+	err = v1.SetupAuthPolicyWebhookWithManager(mgr, config.Get().DiscoveryDocumentCache)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:webhook

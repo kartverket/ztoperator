@@ -16,83 +16,8 @@ type DiscoveryDocumentResolver interface {
 	GetOAuthDiscoveryDocument(uri string, rLog log.Logger) (*DiscoveryDocument, error)
 }
 
-// DiscoveryDocumentCache contains the configured well-known URI allowlist and
-// the discovery documents loaded for those URIs. Both are immutable after
-// construction.
-type DiscoveryDocumentCache struct {
-	allowedURIs []string
-	allowed     map[string]struct{}
-	documents   map[string]DiscoveryDocument
-}
-
-// NewDiscoveryDocumentCache creates a cache from already loaded documents.
-// The input slices and documents are copied so callers cannot mutate the
-// cache after it has been constructed.
-func NewDiscoveryDocumentCache(allowedURIs []string, documents map[string]DiscoveryDocument) *DiscoveryDocumentCache {
-	allowed := make(map[string]struct{}, len(allowedURIs))
-	configuredURIs := make([]string, 0, len(allowedURIs))
-	for _, uri := range allowedURIs {
-		if _, exists := allowed[uri]; exists {
-			continue
-		}
-		allowed[uri] = struct{}{}
-		configuredURIs = append(configuredURIs, uri)
-	}
-
-	cachedDocuments := make(map[string]DiscoveryDocument, len(documents))
-	for uri, document := range documents {
-		cachedDocuments[uri] = cloneDiscoveryDocument(document)
-	}
-
-	return &DiscoveryDocumentCache{
-		allowedURIs: configuredURIs,
-		allowed:     allowed,
-		documents:   cachedDocuments,
-	}
-}
-
-// LoadDiscoveryDocumentCache fetches and caches every configured discovery
-// document. It fails fast when any endpoint cannot be fetched or returns an
-// empty document, so the operator cannot start with a partial cache.
-func LoadDiscoveryDocumentCache(
-	allowedURIs []string,
-	resolver DiscoveryDocumentResolver,
-	rLog log.Logger,
-) (*DiscoveryDocumentCache, error) {
-	if resolver == nil {
-		return nil, errors.New("discovery document resolver is not configured")
-	}
-	if len(allowedURIs) == 0 {
-		return nil, errors.New("at least one well-known URI must be configured")
-	}
-
-	documents := make(map[string]DiscoveryDocument, len(allowedURIs))
-	for _, uri := range allowedURIs {
-		if err := ValidateWellKnownURI(uri); err != nil {
-			return nil, fmt.Errorf("invalid configured well-known URI: %w", err)
-		}
-		if _, exists := documents[uri]; exists {
-			continue
-		}
-
-		document, err := resolver.GetOAuthDiscoveryDocument(uri, rLog)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch discovery document for well-known URI %q: %w", uri, err)
-		}
-		if document == nil {
-			return nil, fmt.Errorf(
-				"failed to fetch discovery document for well-known URI %q: resolver returned an empty document",
-				uri,
-			)
-		}
-		documents[uri] = *document
-	}
-
-	return NewDiscoveryDocumentCache(allowedURIs, documents), nil
-}
-
-// ValidateWellKnownURI verifies that uri is a well-formed http or https URL
-// suitable for use as an OpenID Connect / OAuth discovery endpoint.
+// ValidateWellKnownURI is kept for callers of the REST package. The canonical
+// implementation is retained here for compatibility with the REST client.
 func ValidateWellKnownURI(uri string) error {
 	if uri == "" {
 		return errors.New("wellKnownURI must not be empty")
@@ -120,44 +45,6 @@ func ValidateWellKnownURI(uri string) error {
 	return nil
 }
 
-// GetAllowedWellKnownURIs returns a copy of the configured allowlist.
-func (c *DiscoveryDocumentCache) GetAllowedWellKnownURIs() []string {
-	if c == nil {
-		return nil
-	}
-	return append([]string(nil), c.allowedURIs...)
-}
-
-// IsAllowed reports whether uri is an exactly configured well-known endpoint.
-func (c *DiscoveryDocumentCache) IsAllowed(uri string) bool {
-	if c == nil {
-		return false
-	}
-	_, exists := c.allowed[uri]
-	return exists
-}
-
-// GetOAuthDiscoveryDocument only returns documents already present in the
-// cache. It deliberately never performs an HTTP request.
-func (c *DiscoveryDocumentCache) GetOAuthDiscoveryDocument(
-	uri string,
-	_ log.Logger,
-) (*DiscoveryDocument, error) {
-	if c == nil {
-		return nil, errors.New("discovery document cache is not configured")
-	}
-	if !c.IsAllowed(uri) {
-		return nil, fmt.Errorf("well-known URI %q is not in the configured allowlist", uri)
-	}
-
-	document, exists := c.documents[uri]
-	if !exists {
-		return nil, fmt.Errorf("discovery document for well-known URI %q is not cached", uri)
-	}
-	returnDocument := cloneDiscoveryDocument(document)
-	return &returnDocument, nil
-}
-
 // HTTPDiscoveryDocumentResolver is used only while loading the startup cache.
 type HTTPDiscoveryDocumentResolver struct{}
 
@@ -165,7 +52,7 @@ type HTTPDiscoveryDocumentResolver struct{}
 // preconfigured discovery documents. It is cache-only; unknown URIs are not
 // fetched over HTTP.
 type DefaultDiscoveryDocumentResolver struct {
-	cache *DiscoveryDocumentCache
+	documents map[string]DiscoveryDocument
 }
 
 // NewHTTPDiscoveryDocumentResolver creates the resolver used for startup
@@ -175,24 +62,24 @@ func NewHTTPDiscoveryDocumentResolver() *HTTPDiscoveryDocumentResolver {
 }
 
 func NewDefaultDiscoveryDocumentResolver() *DefaultDiscoveryDocumentResolver {
-	documents := GetWellknownURIToDiscoveryDocument()
-	allowedURIs := make([]string, 0, len(documents))
-	for uri := range documents {
-		allowedURIs = append(allowedURIs, uri)
-	}
 	return &DefaultDiscoveryDocumentResolver{
-		cache: NewDiscoveryDocumentCache(allowedURIs, documents),
+		documents: GetWellknownURIToDiscoveryDocument(),
 	}
 }
 
 func (r *DefaultDiscoveryDocumentResolver) GetOAuthDiscoveryDocument(
 	uri string,
-	rLog log.Logger,
+	_ log.Logger,
 ) (*DiscoveryDocument, error) {
 	if r == nil {
 		return nil, errors.New("default discovery document resolver is not configured")
 	}
-	return r.cache.GetOAuthDiscoveryDocument(uri, rLog)
+	document, exists := r.documents[uri]
+	if !exists {
+		return nil, fmt.Errorf("well-known URI %q is not in the configured allowlist", uri)
+	}
+	returnDocument := cloneDiscoveryDocument(document)
+	return &returnDocument, nil
 }
 
 func (r *HTTPDiscoveryDocumentResolver) GetOAuthDiscoveryDocument(

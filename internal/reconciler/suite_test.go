@@ -8,6 +8,7 @@ import (
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/pkg/config"
+	ztrest "github.com/kartverket/ztoperator/pkg/rest"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
@@ -56,7 +57,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Load environment variables
-	err = config.Load()
+	err = os.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration")
+	Expect(err).NotTo(HaveOccurred())
+	err = config.LoadWithResolver(ztrest.NewDefaultDiscoveryDocumentResolver())
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme

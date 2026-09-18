@@ -8,6 +8,7 @@ import (
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/resolver"
+	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/rest"
@@ -195,7 +196,7 @@ func TestResolveDiscoveryDocumentUsesCacheWithoutHTTPCall(t *testing.T) {
 	defer server.Close()
 
 	wellKnownURI := server.URL + "/.well-known/openid-configuration"
-	cache := rest.NewDiscoveryDocumentCache(
+	cache := config.NewDiscoveryDocumentCache(
 		[]string{wellKnownURI},
 		map[string]rest.DiscoveryDocument{
 			wellKnownURI: {
