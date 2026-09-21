@@ -25,7 +25,7 @@ spec:
             - -metrics-secure=false
             - -webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
           envFrom:
-            - secretRef:
+            - configMapRef:
                 name: ztoperator-env
           image: ztoperator:latest
           imagePullPolicy: Never

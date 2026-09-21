@@ -84,8 +84,8 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: run-local
-run-local: ensurelocal ensureztoperatornotdeployed generate install webhooks sourceenv ## Run ztoperator from your host.
-	go run ./cmd/main.go -webhook-cert-path=./webhook-certs
+run-local: ensurelocal ensureztoperatornotdeployed generate install webhooks ## Run ztoperator from your host.
+	set -a; . config/manager/base/.env; set +a; go run ./cmd/main.go -webhook-cert-path=./webhook-certs
 
 .PHONY: isrunning
 isrunning: ## Check if ztoperator is running on your host machine (i.e. from IDE or with 'make run-local')
@@ -100,8 +100,8 @@ isnotrunning: ## Check if ztoperator is NOT running on your host machine (i.e. f
 	@echo "✅ ztoperator is not running."
 
 .PHONY: sourceenv
-sourceenv: ## Source environment variables from .env file
-	@set -a; [ -f .env ] && . .env; set +a
+sourceenv: ## Source environment variables from config/manager/base/.env file
+	@set -a; [ -f config/manager/base/.env ] && . config/manager/base/.env; set +a
 
 .PHONY: local
 local: cluster ztoperator-namespace cert-manager istio-gateways skiperator mock-oauth2 generate install ## Set up entire local development environment with external dependencies
@@ -179,14 +179,6 @@ endif
 deploy: ensurelocal isnotrunning ztoperator-namespace generate install kustomize docker-build ## Deploy ztoperator and all the required resources for ztoperator to run properly to the kind cluster
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KIND)" load docker-image ${IMG} --name $(KIND_CLUSTER_NAME)
-		@if "$(KUBECTL)" get secret ztoperator-env -n ztoperator-system --context $(KUBECONTEXT) >/dev/null 2>&1; then \
-    		echo "⏳ Updating existing ztoperator-env secret..."; \
-    		"$(KUBECTL)" create secret generic ztoperator-env --from-env-file=.env -n ztoperator-system --context $(KUBECONTEXT) --dry-run=client -o yaml | \
-    		"$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; \
-    	else \
-    		echo "⏳ Creating ztoperator-env secret..."; \
-    		"$(KUBECTL)" create secret generic ztoperator-env --from-env-file=.env -n ztoperator-system --context $(KUBECONTEXT); \
-    	fi
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 

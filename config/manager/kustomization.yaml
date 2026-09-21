@@ -16,3 +16,10 @@ images:
   newName: ztoperator
   newTag: latest
 - name: ztoperator
+
+configMapGenerator:
+- envs:
+  - base/.env
+  name: ztoperator-env
+  namespace: ztoperator-system
+
