@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Allow overriding via env, but default to your Makefile defaults
-KUBECONTEXT="${KUBECONTEXT:-kind-ztoperator}}"
+KUBECONTEXT="${KUBECONTEXT:-kind-ztoperator}"
 KUBECTL_BIN="${KUBECTL_BIN:-./bin/kubectl}"
 
 NAMESPACE="ztoperator-system"
