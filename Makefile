@@ -181,6 +181,8 @@ deploy: ensurelocal isnotrunning ztoperator-namespace generate install kustomize
 	"$(KIND)" load docker-image ${IMG} --name $(KIND_CLUSTER_NAME)
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
+	"$(KUBECTL)" wait --context $(KUBECONTEXT) --namespace ztoperator-system \
+		--for=condition=Available deployment/ztoperator --timeout=120s
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy ztoperator and all the resources deployed by ztoperator to the kind cluster. Call with ignore-not-found=true to ignore resource not found errors during deletion.
