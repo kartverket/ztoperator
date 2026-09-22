@@ -3,25 +3,28 @@ package configpatch_test
 import (
 	"testing"
 
-	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/luascript"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestGetInternalOAuthClusterConfigPatch_NoTLSTransportSocket(t *testing.T) {
-	result := configpatch.GetInternalOAuthClusterConfigPatchValue("mock-oauth2.auth", 8080)
+const (
+	defaultClientID                 = "my-client"
+	defaultTokenEndpointClusterName = "oauth"
+)
 
-	assert.Nil(t, result["transport_socket"], "internal cluster should not have TLS transport socket")
+func TestGetOAuth2ClusterConfig_NoTLSTransportSocketWhenHttp(t *testing.T) {
+	result, _ := configpatch.GetOAuth2ClusterConfig("oauth2", "http://mock-oauth2.auth:8080/entraid/token")
+
+	assert.Nil(t, (*result)["transport_socket"], "internal cluster should not have TLS transport socket")
 }
 
-func TestGetExternalOAuthClusterPatch_HasTLSTransportSocket(t *testing.T) {
-	result := configpatch.GetExternalOAuthClusterPatchValue("login.microsoftonline.com")
+func TestGetOAuth2ClusterConfig_HasTLSTransportSocketWhenHttps(t *testing.T) {
+	result, _ := configpatch.GetOAuth2ClusterConfig("oauth2", "https://login.microsoftonline.com/token")
 
-	ts, ok := result["transport_socket"].(map[string]interface{})
+	ts, ok := (*result)["transport_socket"].(map[string]interface{})
 	require.True(t, ok, "external cluster must have transport_socket")
 	assert.Equal(t, "envoy.transport_sockets.tls", ts["name"])
 
@@ -29,33 +32,51 @@ func TestGetExternalOAuthClusterPatch_HasTLSTransportSocket(t *testing.T) {
 	assert.Equal(t, "login.microsoftonline.com", typed["sni"])
 }
 
-func TestGetOAuthSidecarConfigPatch_EndSessionEndpoint_PresentWhenSet(t *testing.T) {
-	scope := defaultScope()
+func TestGetOAuth2FilterConfig_EndSessionEndpoint_PresentWhenSet(t *testing.T) {
+	autoLoginConfig := defaultAutoLoginConfig()
+	identityProviderUris := defaultIdentityProviderUris()
 
-	result := configpatch.GetOAuthSidecarConfigPatchValue(scope)
+	result := configpatch.GetOAuth2FilterConfig(
+		defaultTokenEndpointClusterName,
+		autoLoginConfig,
+		identityProviderUris,
+		defaultClientID,
+	)
 
 	inner := oauthInnerConfig(t, result)
 	assert.Equal(t, "https://idp.example.com/endsession", inner["end_session_endpoint"])
 }
 
-func TestGetOAuthSidecarConfigPatch_EndSessionEndpoint_AbsentWhenNil(t *testing.T) {
-	scope := defaultScope()
-	scope.IdentityProviderUris.EndSessionURI = nil
+func TestGetOAuth2FilterConfig_EndSessionEndpoint_AbsentWhenNil(t *testing.T) {
+	autoLoginConfig := defaultAutoLoginConfig()
+	identityProviderUris := defaultIdentityProviderUris()
+	identityProviderUris.EndSessionURI = nil
 
-	result := configpatch.GetOAuthSidecarConfigPatchValue(scope)
+	result := configpatch.GetOAuth2FilterConfig(
+		defaultTokenEndpointClusterName,
+		autoLoginConfig,
+		identityProviderUris,
+		defaultClientID,
+	)
 
 	inner := oauthInnerConfig(t, result)
 	_, present := inner["end_session_endpoint"]
 	assert.False(t, present, "end_session_endpoint must be absent when EndSessionURI is nil")
 }
 
-func TestGetOAuthSidecarConfigPatch_Scopes_ForwardedAsIs(t *testing.T) {
+func TestGetOAuth2FilterConfig_Scopes_ForwardedAsIs(t *testing.T) {
 	// Defaulting of "openid" is handled upstream in state.AutoLoginConfig.SetSaneDefaults,
 	// so the config patch generator must forward whatever scopes it receives verbatim.
-	scope := defaultScope()
-	scope.AutoLoginConfig.Scopes = []string{"offline_access"} // openid deliberately omitted
+	autoLoginConfig := defaultAutoLoginConfig()
+	autoLoginConfig.Scopes = []string{"offline_access"} // openid deliberately omitted
+	identityProviderUris := defaultIdentityProviderUris()
 
-	result := configpatch.GetOAuthSidecarConfigPatchValue(scope)
+	result := configpatch.GetOAuth2FilterConfig(
+		defaultTokenEndpointClusterName,
+		autoLoginConfig,
+		identityProviderUris,
+		defaultClientID,
+	)
 
 	inner := oauthInnerConfig(t, result)
 	scopes := inner["auth_scopes"].([]interface{})
@@ -66,11 +87,17 @@ func TestGetOAuthSidecarConfigPatch_Scopes_ForwardedAsIs(t *testing.T) {
 	assert.Equal(t, []string{"offline_access"}, scopeStrs)
 }
 
-func TestGetOAuthSidecarConfigPatch_Scopes_CustomScopesPreserved(t *testing.T) {
-	scope := defaultScope()
-	scope.AutoLoginConfig.Scopes = []string{"openid", "profile", "email"}
+func TestGetOAuth2FilterConfig_Scopes_CustomScopesPreserved(t *testing.T) {
+	autoLoginConfig := defaultAutoLoginConfig()
+	autoLoginConfig.Scopes = []string{"openid", "profile", "email"}
+	identityProviderUris := defaultIdentityProviderUris()
 
-	result := configpatch.GetOAuthSidecarConfigPatchValue(scope)
+	result := configpatch.GetOAuth2FilterConfig(
+		defaultTokenEndpointClusterName,
+		autoLoginConfig,
+		identityProviderUris,
+		defaultClientID,
+	)
 
 	inner := oauthInnerConfig(t, result)
 	scopes := inner["auth_scopes"].([]interface{})
@@ -81,14 +108,20 @@ func TestGetOAuthSidecarConfigPatch_Scopes_CustomScopesPreserved(t *testing.T) {
 	assert.Equal(t, []string{"openid", "profile", "email"}, scopeStrs)
 }
 
-func TestGetOAuthSidecarConfigPatch_Resources_PresentWhenSet(t *testing.T) {
-	scope := defaultScope()
-	scope.AuthPolicy.Spec.AcceptedResources = &[]string{
+func TestGetOAuth2FilterConfig_Resources_PresentWhenSet(t *testing.T) {
+	autoLoginConfig := defaultAutoLoginConfig()
+	autoLoginConfig.ResourceIndicators = []string{
 		"https://example.com/api-1",
 		"https://example.com/api-2",
 	}
+	identityProviderUris := defaultIdentityProviderUris()
 
-	result := configpatch.GetOAuthSidecarConfigPatchValue(scope)
+	result := configpatch.GetOAuth2FilterConfig(
+		defaultTokenEndpointClusterName,
+		autoLoginConfig,
+		identityProviderUris,
+		defaultClientID,
+	)
 
 	inner := oauthInnerConfig(t, result)
 	resources, ok := inner["resources"].([]interface{})
@@ -98,20 +131,32 @@ func TestGetOAuthSidecarConfigPatch_Resources_PresentWhenSet(t *testing.T) {
 	assert.Equal(t, "https://example.com/api-2", resources[1])
 }
 
-func TestGetOAuthSidecarConfigPatch_Resources_AbsentWhenNil(t *testing.T) {
-	scope := defaultScope()
+func TestGetOAuth2FilterConfig_Resources_AbsentWhenNil(t *testing.T) {
+	autoLoginConfig := defaultAutoLoginConfig()
+	identityProviderUris := defaultIdentityProviderUris()
 
-	result := configpatch.GetOAuthSidecarConfigPatchValue(scope)
+	result := configpatch.GetOAuth2FilterConfig(
+		defaultTokenEndpointClusterName,
+		autoLoginConfig,
+		identityProviderUris,
+		defaultClientID,
+	)
 
 	inner := oauthInnerConfig(t, result)
 	_, present := inner["resources"]
 	assert.False(t, present, "resources must be absent when AcceptedResources is nil")
 }
 
-func TestGetOAuthSidecarConfigPatch_PassThroughAndDenyRedirectMatchers(t *testing.T) {
-	scope := defaultScope()
+func TestGetOAuth2FilterConfig_PassThroughAndDenyRedirectMatchers(t *testing.T) {
+	autoLoginConfig := defaultAutoLoginConfig()
+	identityProviderUris := defaultIdentityProviderUris()
 
-	result := configpatch.GetOAuthSidecarConfigPatchValue(scope)
+	result := configpatch.GetOAuth2FilterConfig(
+		defaultTokenEndpointClusterName,
+		autoLoginConfig,
+		identityProviderUris,
+		defaultClientID,
+	)
 
 	inner := oauthInnerConfig(t, result)
 
@@ -128,10 +173,16 @@ func TestGetOAuthSidecarConfigPatch_PassThroughAndDenyRedirectMatchers(t *testin
 	assert.Equal(t, luascript.DenyRedirectHeaderName, denyHeader["name"])
 }
 
-func TestGetOAuthSidecarConfigPatch_CookieConfigs_SameSiteLax(t *testing.T) {
-	scope := defaultScope()
+func TestGetOAuth2FilterConfig_CookieConfigs_SameSiteLax(t *testing.T) {
+	autoLoginConfig := defaultAutoLoginConfig()
+	identityProviderUris := defaultIdentityProviderUris()
 
-	result := configpatch.GetOAuthSidecarConfigPatchValue(scope)
+	result := configpatch.GetOAuth2FilterConfig(
+		defaultTokenEndpointClusterName,
+		autoLoginConfig,
+		identityProviderUris,
+		defaultClientID,
+	)
 
 	inner := oauthInnerConfig(t, result)
 	cookieConfigs, ok := inner["cookie_configs"].(map[string]interface{})
@@ -162,32 +213,20 @@ func oauthInnerConfig(t *testing.T, patch map[string]interface{}) map[string]int
 	return cfg
 }
 
-func defaultScope() state.Scope {
-	clientID := "my-client"
+func defaultIdentityProviderUris() model.IdentityProviderUris {
 	endSession := "https://idp.example.com/endsession"
-	return state.Scope{
-		AuthPolicy: ztoperatorv1alpha1.AuthPolicy{
-			ObjectMeta: metav1.ObjectMeta{Name: "auth-policy", Namespace: "default"},
-			Spec: ztoperatorv1alpha1.AuthPolicySpec{
-				Enabled: true,
-				Selector: ztoperatorv1alpha1.WorkloadSelector{
-					MatchLabels: map[string]string{"app": "myapp"},
-				},
-			},
-		},
-		OAuthCredentials: state.OAuthCredentials{
-			ClientID: &clientID,
-		},
-		IdentityProviderUris: state.IdentityProviderUris{
-			TokenURI:         "http://mock-oauth2.auth:8080/entraid/token",
-			AuthorizationURI: "http://mock-oauth2.auth:8080/entraid/authorize",
-			EndSessionURI:    &endSession,
-		},
-		AutoLoginConfig: state.AutoLoginConfig{
-			Enabled:      true,
-			RedirectPath: "/oauth2/callback",
-			LogoutPath:   "/logout",
-			Scopes:       []string{"openid"},
-		},
+	return model.IdentityProviderUris{
+		TokenURI:         "http://mock-oauth2.auth:8080/entraid/token",
+		AuthorizationURI: "http://mock-oauth2.auth:8080/entraid/authorize",
+		EndSessionURI:    &endSession,
+	}
+}
+
+func defaultAutoLoginConfig() model.AutoLoginConfig {
+	return model.AutoLoginConfig{
+		Enabled:      true,
+		RedirectPath: "/oauth2/callback",
+		LogoutPath:   "/logout",
+		Scopes:       []string{"openid"},
 	}
 }

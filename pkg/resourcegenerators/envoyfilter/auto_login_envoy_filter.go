@@ -1,17 +1,16 @@
 package envoyfilter
 
 import (
-	"strconv"
-
+	"github.com/kartverket/ztoperator/pkg/model"
 	"google.golang.org/protobuf/types/known/structpb"
 	"istio.io/api/networking/v1alpha3"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/kartverket/ztoperator/internal/state"
-	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 )
+
+const oAuthClusterName = "oauth"
 
 // GetDesired returns the desired EnvoyFilter resource for the given AuthPolicy scope
 //
@@ -35,37 +34,14 @@ func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 		return nil
 	}
 
-	idpAsParsedURL, err := helperfunctions.GetParsedURL(scope.IdentityProviderUris.TokenURI)
+	oAuthClusterConfigPatchValue, err := configpatch.GetOAuth2ClusterConfig(
+		oAuthClusterName, scope.IdentityProviderUris.TokenURI,
+	)
 	if err != nil {
-		panic(
-			"failed to get issuer hostname from issuer URI " + scope.IdentityProviderUris.IssuerURI +
-				" due to the following error: " + err.Error(),
-		)
+		panic("failed to get oauth envoy cluster config patch: " + err.Error())
 	}
-	var oAuthClusterConfigPatchValue map[string]interface{}
-	if idpAsParsedURL.Port() != "" {
-		// Internal IDP
-		port, strconvErr := strconv.Atoi(idpAsParsedURL.Port())
-		if strconvErr != nil {
-			panic(strconvErr)
-		}
-		oAuthClusterConfigPatchValue = configpatch.GetInternalOAuthClusterConfigPatchValue(
-			idpAsParsedURL.Hostname(),
-			port,
-		)
-	} else {
-		oAuthClusterConfigPatchValue = configpatch.GetExternalOAuthClusterPatchValue(idpAsParsedURL.Host)
-	}
-
-	luaScriptConfigPatchValue, err := structpb.NewStruct(configpatch.GetLuaScriptConfigPatch(*scope))
-	if err != nil {
-		panic(
-			"failed to serialize Lua script config patch value due to the following error: " + err.Error(),
-		)
-	}
-
 	oAuthClusterConfigPatchValueAsPbStruct, err := structpb.NewStruct(
-		oAuthClusterConfigPatchValue,
+		*oAuthClusterConfigPatchValue,
 	)
 	if err != nil {
 		panic(
@@ -73,8 +49,22 @@ func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 		)
 	}
 
+	luaScriptConfigPatchValue, err := structpb.NewStruct(configpatch.GetLuaScriptFilterConfig(
+		scope.AutoLoginConfig.LuaScriptConfig.LuaScript,
+	))
+	if err != nil {
+		panic(
+			"failed to serialize Lua script config patch value due to the following error: " + err.Error(),
+		)
+	}
+
 	oAuthSidecarConfigPatchValueAsPbStruct, err := structpb.NewStruct(
-		configpatch.GetOAuthSidecarConfigPatchValue(*scope),
+		configpatch.GetOAuth2FilterConfig(
+			oAuthClusterName,
+			scope.AutoLoginConfig,
+			scope.IdentityProviderUris,
+			*scope.OAuthCredentials.ClientID,
+		),
 	)
 	if err != nil {
 		panic(

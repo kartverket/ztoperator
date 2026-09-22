@@ -97,8 +97,8 @@ func readHeaders(t *testing.T, L *lua.LState, handle lua.LValue) map[string]stri
 	return result
 }
 
-func defaultAuthPolicy() *v1alpha1.AuthPolicy {
-	return &v1alpha1.AuthPolicy{
+func defaultAuthPolicy() v1alpha1.AuthPolicy {
+	return v1alpha1.AuthPolicy{
 		Spec: v1alpha1.AuthPolicySpec{
 			Enabled:      true,
 			WellKnownURI: "https://idp.example.com/.well-known/openid-configuration",

@@ -1,16 +1,12 @@
 package configpatch
 
-import (
-	"github.com/kartverket/ztoperator/internal/state"
-)
-
-func GetLuaScriptConfigPatch(scope state.Scope) map[string]interface{} {
-	return map[string]interface{}{
+func GetLuaScriptFilterConfig(luaScript string) map[string]any {
+	return map[string]any{
 		"name": "envoy.filters.http.lua",
-		"typed_config": map[string]interface{}{
+		"typed_config": map[string]any{
 			"@type": "type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua",
-			"default_source_code": map[string]interface{}{
-				"inline_string": scope.AutoLoginConfig.LuaScriptConfig.LuaScript,
+			"default_source_code": map[string]any{
+				"inline_string": luaScript,
 			},
 		},
 	}

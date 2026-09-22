@@ -45,9 +45,7 @@ var luaScriptTemplate string
 //   - Redirects to the end-session endpoint have the postLogoutRedirectUri
 //     appended as a query parameter when one is configured.
 func GenerateLuaScript(
-	authPolicy *v1alpha1.AuthPolicy,
-	autoLoginConfig state.AutoLoginConfig,
-	identityProviderUris state.IdentityProviderUris,
+	authPolicy v1alpha1.AuthPolicy,
 	autoLoginConfig model.AutoLoginConfig,
 	identityProviderUris model.IdentityProviderUris,
 ) string {
