@@ -114,7 +114,7 @@ var _ = Describe("AuthPolicy Controller", func() {
 		Expect(metricsBody).To(ContainSubstring(fmt.Sprintf(`namespace="%s"`, authPolicyNamespace)))
 		Expect(metricsBody).To(ContainSubstring(`enabled="true"`))
 		Expect(metricsBody).To(ContainSubstring(`auto_login_enabled="false"`))
-		Expect(metricsBody).To(ContainSubstring(`issuer="https://login.example.com"`))
+		Expect(metricsBody).To(ContainSubstring(`issuer="login.example.com"`))
 
 		By("cleaning up")
 		Expect(k8sClient.Delete(ctx, authPolicy)).To(Succeed())

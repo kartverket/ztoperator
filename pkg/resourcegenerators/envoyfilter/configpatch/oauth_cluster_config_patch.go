@@ -28,6 +28,11 @@ func GetInternalOAuthClusterConfigPatchValue(idpHostname string, port int) map[s
 		},
 	}
 }
+	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	parsedUrl, err := helperfunctions.GetParsedHttpURL(tokenUrl)
+	if err != nil {
+		return nil, fmt.Errorf("parse token URL: %w", err)
+	}
 
 func GetExternalOAuthClusterPatchValue(idpHostname string) map[string]interface{} {
 	return map[string]interface{}{
@@ -37,8 +42,10 @@ func GetExternalOAuthClusterPatchValue(idpHostname string) map[string]interface{
 		"connect_timeout":   "10s",
 		"lb_policy":         "ROUND_ROBIN",
 		"transport_socket": map[string]interface{}{
+	if parsedUrl.Tls {
+		clusterConfigPatch["transport_socket"] = map[string]any{
 			"name": "envoy.transport_sockets.tls",
-			"typed_config": map[string]interface{}{
+			"typed_config": map[string]any{
 				"@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext",
 				"sni":   idpHostname,
 			},
@@ -62,5 +69,8 @@ func GetExternalOAuthClusterPatchValue(idpHostname string) map[string]interface{
 				},
 			},
 		},
+				"sni":   parsedUrl.Host,
+			},
+		}
 	}
 }
