@@ -11,6 +11,7 @@ DEPLOYMENT="ztoperator"
 VALIDATING_CFG="ztoperator-validating-webhook-configuration"
 
 EXPECTED_SVC="webhook-service"
+EXPECTED_WEBHOOK_NAME="vpod-v1.kb.io"
 EXPECTED_SELECTOR_KEY="skip.kartverket.no/skip-managed"
 EXPECTED_SELECTOR_VALUE="true"
 
@@ -42,24 +43,28 @@ check_webhook_config() {
 
   ${KUBECTL_BIN} get "$KIND" "$NAME" >/dev/null
 
-  # Ensure at least one webhook exists
+  # The AuthPolicy webhook is first, but the namespace selector belongs to the pod webhook.
   WEBHOOK_NAME=$(${KUBECTL_BIN} get "$KIND" "$NAME" \
-    -o jsonpath='{.webhooks[0].name}')
+    -o "jsonpath={.webhooks[?(@.name==\"${EXPECTED_WEBHOOK_NAME}\")].name}")
 
   if [[ -z "$WEBHOOK_NAME" ]]; then
-    echo "❌ No webhooks defined in ${NAME}"
+    echo "❌ ${NAME} does not contain webhook ${EXPECTED_WEBHOOK_NAME}"
     exit 1
   fi
 
-  # clientConfig.service
-  SVC_NAME=$(${KUBECTL_BIN} get "$KIND" "$NAME" \
-    -o jsonpath='{.webhooks[0].clientConfig.service.name}')
+  get_webhook_field() {
+    local FIELD="$1"
+    ${KUBECTL_BIN} get "$KIND" "$NAME" \
+      -o "jsonpath={.webhooks[?(@.name==\"${EXPECTED_WEBHOOK_NAME}\")].${FIELD}}"
+  }
 
-  SVC_NS=$(${KUBECTL_BIN} get "$KIND" "$NAME" \
-    -o jsonpath='{.webhooks[0].clientConfig.service.namespace}')
+  # clientConfig.service
+  SVC_NAME=$(get_webhook_field 'clientConfig.service.name')
+
+  SVC_NS=$(get_webhook_field 'clientConfig.service.namespace')
 
   if [[ "$SVC_NAME" != "$EXPECTED_SVC" || "$SVC_NS" != "$NAMESPACE" ]]; then
-    echo "❌ ${NAME} webhooks[0]: clientConfig.service must be ${NAMESPACE}/${EXPECTED_SVC}"
+    echo "❌ ${NAME} webhook ${EXPECTED_WEBHOOK_NAME}: clientConfig.service must be ${NAMESPACE}/${EXPECTED_SVC}"
     echo "   got ${SVC_NS}/${SVC_NAME}"
     exit 1
   fi
@@ -67,8 +72,7 @@ check_webhook_config() {
   # CA bundle is injected asynchronously by cert-manager.
   CA_BUNDLE=""
   for _ in {1..30}; do
-    CA_BUNDLE=$(${KUBECTL_BIN} get "$KIND" "$NAME" \
-      -o jsonpath='{.webhooks[0].clientConfig.caBundle}')
+    CA_BUNDLE=$(get_webhook_field 'clientConfig.caBundle')
     if [[ -n "$CA_BUNDLE" ]]; then
       break
     fi
@@ -76,19 +80,17 @@ check_webhook_config() {
   done
 
   if [[ -z "$CA_BUNDLE" ]]; then
-    echo "❌ ${NAME} webhooks[0]: clientConfig.caBundle is empty"
+    echo "❌ ${NAME} webhook ${EXPECTED_WEBHOOK_NAME}: clientConfig.caBundle is empty"
     exit 1
   fi
 
-  # namespaceSelector (order-independent, portable)
-  SELECTOR_KEY=$(${KUBECTL_BIN} get "$KIND" "$NAME" \
-    -o jsonpath='{.webhooks[0].namespaceSelector.matchExpressions[0].key}')
+  # namespaceSelector
+  SELECTOR_KEY=$(get_webhook_field 'namespaceSelector.matchExpressions[0].key')
 
-  SELECTOR_VALUE=$(${KUBECTL_BIN} get "$KIND" "$NAME" \
-    -o jsonpath='{.webhooks[0].namespaceSelector.matchExpressions[0].values[0]}')
+  SELECTOR_VALUE=$(get_webhook_field 'namespaceSelector.matchExpressions[0].values[0]')
 
   if [[ "$SELECTOR_KEY" != "$EXPECTED_SELECTOR_KEY" || "$SELECTOR_VALUE" != "$EXPECTED_SELECTOR_VALUE" ]]; then
-    echo "❌ ${NAME} webhooks[0]: namespaceSelector must include ${EXPECTED_SELECTOR_KEY}=In(${EXPECTED_SELECTOR_VALUE})"
+    echo "❌ ${NAME} webhook ${EXPECTED_WEBHOOK_NAME}: namespaceSelector must include ${EXPECTED_SELECTOR_KEY}=In(${EXPECTED_SELECTOR_VALUE})"
     echo "   Found: ${SELECTOR_KEY}=In(${SELECTOR_VALUE:-<empty>})"
     exit 1
   fi
