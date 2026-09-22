@@ -40,5 +40,6 @@ func ResolveAutoLoginConfig(
 		),
 	}
 
+	authPolicy ztoperatorv1alpha1.AuthPolicy,
 	return autoLoginConfig
 }

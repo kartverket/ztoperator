@@ -14,7 +14,7 @@ import (
 
 func ResolveDiscoveryDocument(
 	ctx context.Context,
-	authPolicy *ztoperatorv1alpha1.AuthPolicy,
+	authPolicy ztoperatorv1alpha1.AuthPolicy,
 	resolver rest.DiscoveryDocumentResolver,
 ) (*state.IdentityProviderUris, error) {
 	rLog := log.GetLogger(ctx)

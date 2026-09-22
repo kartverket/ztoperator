@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 
@@ -127,7 +126,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			ValidationErrorMessage: &validationErrorMessage,
 		}
 	} else {
-		resolvedScope, err := resolveAuthPolicy(ctx, r.Client, authPolicy, r.DiscoveryDocumentResolver)
+		resolvedScope, err := resolveAuthPolicy(ctx, r.Client, *authPolicy, r.DiscoveryDocumentResolver)
 		if err != nil {
 			rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))
 			authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
@@ -210,13 +209,10 @@ func (r *AuthPolicyReconciler) doReconcile(
 func resolveAuthPolicy(
 	ctx context.Context,
 	k8sClient client.Client,
-	authPolicy *ztoperatorv1alpha1.AuthPolicy,
+	authPolicy ztoperatorv1alpha1.AuthPolicy,
 	discoveryDocumentResolver rest.DiscoveryDocumentResolver,
 ) (*model.Scope, error) {
 	rLog := log.GetLogger(ctx)
-	if authPolicy == nil {
-		return nil, errors.New("encountered AuthPolicy as null when resolving")
-	}
 	rLog.Info(fmt.Sprintf("Trying to resolve auth policy %s/%s", authPolicy.Namespace, authPolicy.Name))
 
 	oAuthCredentials, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
@@ -257,7 +253,7 @@ func resolveAuthPolicy(
 
 	return &model.Scope{
 		Audiences:            *resolvedAudiences,
-		AuthPolicy:           *authPolicy,
+		AuthPolicy:           authPolicy,
 		AutoLoginConfig:      autoLoginConfig,
 		OAuthCredentials:     *oAuthCredentials,
 		IdentityProviderUris: *identityProviderUris,
