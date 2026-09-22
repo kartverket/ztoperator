@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -158,8 +158,8 @@ func TestGetDesired_OutputClaimToHeadersAreEmpty_WhenEmptySlice(t *testing.T) {
 	assert.Nil(t, ra.Spec.JwtRules[0].OutputClaimToHeaders)
 }
 
-func defaultScope() state.Scope {
-	return state.Scope{
+func defaultScope() model.Scope {
+	return model.Scope{
 		AuthPolicy: ztoperatorv1alpha1.AuthPolicy{
 			ObjectMeta: metav1.ObjectMeta{Name: "my-policy", Namespace: "default"},
 			Spec: ztoperatorv1alpha1.AuthPolicySpec{
@@ -170,7 +170,7 @@ func defaultScope() state.Scope {
 			},
 		},
 		Audiences: []string{},
-		IdentityProviderUris: state.IdentityProviderUris{
+		IdentityProviderUris: model.IdentityProviderUris{
 			IssuerURI: "https://login.example.com",
 			JwksURI:   "https://login.example.com/.well-known/jwks.json",
 		},

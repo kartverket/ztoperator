@@ -8,7 +8,7 @@ import (
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/reconciler"
-	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -23,7 +23,7 @@ import (
 var _ = Describe("ControllerResourceAdapter", func() {
 	var (
 		testNamespace string
-		scope         *state.Scope
+		scope         *model.Scope
 	)
 
 	// secretShouldUpdate / secretUpdateFields mimic the production callbacks closely enough to exercise the
@@ -57,7 +57,7 @@ var _ = Describe("ControllerResourceAdapter", func() {
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 
 		// A minimal scope whose AuthPolicy acts as the owner of reconciled resources.
-		scope = &state.Scope{
+		scope = &model.Scope{
 			AuthPolicy: ztoperatorv1alpha1.AuthPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-authpolicy",

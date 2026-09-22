@@ -29,7 +29,7 @@ import (
 //
 //  3. An OAuth2 HTTP filter (INSERT_BEFORE jwt_authn) that drives the Authorization Code Flow and
 //     exchanges the authorization code for tokens using the upstream OAuth2 cluster defined above.
-func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFilter {
+func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFilter {
 	if !scope.AuthPolicy.Spec.Enabled || scope.InvalidConfig || scope.AuthPolicy.Spec.AutoLogin == nil ||
 		!scope.AuthPolicy.Spec.AutoLogin.Enabled {
 		return nil

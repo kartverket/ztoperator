@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/luascript"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -59,7 +59,7 @@ func TestDenyRedirectMatchers(t *testing.T) {
 }
 
 func TestRequireAuthMatchers(t *testing.T) {
-	baseConfig := state.AutoLoginConfig{
+	baseConfig := model.AutoLoginConfig{
 		RedirectPath: "/oauth2/callback",
 		LogoutPath:   "/logout",
 	}

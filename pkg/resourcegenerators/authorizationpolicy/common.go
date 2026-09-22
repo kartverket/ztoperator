@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"istio.io/api/security/v1beta1"
 	v1beta2 "istio.io/api/type/v1beta1"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
@@ -87,7 +87,7 @@ func getAudienceAndIssuerConditions(
 	return conditions
 }
 
-func ConstructAcceptedResources(scope state.Scope) []string {
+func ConstructAcceptedResources(scope model.Scope) []string {
 	var acceptedResources []string
 	acceptedResources = append(acceptedResources, scope.Audiences...)
 
@@ -98,7 +98,7 @@ func ConstructAcceptedResources(scope state.Scope) []string {
 }
 
 func AllowAuthorizationPolicy(
-	scope *state.Scope,
+	scope *model.Scope,
 	objectMeta v1.ObjectMeta,
 	allowRules []*v1beta1.Rule,
 ) *istioclientsecurityv1.AuthorizationPolicy {
@@ -111,7 +111,7 @@ func AllowAuthorizationPolicy(
 }
 
 func DenyAuthorizationPolicy(
-	scope *state.Scope,
+	scope *model.Scope,
 	objectMeta v1.ObjectMeta,
 	denyRules []*v1beta1.Rule,
 ) *istioclientsecurityv1.AuthorizationPolicy {
@@ -124,7 +124,7 @@ func DenyAuthorizationPolicy(
 }
 
 func authorizationPolicy(
-	scope *state.Scope,
+	scope *model.Scope,
 	objectMeta v1.ObjectMeta,
 	action v1beta1.AuthorizationPolicy_Action,
 	rules []*v1beta1.Rule,

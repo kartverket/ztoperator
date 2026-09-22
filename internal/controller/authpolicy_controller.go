@@ -12,12 +12,12 @@ import (
 	"github.com/kartverket/ztoperator/internal/predicates"
 	"github.com/kartverket/ztoperator/internal/reconciler"
 	"github.com/kartverket/ztoperator/internal/resolver"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/internal/statusmanager"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/metrics"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/kartverket/ztoperator/pkg/validation"
@@ -118,10 +118,10 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	var scope *state.Scope
+	var scope *model.Scope
 	if validationErr := validateAuthPolicy(ctx, authPolicy); validationErr != nil {
 		validationErrorMessage := validationErr.Error()
-		scope = &state.Scope{
+		scope = &model.Scope{
 			AuthPolicy:             *authPolicy,
 			InvalidConfig:          true,
 			ValidationErrorMessage: &validationErrorMessage,
@@ -153,7 +153,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *AuthPolicyReconciler) doReconcile(
 	ctx context.Context,
 	reconcileFuncs []reconciliation.ControllerResource,
-	scope *state.Scope,
+	scope *model.Scope,
 ) (ctrl.Result, error) {
 	result := ctrl.Result{}
 	var errs []error
@@ -212,7 +212,7 @@ func resolveAuthPolicy(
 	k8sClient client.Client,
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
 	discoveryDocumentResolver rest.DiscoveryDocumentResolver,
-) (*state.Scope, error) {
+) (*model.Scope, error) {
 	rLog := log.GetLogger(ctx)
 	if authPolicy == nil {
 		return nil, errors.New("encountered AuthPolicy as null when resolving")
@@ -255,7 +255,7 @@ func resolveAuthPolicy(
 
 	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name %s/%s", authPolicy.Namespace, authPolicy.Name))
 
-	return &state.Scope{
+	return &model.Scope{
 		Audiences:            *resolvedAudiences,
 		AuthPolicy:           *authPolicy,
 		AutoLoginConfig:      autoLoginConfig,

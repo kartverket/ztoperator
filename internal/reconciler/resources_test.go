@@ -8,9 +8,9 @@ import (
 	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/internal/reconciler"
 	"github.com/kartverket/ztoperator/internal/resolver"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
@@ -32,15 +32,15 @@ import (
 var _ = Describe("ControllerResources", func() {
 	const authPolicyName = "test-app"
 
-	scopeFor := func(namespace string) *state.Scope {
-		return &state.Scope{
+	scopeFor := func(namespace string) *model.Scope {
+		return &model.Scope{
 			AuthPolicy: ztoperatorv1alpha1.AuthPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      authPolicyName,
 					Namespace: namespace,
 				},
 			},
-			AutoLoginConfig: state.AutoLoginConfig{
+			AutoLoginConfig: model.AutoLoginConfig{
 				EnvoySecretName: names.EnvoySecret(authPolicyName),
 			},
 		}
@@ -96,11 +96,11 @@ var _ = Describe("ControllerResources", func() {
 					AutoLogin: autoLogin,
 				},
 			}
-			scope := &state.Scope{
+			scope := &model.Scope{
 				AuthPolicy: *authPolicy,
 				AutoLoginConfig: resolver.ResolveAutoLoginConfig(
-					authPolicy,
-					state.IdentityProviderUris{},
+					*authPolicy,
+					model.IdentityProviderUris{},
 				),
 			}
 
@@ -124,7 +124,7 @@ var _ = Describe("ControllerResources", func() {
 var _ = Describe("auto-login Secret reconciliation", func() {
 	var (
 		testNamespace string
-		scope         *state.Scope
+		scope         *model.Scope
 	)
 
 	// buildSecretAdapter wires up the auto-login Secret adapter exactly like the production factory does: the desired
@@ -162,7 +162,7 @@ var _ = Describe("auto-login Secret reconciliation", func() {
 		}
 		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
 
-		scope = &state.Scope{
+		scope = &model.Scope{
 			AuthPolicy: ztoperatorv1alpha1.AuthPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-app",
@@ -174,10 +174,10 @@ var _ = Describe("auto-login Secret reconciliation", func() {
 					AutoLogin: &ztoperatorv1alpha1.AutoLogin{Enabled: true},
 				},
 			},
-			OAuthCredentials: state.OAuthCredentials{
+			OAuthCredentials: model.OAuthCredentials{
 				ClientSecret: helperfunctions.Ptr("super-secret"),
 			},
-			AutoLoginConfig: state.AutoLoginConfig{
+			AutoLoginConfig: model.AutoLoginConfig{
 				EnvoySecretName: names.EnvoySecret("test-app"),
 			},
 		}

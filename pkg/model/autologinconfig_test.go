@@ -1,12 +1,12 @@
-package resolver_test
+package model_test
 
 import (
 	"testing"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/resolver"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	"github.com/kartverket/ztoperator/pkg/luascript"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,7 +18,7 @@ func TestResolveAutoLoginConfig_WithAutoLoginDisabled_ReturnsDisabledConfig(t *t
 	identityProviderUris := createTestIdentityProviderUris()
 
 	// 2. Act
-	result := resolver.ResolveAutoLoginConfig(authPolicy, identityProviderUris)
+	result := model.ToAutoLoginConfig(*authPolicy, identityProviderUris, luascript.GenerateLuaScript)
 
 	// 3. Assert
 	assert.False(t, result.Enabled, "AutoLogin should be disabled")
@@ -37,7 +37,7 @@ func TestResolveAutoLoginConfig_WithAutoLoginNil_ReturnsDisabledConfig(t *testin
 	identityProviderUris := createTestIdentityProviderUris()
 
 	// 2. Act
-	result := resolver.ResolveAutoLoginConfig(authPolicy, identityProviderUris)
+	result := model.ToAutoLoginConfig(*authPolicy, identityProviderUris, luascript.GenerateLuaScript)
 
 	// 3. Assert
 	assert.False(t, result.Enabled, "AutoLogin should be disabled when nil")
@@ -58,7 +58,7 @@ func TestResolveAutoLoginConfig_WithBasicAutoLogin_ReturnsConfigWithDefaults(t *
 	identityProviderUris := createTestIdentityProviderUris()
 
 	// 2. Act
-	result := resolver.ResolveAutoLoginConfig(authPolicy, identityProviderUris)
+	result := model.ToAutoLoginConfig(*authPolicy, identityProviderUris, luascript.GenerateLuaScript)
 
 	// 3. Assert
 	assert.True(t, result.Enabled, "AutoLogin should be enabled")
@@ -88,7 +88,7 @@ func TestResolveAutoLoginConfig_WithCustomConfiguration_PreservesAllValues(t *te
 	identityProviderUris := createTestIdentityProviderUris()
 
 	// 2. Act
-	result := resolver.ResolveAutoLoginConfig(authPolicy, identityProviderUris)
+	result := model.ToAutoLoginConfig(*authPolicy, identityProviderUris, luascript.GenerateLuaScript)
 
 	// 3. Assert
 	assert.True(t, result.Enabled, "AutoLogin should be enabled")
@@ -132,7 +132,7 @@ func TestResolveAutoLoginConfig_DefaultsOpenIDIntoScopesWhenMissing(t *testing.T
 	identityProviderUris := createTestIdentityProviderUris()
 
 	// 2. Act
-	result := resolver.ResolveAutoLoginConfig(authPolicy, identityProviderUris)
+	result := model.ToAutoLoginConfig(*authPolicy, identityProviderUris, luascript.GenerateLuaScript)
 
 	// 3. Assert
 	assert.Equal(t, []string{"profile", "email", "openid"}, result.Scopes)
@@ -151,8 +151,8 @@ func createTestAuthPolicy(name string, autoLogin *ztoperatorv1alpha1.AutoLogin) 
 	}
 }
 
-func createTestIdentityProviderUris() state.IdentityProviderUris {
-	return state.IdentityProviderUris{
+func createTestIdentityProviderUris() model.IdentityProviderUris {
+	return model.IdentityProviderUris{
 		IssuerURI:        "http://test-idp.example.com",
 		JwksURI:          "http://test-idp.example.com/jwks",
 		TokenURI:         "http://test-idp.example.com/token",
