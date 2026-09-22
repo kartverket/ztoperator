@@ -320,7 +320,7 @@ ensureztoperatordeployed: kubectl ensurelocal isnotrunning ## Ensure ztoperator 
 .PHONY: ensurerunningordeployed
 ensurerunningordeployed: ## Ensure ztoperator is running on host OR deployed in cluster, but not both
 	@$(MAKE) isrunning >/dev/null 2>&1 && running=1 || running=0; \
-	$(MAKE) ensureztoperatordeployed >/dev/null 2>&1 && deployed=1 || deployed=0; \
+	$(MAKE) ensureztoperatordeployed && deployed=1 || deployed=0; \
 	if [ "$$running" = "1" ] && [ "$$deployed" = "1" ]; then \
 		echo "❌ Ztoperator is both running on the host AND deployed in the cluster. Stop one before continuing."; \
 		exit 1; \

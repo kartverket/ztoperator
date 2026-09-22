@@ -64,9 +64,16 @@ check_webhook_config() {
     exit 1
   fi
 
-  # CA bundle
-  CA_BUNDLE=$(${KUBECTL_BIN} get "$KIND" "$NAME" \
-    -o jsonpath='{.webhooks[0].clientConfig.caBundle}')
+  # CA bundle is injected asynchronously by cert-manager.
+  CA_BUNDLE=""
+  for _ in {1..30}; do
+    CA_BUNDLE=$(${KUBECTL_BIN} get "$KIND" "$NAME" \
+      -o jsonpath='{.webhooks[0].clientConfig.caBundle}')
+    if [[ -n "$CA_BUNDLE" ]]; then
+      break
+    fi
+    sleep 2
+  done
 
   if [[ -z "$CA_BUNDLE" ]]; then
     echo "❌ ${NAME} webhooks[0]: clientConfig.caBundle is empty"
