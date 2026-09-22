@@ -1,16 +1,16 @@
-package authorizationpolicytest_test
+package authorizationpolicy_test
 
 import (
 	"reflect"
 	"testing"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy"
 )
 
 func TestConstructAcceptedResourcesWithAudienceNil(t *testing.T) {
-	scope := state.Scope{
+	scope := model.Scope{
 		Audiences: nil,
 	}
 	actualValues := authorizationpolicy.ConstructAcceptedResources(scope)
@@ -26,7 +26,7 @@ func TestConstructAcceptedResourcesWithAudience(t *testing.T) {
 		"audience2",
 		"audience3",
 	}
-	scope := state.Scope{
+	scope := model.Scope{
 		Audiences: expectedAudiences,
 	}
 	actualValues := authorizationpolicy.ConstructAcceptedResources(scope)
@@ -52,7 +52,7 @@ func TestConstructAcceptedResourcesWithAudienceAndAcceptedResources(t *testing.T
 	expectedValues = append(expectedValues, expectedAudiences...)
 	expectedValues = append(expectedValues, expectedAcceptedResources...)
 
-	scope := state.Scope{
+	scope := model.Scope{
 		Audiences: expectedAudiences,
 		AuthPolicy: v1alpha1.AuthPolicy{
 			Spec: v1alpha1.AuthPolicySpec{
