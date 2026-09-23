@@ -6,7 +6,9 @@ metadata:
 spec:
   egress:
     - ports:
-        - port: 6443
+        - port: 53
+          protocol: UDP
+        - port: 53
           protocol: TCP
       to:
         - namespaceSelector:
@@ -14,7 +16,7 @@ spec:
               kubernetes.io/metadata.name: kube-system
           podSelector:
             matchLabels:
-              component: kube-apiserver
+              k8s-app: kube-dns
   ingress:
     - from:
         - namespaceSelector:

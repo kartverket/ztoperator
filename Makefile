@@ -34,6 +34,8 @@ SHELL = /usr/bin/env bash -o pipefail
 
 ##@ Variables
 
+ALLOWED_LOCAL_EGRESS_HOSTS = test.idporten.no,test.ansattporten.no,test.maskinporten.no,login.microsoftonline.com
+
 KUBERNETES_VERSION			= 1.35.1
 CERT_MANAGER_VERSION		= 1.20.2
 ISTIO_VERSION 				= $(call extract-version,istio.io/client-go)
@@ -175,25 +177,30 @@ ifndef ignore-not-found
   ignore-not-found = false
 endif
 
+.PHONY: ztoperator-service-entry
+ztoperator-service-entry: kubectl ztoperator-namespace ## Create a ServiceEntry for ztoperator with the allowed egress hosts.
+	@hosts_list="$(ALLOWED_LOCAL_EGRESS_HOSTS)"; \
+	hosts_yaml=""; \
+	for host in $$(echo "$$hosts_list" | tr ',' '\n'); do \
+		hosts_yaml="$$hosts_yaml    - $$host\n"; \
+	done; \
+	printf "apiVersion: networking.istio.io/v1\nkind: ServiceEntry\nmetadata:\n  name: ztoperator-egress\n  namespace: ztoperator-system\nspec:\n  exportTo:\n    - .\n  hosts:\n$$hosts_yaml  ports:\n    - name: https\n      number: 443\n      protocol: HTTPS\n  resolution: DNS\n" | \
+	$(KUBECTL) apply --context $(KUBECONTEXT) -f -
+
+
 .PHONY: deploy
-deploy: ensurelocal isnotrunning ztoperator-namespace generate install kustomize docker-build ## Deploy ztoperator and all the required resources for ztoperator to run properly to the kind cluster
+deploy: ensurelocal isnotrunning ztoperator-namespace generate install kustomize docker-build ztoperator-service-entry ## Deploy ztoperator and all the required resources for ztoperator to run properly to the kind cluster
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KIND)" load docker-image ${IMG} --name $(KIND_CLUSTER_NAME)
-		@if "$(KUBECTL)" get secret ztoperator-env -n ztoperator-system --context $(KUBECONTEXT) >/dev/null 2>&1; then \
-    		echo "⏳ Updating existing ztoperator-env secret..."; \
-    		"$(KUBECTL)" create secret generic ztoperator-env --from-env-file=.env -n ztoperator-system --context $(KUBECONTEXT) --dry-run=client -o yaml | \
-    		"$(KUBECTL)" apply --context $(KUBECONTEXT) -f -; \
-    	else \
-    		echo "⏳ Creating ztoperator-env secret..."; \
-    		"$(KUBECTL)" create secret generic ztoperator-env --from-env-file=.env -n ztoperator-system --context $(KUBECONTEXT); \
-    	fi
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
+	"$(KUBECTL)" wait pod --for=condition=ready --timeout=60s -n ztoperator-system -l app=ztoperator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying ztoperator." && exit 1)
+	@echo -e "✅  ztoperator installed in namespace 'ztoperator-system'!"
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy ztoperator and all the resources deployed by ztoperator to the kind cluster. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	@out="$$( "$(KUSTOMIZE)" build config/webhook 2>/dev/null || true )"; \
-	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No manager resources to delete; skipping."; fi
+	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No webhook resources to delete; skipping."; fi
 	@out="$$( "$(KUSTOMIZE)" build config/manager 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No manager resources to delete; skipping."; fi
 
