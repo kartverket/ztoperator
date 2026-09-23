@@ -51,40 +51,19 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
 
-dockers:
-  - image_templates:
-      - "ghcr.io/kartverket/ztoperator:{{ .Tag }}-linux-amd64"
-    use: buildx
+dockers_v2:
+  - images:
+      - "ghcr.io/kartverket/ztoperator"
     dockerfile: Dockerfile.goreleaser
-    build_flag_templates:
-      - "--pull"
-      - "--platform=linux/amd64"
-    goos: linux
-    goarch: amd64
-  - image_templates:
-      - "ghcr.io/kartverket/ztoperator:{{ .Tag }}-linux-arm64"
-    use: buildx
-    dockerfile: Dockerfile.goreleaser
-    build_flag_templates:
-      - "--pull"
-      - "--platform=linux/arm64"
-    goos: linux
-    goarch: arm64
-
-docker_manifests:
-  - name_template: "ghcr.io/kartverket/ztoperator:{{ .Tag }}"
-    image_templates:
-      - "ghcr.io/kartverket/ztoperator:{{ .Tag }}-linux-arm64"
-      - "ghcr.io/kartverket/ztoperator:{{ .Tag }}-linux-amd64"
-
-  - name_template: "ghcr.io/kartverket/ztoperator:latest"
-    image_templates:
-      - "ghcr.io/kartverket/ztoperator:{{ .Tag }}-linux-arm64"
-      - "ghcr.io/kartverket/ztoperator:{{ .Tag }}-linux-amd64"
+    tags:
+      - "{{ .Tag }}"
+      - "latest"
+    platforms:
+      - linux/amd64
+      - linux/arm64
 
 docker_signs:
-  - artifacts: all
-    cmd: cosign
+  - cmd: cosign
     args:
       - "sign"
       - "${artifact}"
