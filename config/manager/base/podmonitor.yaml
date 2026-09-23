@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    instance: primary
+  name: ztoperator-monitor
+  namespace: ztoperator-system
+spec:
+  namespaceSelector:
+    matchNames:
+      - ztoperator-system
+  podMetricsEndpoints:
+    - port: metrics
+  selector:
+    matchLabels:
+      app: ztoperator

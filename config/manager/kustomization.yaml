@@ -1,18 +1,24 @@
-resources:
-- deployment.yaml
-- leader-election-role.yaml
-- leader-election-rolebinding.yaml
-- netpol.yaml
-- pdb.yaml
-- serviceaccount.yaml
-- clusterrolebinding.yaml
-- service-entry.yaml
-- service.yaml
-- webhook-certificate.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+resources:
+- base/deployment.yaml
+- base/leader-election-role.yaml
+- base/leader-election-rolebinding.yaml
+- base/netpol.yaml
+- base/pdb.yaml
+- base/podmonitor.yaml
+- base/service.yaml
+- base/serviceaccount.yaml
+- base/webhook-certificate.yaml
+- base/webhook-issuer.yaml
+
 images:
 - name: controller
   newName: ztoperator
   newTag: latest
-- name: ztoperator
+
+configMapGenerator:
+- envs:
+  - base/.env
+  name: ztoperator-env
+  namespace: ztoperator-system
