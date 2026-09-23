@@ -1,7 +1,7 @@
 package requestauthentication
 
 import (
-	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/model"
 	securityv1 "istio.io/api/security/v1"
 	"istio.io/api/security/v1beta1"
 	istiotypev1beta1 "istio.io/api/type/v1beta1"
@@ -9,7 +9,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.RequestAuthentication {
+func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.RequestAuthentication {
 	if !scope.AuthPolicy.Spec.Enabled {
 		return nil
 	}

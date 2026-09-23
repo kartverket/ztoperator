@@ -1,11 +1,11 @@
-package state_test
+package model_test
 
 import (
 	"testing"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -14,7 +14,7 @@ import (
 )
 
 func TestReplaceDescendant_ReplacesExistingEntry(t *testing.T) {
-	s := &state.Scope{}
+	s := &model.Scope{}
 	secretName := "my-policy-envoy-secret"
 	initialSecret := newSecret(secretName)
 	updatedSecret := newSecret(secretName)
@@ -31,7 +31,7 @@ func TestReplaceDescendant_ReplacesExistingEntry(t *testing.T) {
 	assert.Len(t, s.Descendants, 1, "expected exactly one descendant entry after replacing")
 	descendant := s.Descendants[0]
 
-	assert.Equal(t, state.GetID("Secret", secretName), descendant.ID)
+	assert.Equal(t, model.GetID("Secret", secretName), descendant.ID)
 	assert.Same(t, updatedSecret, descendant.Object)
 
 	assert.Nil(t, descendant.ErrorMessage, "expected stale error message to be cleared")
@@ -43,10 +43,10 @@ func TestReplaceDescendant_ReplacesExistingEntry(t *testing.T) {
 }
 
 func TestReplaceDescendant_AppendsWhenExistingIDDoesNotMatch(t *testing.T) {
-	s := &state.Scope{
-		Descendants: []state.Descendant[client.Object]{
+	s := &model.Scope{
+		Descendants: []model.Descendant[client.Object]{
 			{
-				ID:     state.GetID("Secret", "other-secret"),
+				ID:     model.GetID("Secret", "other-secret"),
 				Object: newSecret("other-secret"),
 			},
 		},
@@ -58,32 +58,32 @@ func TestReplaceDescendant_AppendsWhenExistingIDDoesNotMatch(t *testing.T) {
 	s.ReplaceDescendant(secret, nil, &successMsg, "Secret", secretName)
 
 	require.Len(t, s.Descendants, 2)
-	assert.Equal(t, state.GetID("Secret", "other-secret"), s.Descendants[0].ID)
-	assert.Equal(t, state.GetID("Secret", secretName), s.Descendants[1].ID)
+	assert.Equal(t, model.GetID("Secret", "other-secret"), s.Descendants[0].ID)
+	assert.Equal(t, model.GetID("Secret", secretName), s.Descendants[1].ID)
 	assert.Same(t, secret, s.Descendants[1].Object)
 	require.NotNil(t, s.Descendants[1].SuccessMessage)
 	assert.Equal(t, successMsg, *s.Descendants[1].SuccessMessage)
 }
 
 func TestGetErrors_ReturnsOnlyDescendantErrors(t *testing.T) {
-	s := &state.Scope{}
+	s := &model.Scope{}
 	firstErr := "first error"
 	secondErr := "second error"
 	successMsg := "first success"
 
-	s.Descendants = []state.Descendant[client.Object]{
+	s.Descendants = []model.Descendant[client.Object]{
 		{
-			ID:           state.GetID("Secret", "first"),
+			ID:           model.GetID("Secret", "first"),
 			Object:       newSecret("first"),
 			ErrorMessage: &firstErr,
 		},
 		{
-			ID:             state.GetID("Secret", "second"),
+			ID:             model.GetID("Secret", "second"),
 			Object:         newSecret("second"),
 			SuccessMessage: &successMsg,
 		},
 		{
-			ID:           state.GetID("Secret", "third"),
+			ID:           model.GetID("Secret", "third"),
 			Object:       newSecret("third"),
 			ErrorMessage: &secondErr,
 		},
@@ -93,7 +93,7 @@ func TestGetErrors_ReturnsOnlyDescendantErrors(t *testing.T) {
 }
 
 func TestSetSaneDefaults_PreservesExplicitPaths(t *testing.T) {
-	autoLoginConfig := state.AutoLoginConfig{}
+	autoLoginConfig := model.AutoLoginConfig{}
 
 	callback := "/custom-callback"
 	logout := "/custom-logout"
@@ -108,7 +108,7 @@ func TestSetSaneDefaults_PreservesExplicitPaths(t *testing.T) {
 }
 
 func TestSetSaneDefaults_AddsOpenIDToScopesWhenMissing(t *testing.T) {
-	autoLoginConfig := state.AutoLoginConfig{
+	autoLoginConfig := model.AutoLoginConfig{
 		Scopes: []string{"profile", "email"},
 	}
 
@@ -118,7 +118,7 @@ func TestSetSaneDefaults_AddsOpenIDToScopesWhenMissing(t *testing.T) {
 }
 
 func TestSetSaneDefaults_AddsOpenIDToScopesWhenNil(t *testing.T) {
-	autoLoginConfig := state.AutoLoginConfig{}
+	autoLoginConfig := model.AutoLoginConfig{}
 
 	autoLoginConfig.SetSaneDefaults(ztoperatorv1alpha1.AutoLogin{})
 
@@ -126,7 +126,7 @@ func TestSetSaneDefaults_AddsOpenIDToScopesWhenNil(t *testing.T) {
 }
 
 func TestSetSaneDefaults_DoesNotDuplicateOpenIDInScopes(t *testing.T) {
-	autoLoginConfig := state.AutoLoginConfig{
+	autoLoginConfig := model.AutoLoginConfig{
 		Scopes: []string{"openid", "profile"},
 	}
 

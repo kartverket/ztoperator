@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -15,12 +15,12 @@ import (
 func ResolveOAuthCredentials(
 	ctx context.Context,
 	k8sClient client.Client,
-	authPolicy *ztoperatorv1alpha1.AuthPolicy,
-) (*state.OAuthCredentials, error) {
+	authPolicy ztoperatorv1alpha1.AuthPolicy,
+) (*model.OAuthCredentials, error) {
 	if authPolicy.Spec.OAuthCredentials == nil ||
 		authPolicy.Spec.AutoLogin == nil ||
 		!authPolicy.Spec.AutoLogin.Enabled {
-		return &state.OAuthCredentials{}, nil
+		return &model.OAuthCredentials{}, nil
 	}
 
 	oAuthSecret, err := helperfunctions.GetSecret(ctx, k8sClient, types.NamespacedName{
@@ -56,7 +56,7 @@ func ResolveOAuthCredentials(
 		)
 	}
 
-	return &state.OAuthCredentials{
+	return &model.OAuthCredentials{
 		ClientID:     &clientID,
 		ClientSecret: &clientSecret,
 	}, nil

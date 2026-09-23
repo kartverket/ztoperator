@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"istio.io/api/networking/v1alpha3"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -136,10 +136,10 @@ func TestGetDesired_ExternalIdP_ClusterPatchHasTLS(t *testing.T) {
 	assert.Equal(t, "envoy.transport_sockets.tls", ts["name"])
 }
 
-func defaultScope() state.Scope {
+func defaultScope() model.Scope {
 	clientID := "entraid_server"
 	endSession := "http://mock-oauth2.auth:8080/entraid/endsession"
-	return state.Scope{
+	return model.Scope{
 		AuthPolicy: ztoperatorv1alpha1.AuthPolicy{
 			ObjectMeta: metav1.ObjectMeta{Name: "auth-policy", Namespace: "default"},
 			Spec: ztoperatorv1alpha1.AuthPolicySpec{
@@ -150,21 +150,21 @@ func defaultScope() state.Scope {
 				AutoLogin: &ztoperatorv1alpha1.AutoLogin{Enabled: true},
 			},
 		},
-		OAuthCredentials: state.OAuthCredentials{
+		OAuthCredentials: model.OAuthCredentials{
 			ClientID: &clientID,
 		},
-		IdentityProviderUris: state.IdentityProviderUris{
+		IdentityProviderUris: model.IdentityProviderUris{
 			IssuerURI:        "http://mock-oauth2.auth:8080/entraid",
 			TokenURI:         "http://mock-oauth2.auth:8080/entraid/token",
 			AuthorizationURI: "http://mock-oauth2.auth:8080/entraid/authorize",
 			EndSessionURI:    &endSession,
 		},
-		AutoLoginConfig: state.AutoLoginConfig{
+		AutoLoginConfig: model.AutoLoginConfig{
 			Enabled:      true,
 			RedirectPath: "/oauth2/callback",
 			LogoutPath:   "/logout",
 			Scopes:       []string{"openid"},
-			LuaScriptConfig: state.LuaScriptConfig{
+			LuaScriptConfig: model.LuaScriptConfig{
 				LuaScript: "-- generated lua",
 			},
 			EnvoySecretName: "auth-policy-envoy-secret",

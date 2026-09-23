@@ -3,15 +3,15 @@ package secret
 import (
 	"fmt"
 
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
-func GetDesired(scope *state.Scope, objectMeta metav1.ObjectMeta) *v1.Secret {
+func GetDesired(scope *model.Scope, objectMeta metav1.ObjectMeta) *v1.Secret {
 	if !scope.AuthPolicy.Spec.Enabled || scope.InvalidConfig || scope.AuthPolicy.Spec.AutoLogin == nil ||
 		!scope.AuthPolicy.Spec.AutoLogin.Enabled {
 		return nil

@@ -76,7 +76,7 @@ func RefreshAuthPolicyInfo(ctx context.Context, k8sClient client.Client, authPol
 	var namespace v1.Namespace
 	_ = k8sClient.Get(ctx, client.ObjectKey{Name: authPolicy.Namespace}, &namespace)
 
-	idpAsParsedURL, err := helperfunctions.GetParsedURL(authPolicy.Spec.WellKnownURI)
+	idpAsParsedURL, err := helperfunctions.GetParsedHttpURL(authPolicy.Spec.WellKnownURI)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to get issuer hostname from issuer URI %s due to the following error: %w",
@@ -101,7 +101,7 @@ func RefreshAuthPolicyInfo(ctx context.Context, k8sClient client.Client, authPol
 			authPolicy.Namespace,
 			string(authPolicy.Status.Phase),
 			namespace.Labels["team"],
-			idpAsParsedURL.Scheme+"://"+idpAsParsedURL.Hostname(),
+			idpAsParsedURL.Host,
 			strconv.FormatBool(authPolicy.Spec.Enabled),
 			strconv.FormatBool(autoLoginEnabled),
 			"",
@@ -114,7 +114,7 @@ func RefreshAuthPolicyInfo(ctx context.Context, k8sClient client.Client, authPol
 			authPolicy.Namespace,
 			string(authPolicy.Status.Phase),
 			namespace.Labels["team"],
-			idpAsParsedURL.Scheme+"://"+idpAsParsedURL.Hostname(),
+			idpAsParsedURL.Host,
 			strconv.FormatBool(authPolicy.Spec.Enabled),
 			strconv.FormatBool(autoLoginEnabled),
 			pod.Name,

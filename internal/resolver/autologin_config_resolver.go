@@ -2,43 +2,19 @@ package resolver
 
 import (
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/names"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/luascript"
+	"github.com/kartverket/ztoperator/pkg/model"
 )
 
 // ResolveAutoLoginConfig constructs the AutoLoginConfig from the AuthPolicy spec and resolved identity provider URIs.
 func ResolveAutoLoginConfig(
-	authPolicy *ztoperatorv1alpha1.AuthPolicy,
-	identityProviderUris state.IdentityProviderUris,
-) state.AutoLoginConfig {
-	envoySecretName := names.EnvoySecret(authPolicy.Name)
-
-	if authPolicy.Spec.AutoLogin == nil || !authPolicy.Spec.AutoLogin.Enabled {
-		return state.AutoLoginConfig{
-			Enabled:         false,
-			EnvoySecretName: envoySecretName,
-		}
-	}
-
-	autoLoginConfig := state.AutoLoginConfig{
-		Enabled:               authPolicy.Spec.AutoLogin.Enabled,
-		LoginPath:             authPolicy.Spec.AutoLogin.LoginPath,
-		PostLogoutRedirectURI: authPolicy.Spec.AutoLogin.PostLogoutRedirectURI,
-		Scopes:                authPolicy.Spec.AutoLogin.Scopes,
-		LoginParams:           authPolicy.Spec.AutoLogin.LoginParams,
-		EnvoySecretName:       envoySecretName,
-	}
-
-	autoLoginConfig.SetSaneDefaults(*authPolicy.Spec.AutoLogin)
-
-	autoLoginConfig.LuaScriptConfig = state.LuaScriptConfig{
-		LuaScript: luascript.GenerateLuaScript(
-			authPolicy,
-			autoLoginConfig,
-			identityProviderUris,
-		),
-	}
-
+	authPolicy ztoperatorv1alpha1.AuthPolicy,
+	identityProviderUris model.IdentityProviderUris,
+) model.AutoLoginConfig {
+	autoLoginConfig := model.ToAutoLoginConfig(
+		authPolicy,
+		identityProviderUris,
+		luascript.GenerateLuaScript,
+	)
 	return autoLoginConfig
 }

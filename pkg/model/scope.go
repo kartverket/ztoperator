@@ -1,4 +1,4 @@
-package state
+package model
 
 import (
 	"fmt"
@@ -27,22 +27,6 @@ type IdentityProviderUris struct {
 	TokenURI         string
 	AuthorizationURI string
 	EndSessionURI    *string
-}
-
-type AutoLoginConfig struct {
-	Enabled               bool
-	LoginPath             *string
-	RedirectPath          string
-	LogoutPath            string
-	PostLogoutRedirectURI *string
-	Scopes                []string
-	LoginParams           map[string]string
-	LuaScriptConfig       LuaScriptConfig
-	EnvoySecretName       string
-}
-
-type LuaScriptConfig struct {
-	LuaScript string
 }
 
 type OAuthCredentials struct {

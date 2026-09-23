@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	"istio.io/api/security/v1beta1"
@@ -12,7 +12,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
+func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
 	if !scope.AuthPolicy.Spec.Enabled {
 		// AuthPolicy disabled, no deny rules to create
 		return nil
@@ -82,7 +82,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 Audience and issuer conditions are always included as base conditions.
 Additionally, any conditions specified as baseline auth are also included.
 */
-func constructBaseConditionsForDenyPolicy(scope *state.Scope) []*v1beta1.Condition {
+func constructBaseConditionsForDenyPolicy(scope *model.Scope) []*v1beta1.Condition {
 	audienceAndIssuerConditions := authorizationpolicy.GetAudienceAndIssuerConditionsForDenyPolicy(
 		authorizationpolicy.ConstructAcceptedResources(*scope),
 		scope.IdentityProviderUris.IssuerURI,

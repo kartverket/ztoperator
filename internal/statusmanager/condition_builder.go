@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,7 +17,7 @@ func BuildConditions(
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
 	reconciliationState ReconciliationState,
 	validationErrorMessage *string,
-	descendants []state.Descendant[client.Object],
+	descendants []model.Descendant[client.Object],
 	reconcileFuncs []reconciliation.ControllerResource,
 	existingConditions []metav1.Condition,
 ) []metav1.Condition {
@@ -40,7 +40,7 @@ func BuildAuthPolicyCondition(
 	validationErrorMessage *string,
 	existingConditions []metav1.Condition,
 ) metav1.Condition {
-	conditionType := state.GetID(strings.TrimPrefix(authPolicy.Kind, "*"), authPolicy.Name)
+	conditionType := model.GetID(strings.TrimPrefix(authPolicy.Kind, "*"), authPolicy.Name)
 
 	condition := metav1.Condition{
 		Type:               conditionType,
@@ -82,7 +82,7 @@ func BuildAuthPolicyCondition(
 
 // BuildDescendantConditions builds conditions for all descendants.
 func BuildDescendantConditions(
-	descendants []state.Descendant[client.Object],
+	descendants []model.Descendant[client.Object],
 	existingConditions []metav1.Condition,
 ) []metav1.Condition {
 	conditions := make([]metav1.Condition, 0, len(descendants))
@@ -124,7 +124,7 @@ func BuildDescendantConditions(
 
 // BuildMissingResourceConditions builds conditions for resources that were expected but not found.
 func BuildMissingResourceConditions(
-	descendants []state.Descendant[client.Object],
+	descendants []model.Descendant[client.Object],
 	reconcileFuncs []reconciliation.ControllerResource,
 	existingConditions []metav1.Condition,
 ) []metav1.Condition {
@@ -138,7 +138,7 @@ func BuildMissingResourceConditions(
 
 	for _, rf := range reconcileFuncs {
 		if !rf.IsResourceNil() {
-			expectedID := state.GetID(rf.GetResourceKind(), rf.GetResourceName())
+			expectedID := model.GetID(rf.GetResourceKind(), rf.GetResourceName())
 			if !descendantIDs[expectedID] {
 				condition := metav1.Condition{
 					Type:   expectedID,

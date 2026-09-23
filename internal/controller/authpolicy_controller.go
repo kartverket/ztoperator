@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 
@@ -12,12 +11,12 @@ import (
 	"github.com/kartverket/ztoperator/internal/predicates"
 	"github.com/kartverket/ztoperator/internal/reconciler"
 	"github.com/kartverket/ztoperator/internal/resolver"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/internal/statusmanager"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/metrics"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/kartverket/ztoperator/pkg/validation"
@@ -118,16 +117,16 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	var scope *state.Scope
+	var scope *model.Scope
 	if validationErr := validateAuthPolicy(ctx, authPolicy); validationErr != nil {
 		validationErrorMessage := validationErr.Error()
-		scope = &state.Scope{
+		scope = &model.Scope{
 			AuthPolicy:             *authPolicy,
 			InvalidConfig:          true,
 			ValidationErrorMessage: &validationErrorMessage,
 		}
 	} else {
-		resolvedScope, err := resolveAuthPolicy(ctx, r.Client, authPolicy, r.DiscoveryDocumentResolver)
+		resolvedScope, err := resolveAuthPolicy(ctx, r.Client, *authPolicy, r.DiscoveryDocumentResolver)
 		if err != nil {
 			rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))
 			authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
@@ -153,7 +152,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *AuthPolicyReconciler) doReconcile(
 	ctx context.Context,
 	reconcileFuncs []reconciliation.ControllerResource,
-	scope *state.Scope,
+	scope *model.Scope,
 ) (ctrl.Result, error) {
 	result := ctrl.Result{}
 	var errs []error
@@ -210,13 +209,10 @@ func (r *AuthPolicyReconciler) doReconcile(
 func resolveAuthPolicy(
 	ctx context.Context,
 	k8sClient client.Client,
-	authPolicy *ztoperatorv1alpha1.AuthPolicy,
+	authPolicy ztoperatorv1alpha1.AuthPolicy,
 	discoveryDocumentResolver rest.DiscoveryDocumentResolver,
-) (*state.Scope, error) {
+) (*model.Scope, error) {
 	rLog := log.GetLogger(ctx)
-	if authPolicy == nil {
-		return nil, errors.New("encountered AuthPolicy as null when resolving")
-	}
 	rLog.Info(fmt.Sprintf("Trying to resolve auth policy %s/%s", authPolicy.Namespace, authPolicy.Name))
 
 	oAuthCredentials, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
@@ -255,9 +251,9 @@ func resolveAuthPolicy(
 
 	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name %s/%s", authPolicy.Namespace, authPolicy.Name))
 
-	return &state.Scope{
+	return &model.Scope{
 		Audiences:            *resolvedAudiences,
-		AuthPolicy:           *authPolicy,
+		AuthPolicy:           authPolicy,
 		AutoLoginConfig:      autoLoginConfig,
 		OAuthCredentials:     *oAuthCredentials,
 		IdentityProviderUris: *identityProviderUris,
