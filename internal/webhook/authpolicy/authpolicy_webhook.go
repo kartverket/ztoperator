@@ -1,4 +1,4 @@
-package v1
+package authpolicy
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/pkg/config"
+	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -17,14 +17,14 @@ import (
 // AuthPolicyCustomValidator validates AuthPolicy objects before they are
 // persisted by the Kubernetes API server.
 type AuthPolicyCustomValidator struct {
-	DiscoveryDocumentCache *config.DiscoveryDocumentCache
+	DiscoveryDocumentCache map[string]rest.DiscoveryDocument
 }
 
 var _ admission.Validator[*ztoperatorv1alpha1.AuthPolicy] = &AuthPolicyCustomValidator{}
 
 // SetupAuthPolicyWebhookWithManager registers the AuthPolicy validating
 // webhook with the configured well-known URI cache.
-func SetupAuthPolicyWebhookWithManager(mgr ctrl.Manager, discoveryCache *config.DiscoveryDocumentCache) error {
+func SetupAuthPolicyWebhookWithManager(mgr ctrl.Manager, discoveryCache map[string]rest.DiscoveryDocument) error {
 	return ctrl.NewWebhookManagedBy(mgr, &ztoperatorv1alpha1.AuthPolicy{}).
 		WithValidator(&AuthPolicyCustomValidator{DiscoveryDocumentCache: discoveryCache}).
 		Complete()
@@ -53,16 +53,13 @@ func (v *AuthPolicyCustomValidator) ValidateDelete(
 
 func validateAuthPolicy(
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
-	discoveryCache *config.DiscoveryDocumentCache,
+	discoveryCache map[string]rest.DiscoveryDocument,
 ) error {
 	if authPolicy == nil {
 		return errors.New("AuthPolicy must not be nil")
 	}
 
-	if err := validation.ValidateWellKnownURI(authPolicy.Spec.WellKnownURI); err != nil {
-		return err
-	}
-	if !discoveryCache.IsAllowed(authPolicy.Spec.WellKnownURI) {
+	if _, allowed := discoveryCache[authPolicy.Spec.WellKnownURI]; !allowed {
 		return fmt.Errorf("wellKnownURI %q is not in the configured allowlist", authPolicy.Spec.WellKnownURI)
 	}
 	return validation.ValidatePaths(authPolicy.GetPaths())

@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kartverket/ztoperator/internal/webhook/authpolicy"
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/metrics"
@@ -105,7 +106,6 @@ func main() {
 		setupLog.Error(configLoadErr, "unable to load config")
 		os.Exit(1)
 	}
-	operatorConfig := config.Get()
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -199,7 +199,7 @@ func main() {
 		Client:                 mgr.GetClient(),
 		Scheme:                 mgr.GetScheme(),
 		Recorder:               mgr.GetEventRecorder("authpolicy-controller"),
-		DiscoveryDocumentCache: operatorConfig.DiscoveryDocumentCache,
+		DiscoveryDocumentCache: config.Get().DiscoveryDocumentCache,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthPolicy")
 		os.Exit(1)
@@ -210,9 +210,9 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Pod")
 			os.Exit(1)
 		}
-		if err := v1.SetupAuthPolicyWebhookWithManager(
+		if err := authpolicy.SetupAuthPolicyWebhookWithManager(
 			mgr,
-			operatorConfig.DiscoveryDocumentCache,
+			config.Get().DiscoveryDocumentCache,
 		); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "AuthPolicy")
 			os.Exit(1)

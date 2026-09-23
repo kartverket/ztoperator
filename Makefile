@@ -180,7 +180,7 @@ deploy: ensurelocal isnotrunning ztoperator-namespace generate install kustomize
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KIND)" load docker-image ${IMG} --name $(KIND_CLUSTER_NAME)
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
-	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
+	"$(KUSTOMIZE)" build config/manager/local | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUBECTL)" wait --context $(KUBECONTEXT) --namespace ztoperator-system \
 		--for=condition=Available deployment/ztoperator --timeout=120s
 
@@ -188,7 +188,7 @@ deploy: ensurelocal isnotrunning ztoperator-namespace generate install kustomize
 undeploy: kustomize ## Undeploy ztoperator and all the resources deployed by ztoperator to the kind cluster. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	@out="$$( "$(KUSTOMIZE)" build config/webhook 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No manager resources to delete; skipping."; fi
-	@out="$$( "$(KUSTOMIZE)" build config/manager 2>/dev/null || true )"; \
+	@out="$$( "$(KUSTOMIZE)" build config/manager/local 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No manager resources to delete; skipping."; fi
 
 .PHONY: webhooks

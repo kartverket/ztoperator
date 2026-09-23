@@ -3,8 +3,6 @@ package rest
 import (
 	"errors"
 	"fmt"
-	"net/url"
-	"strings"
 	"time"
 
 	"resty.dev/v3"
@@ -14,35 +12,6 @@ import (
 
 type DiscoveryDocumentResolver interface {
 	GetOAuthDiscoveryDocument(uri string, rLog log.Logger) (*DiscoveryDocument, error)
-}
-
-// ValidateWellKnownURI is kept for callers of the REST package. The canonical
-// implementation is retained here for compatibility with the REST client.
-func ValidateWellKnownURI(uri string) error {
-	if uri == "" {
-		return errors.New("wellKnownURI must not be empty")
-	}
-
-	parsed, err := url.Parse(uri)
-	if err != nil {
-		return fmt.Errorf("wellKnownURI %q is not a valid URL: %w", uri, err)
-	}
-
-	scheme := strings.ToLower(parsed.Scheme)
-	if scheme != "http" && scheme != "https" {
-		return fmt.Errorf("wellKnownURI %q must use http or https scheme", uri)
-	}
-	if parsed.Host == "" {
-		return fmt.Errorf("wellKnownURI %q must include a host", uri)
-	}
-	if parsed.RawQuery != "" {
-		return fmt.Errorf("wellKnownURI %q must not contain a query string", uri)
-	}
-	if parsed.Fragment != "" {
-		return fmt.Errorf("wellKnownURI %q must not contain a fragment", uri)
-	}
-
-	return nil
 }
 
 // HTTPDiscoveryDocumentResolver is used only while loading the startup cache.
@@ -67,6 +36,12 @@ func NewDefaultDiscoveryDocumentResolver() *DefaultDiscoveryDocumentResolver {
 	}
 }
 
+// NewDiscoveryDocumentMapResolver creates a resolver that only reads from the
+// provided, already loaded discovery documents.
+func NewDiscoveryDocumentMapResolver(documents map[string]DiscoveryDocument) *DefaultDiscoveryDocumentResolver {
+	return &DefaultDiscoveryDocumentResolver{documents: documents}
+}
+
 func (r *DefaultDiscoveryDocumentResolver) GetOAuthDiscoveryDocument(
 	uri string,
 	_ log.Logger,
@@ -86,9 +61,6 @@ func (r *HTTPDiscoveryDocumentResolver) GetOAuthDiscoveryDocument(
 	uri string,
 	rLog log.Logger,
 ) (*DiscoveryDocument, error) {
-	if err := ValidateWellKnownURI(uri); err != nil {
-		return nil, err
-	}
 
 	var discoveryDocument DiscoveryDocument
 	rLog.Info(fmt.Sprintf("Fetching discovery document for well-known uri: %s", uri))

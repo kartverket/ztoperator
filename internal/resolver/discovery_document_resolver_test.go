@@ -8,7 +8,6 @@ import (
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/resolver"
-	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/rest"
@@ -17,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestInvalidWellKnownUriGivesError(t *testing.T) {
+func TestWellKnownURIOutsideLoadedDocumentsGivesError(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. Arrange
@@ -196,23 +195,20 @@ func TestResolveDiscoveryDocumentUsesCacheWithoutHTTPCall(t *testing.T) {
 	defer server.Close()
 
 	wellKnownURI := server.URL + "/.well-known/openid-configuration"
-	cache := config.NewDiscoveryDocumentCache(
-		[]string{wellKnownURI},
-		map[string]rest.DiscoveryDocument{
-			wellKnownURI: {
-				Issuer:                helperfunctions.Ptr("https://idp.example.com"),
-				JwksURI:               helperfunctions.Ptr("https://idp.example.com/jwks"),
-				TokenEndpoint:         helperfunctions.Ptr("https://idp.example.com/token"),
-				AuthorizationEndpoint: helperfunctions.Ptr("https://idp.example.com/authorize"),
-				EndSessionEndpoint:    helperfunctions.Ptr("https://idp.example.com/endsession"),
-			},
+	discoveryDocuments := map[string]rest.DiscoveryDocument{
+		wellKnownURI: {
+			Issuer:                helperfunctions.Ptr("https://idp.example.com"),
+			JwksURI:               helperfunctions.Ptr("https://idp.example.com/jwks"),
+			TokenEndpoint:         helperfunctions.Ptr("https://idp.example.com/token"),
+			AuthorizationEndpoint: helperfunctions.Ptr("https://idp.example.com/authorize"),
+			EndSessionEndpoint:    helperfunctions.Ptr("https://idp.example.com/endsession"),
 		},
-	)
+	}
 
 	result, err := resolver.ResolveDiscoveryDocument(
 		ctx,
 		defaultZtoperatorAuthPolicy(wellKnownURI),
-		cache,
+		rest.NewDiscoveryDocumentMapResolver(discoveryDocuments),
 	)
 
 	require.NoError(t, err)

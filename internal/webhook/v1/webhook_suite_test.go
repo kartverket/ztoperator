@@ -12,16 +12,17 @@ import (
 	"time"
 
 	ztoperatorv1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/webhook/authpolicy"
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
-	restclient "github.com/kartverket/ztoperator/pkg/rest"
+	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
+	k8srest "k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -45,7 +46,7 @@ var (
 	ctx       context.Context
 	cancel    context.CancelFunc
 	k8sClient client.Client
-	cfg       *rest.Config
+	cfg       *k8srest.Config
 	testEnv   *envtest.Environment
 
 	webhookManifestsDir string
@@ -69,11 +70,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Load environment variables
-	err = os.Setenv("ZTOPERATOR_CLUSTER_NAME", "test-cluster")
-	Expect(err).NotTo(HaveOccurred())
-	err = os.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", testWellKnownURI)
-	Expect(err).NotTo(HaveOccurred())
-	err = config.LoadWithResolver(restclient.NewDefaultDiscoveryDocumentResolver())
+	Expect(os.Setenv("ZTOPERATOR_CLUSTER_NAME", "test-cluster")).To(Succeed())
+	Expect(os.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", testWellKnownURI)).To(Succeed())
+	err = config.LoadWithResolver(rest.NewDefaultDiscoveryDocumentResolver())
 	Expect(err).NotTo(HaveOccurred())
 
 	webhookManifestsDir, err = buildWebhookManifestsWithKustomize()
@@ -124,7 +123,7 @@ var _ = BeforeSuite(func() {
 
 	err = v1.SetupPodWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
-	err = v1.SetupAuthPolicyWebhookWithManager(mgr, config.Get().DiscoveryDocumentCache)
+	err = authpolicy.SetupAuthPolicyWebhookWithManager(mgr, config.Get().DiscoveryDocumentCache)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:webhook

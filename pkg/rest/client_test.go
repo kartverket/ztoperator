@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kartverket/ztoperator/pkg/config"
 	ztlog "github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/stretchr/testify/require"
@@ -57,56 +56,6 @@ func TestGetOAuthDiscoveryDocument_FetchesUnknownURIOverHTTP(t *testing.T) {
 	assertStringPtrValue(t, "token_endpoint", doc.TokenEndpoint, "https://issuer.example.com/token")
 	assertStringPtrValue(t, "jwks_uri", doc.JwksURI, "https://issuer.example.com/jwks")
 	assertStringPtrValue(t, "end_session_endpoint", doc.EndSessionEndpoint, "https://issuer.example.com/logout")
-}
-
-func TestDiscoveryDocumentCache_DoesNotFetchUnknownURI(t *testing.T) {
-	t.Parallel()
-
-	requested := false
-	cache := config.NewDiscoveryDocumentCache(
-		[]string{"https://cached.example.com/.well-known/openid-configuration"},
-		map[string]rest.DiscoveryDocument{
-			"https://cached.example.com/.well-known/openid-configuration": {
-				Issuer: stringPtr("https://cached.example.com"),
-			},
-		},
-	)
-
-	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		requested = true
-	}))
-	defer server.Close()
-
-	document, err := cache.GetOAuthDiscoveryDocument(server.URL, testLogger())
-	require.Error(t, err)
-	require.Nil(t, document)
-	require.False(t, requested)
-}
-
-func TestDiscoveryDocumentCache_ReturnsDefensiveDocumentCopy(t *testing.T) {
-	t.Parallel()
-
-	uri := "https://cached.example.com/.well-known/openid-configuration"
-	cache := config.NewDiscoveryDocumentCache(
-		[]string{uri},
-		map[string]rest.DiscoveryDocument{
-			uri: {
-				Issuer: stringPtr("https://cached.example.com"),
-			},
-		},
-	)
-
-	first, err := cache.GetOAuthDiscoveryDocument(uri, testLogger())
-	require.NoError(t, err)
-	*first.Issuer = "https://mutated.example.com"
-
-	second, err := cache.GetOAuthDiscoveryDocument(uri, testLogger())
-	require.NoError(t, err)
-	require.Equal(t, "https://cached.example.com", *second.Issuer)
-}
-
-func stringPtr(value string) *string {
-	return &value
 }
 
 func TestGetOAuthDiscoveryDocument_ReturnsErrorForNon200Response(t *testing.T) {

@@ -56,11 +56,13 @@ func TestLoadWithResolverCachesAllConfiguredDiscoveryDocuments(t *testing.T) {
 	require.NotNil(t, loaded.DiscoveryDocumentCache)
 	require.Equal(t, []string{configTestURI1, configTestURI2}, loaded.AllowedWellKnownURIs)
 	require.Equal(t, []string{configTestURI1, configTestURI2}, resolver.calls)
-	require.True(t, loaded.DiscoveryDocumentCache.IsAllowed(configTestURI1))
-	require.True(t, loaded.DiscoveryDocumentCache.IsAllowed(configTestURI2))
+	_, uri1Allowed := loaded.DiscoveryDocumentCache[configTestURI1]
+	require.True(t, uri1Allowed)
+	_, uri2Allowed := loaded.DiscoveryDocumentCache[configTestURI2]
+	require.True(t, uri2Allowed)
 
-	document, err := loaded.DiscoveryDocumentCache.GetOAuthDiscoveryDocument(configTestURI1, log.Logger{})
-	require.NoError(t, err)
+	document, documentCached := loaded.DiscoveryDocumentCache[configTestURI1]
+	require.True(t, documentCached)
 	require.Equal(t, "https://idp-one.example.com", *document.Issuer)
 }
 
@@ -81,9 +83,33 @@ func TestLoadFetchesAndCachesDiscoveryDocumentFromConfiguredHTTPEndpoint(t *test
 
 	require.NoError(t, config.Load())
 	loaded := config.Get()
-	document, err := loaded.DiscoveryDocumentCache.GetOAuthDiscoveryDocument(uri, log.Logger{})
-	require.NoError(t, err)
+	document, documentCached := loaded.DiscoveryDocumentCache[uri]
+	require.True(t, documentCached)
 	require.Equal(t, "https://idp.example.com", *document.Issuer)
+}
+
+func TestGetReturnsDefensiveDiscoveryDocumentCopy(t *testing.T) {
+	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", configTestURI1)
+
+	resolver := &configTestResolver{
+		documents: map[string]*rest.DiscoveryDocument{
+			configTestURI1: {
+				Issuer: helperfunctions.Ptr("https://idp-one.example.com"),
+			},
+		},
+		errors: map[string]error{},
+	}
+
+	require.NoError(t, config.LoadWithResolver(resolver))
+	loaded := config.Get()
+	loadedDocument := loaded.DiscoveryDocumentCache[configTestURI1]
+	*loadedDocument.Issuer = "https://mutated.example.com"
+	loaded.DiscoveryDocumentCache[configTestURI1] = rest.DiscoveryDocument{}
+
+	fresh := config.Get()
+	freshDocument, exists := fresh.DiscoveryDocumentCache[configTestURI1]
+	require.True(t, exists)
+	require.Equal(t, "https://idp-one.example.com", *freshDocument.Issuer)
 }
 
 func TestLoadFailsWhenConfiguredHTTPEndpointIsUnavailable(t *testing.T) {

@@ -14,7 +14,6 @@ import (
 	"github.com/kartverket/ztoperator/internal/resolver"
 	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/internal/statusmanager"
-	operatorconfig "github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
 	"github.com/kartverket/ztoperator/pkg/log"
@@ -41,7 +40,7 @@ type AuthPolicyReconciler struct {
 	client.Client
 	Scheme                 *runtime.Scheme
 	Recorder               events.EventRecorder
-	DiscoveryDocumentCache *operatorconfig.DiscoveryDocumentCache
+	DiscoveryDocumentCache map[string]rest.DiscoveryDocument
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -212,7 +211,7 @@ func resolveAuthPolicy(
 	ctx context.Context,
 	k8sClient client.Client,
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
-	discoveryDocumentResolver rest.DiscoveryDocumentResolver,
+	discoveryDocuments map[string]rest.DiscoveryDocument,
 ) (*state.Scope, error) {
 	rLog := log.GetLogger(ctx)
 	if authPolicy == nil {
@@ -236,7 +235,7 @@ func resolveAuthPolicy(
 	var identityProviderUris, errIdentityProviderUris = resolver.ResolveDiscoveryDocument(
 		ctx,
 		authPolicy,
-		discoveryDocumentResolver,
+		rest.NewDiscoveryDocumentMapResolver(discoveryDocuments),
 	)
 	if errIdentityProviderUris != nil {
 		return nil, errIdentityProviderUris
@@ -270,22 +269,12 @@ func resolveAuthPolicy(
 func validateAuthPolicy(
 	ctx context.Context,
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
-	discoveryCache *operatorconfig.DiscoveryDocumentCache,
+	discoveryCache map[string]rest.DiscoveryDocument,
 ) error {
 	rLog := log.GetLogger(ctx)
 
-	rLog.Debug("Validating WellKnownURI for AuthPolicy", "namespace", authPolicy.Namespace, "name", authPolicy.Name)
-	if err := validation.ValidateWellKnownURI(authPolicy.Spec.WellKnownURI); err != nil {
-		rLog.Error(
-			err,
-			"wellKnownURI validation failed for AuthPolicy",
-			"namespace", authPolicy.Namespace,
-			"name", authPolicy.Name,
-		)
-		return err
-	}
 	rLog.Debug("Validating AuthPolicy wellKnownURI against configured allowlist", "namespace", authPolicy.Namespace, "name", authPolicy.Name)
-	if !discoveryCache.IsAllowed(authPolicy.Spec.WellKnownURI) {
+	if _, allowed := discoveryCache[authPolicy.Spec.WellKnownURI]; !allowed {
 		err := fmt.Errorf("wellKnownURI %q is not in the configured allowlist", authPolicy.Spec.WellKnownURI)
 		rLog.Error(
 			err,
