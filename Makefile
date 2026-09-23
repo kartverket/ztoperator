@@ -86,8 +86,8 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: run-local
-run-local: ensurelocal ensureztoperatornotdeployed generate install webhooks sourceenv ## Run ztoperator from your host.
-	go run ./cmd/main.go -webhook-cert-path=./webhook-certs
+run-local: ensurelocal ensureztoperatornotdeployed generate install webhooks ## Run ztoperator from your host.
+	set -a; . config/manager/base/.env; set +a; go run ./cmd/main.go -webhook-cert-path=./webhook-certs
 
 .PHONY: isrunning
 isrunning: ## Check if ztoperator is running on your host machine (i.e. from IDE or with 'make run-local')
@@ -100,10 +100,6 @@ isnotrunning: ## Check if ztoperator is NOT running on your host machine (i.e. f
 	@echo "Checking if ztoperator is not running..."
 	@lsof -i :8081 > /dev/null || (echo "✅ ztoperator is not running on your host. Ready to deploy." && exit 0 || echo "❌ ztoperator is running on your host. Please stop it first." && exit 1)
 	@echo "✅ ztoperator is not running."
-
-.PHONY: sourceenv
-sourceenv: ## Source environment variables from .env file
-	@set -a; [ -f .env ] && . .env; set +a
 
 .PHONY: local
 local: cluster ztoperator-namespace cert-manager istio-gateways skiperator mock-oauth2 generate install ## Set up entire local development environment with external dependencies
