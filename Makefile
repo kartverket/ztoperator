@@ -110,7 +110,7 @@ clean: kind ## Clean up local environment by deleting kind cluster
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	"$(CONTROLLER_GEN)" rbac:roleName=ztoperator crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases output:webhook:artifacts:config=config/webhook/bases
+	"$(CONTROLLER_GEN)" object rbac:roleName=ztoperator crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases output:webhook:artifacts:config=config/webhook/bases
 
 .PHONY: docs
 docs: ## Generate API documentation from CRD bases using crdoc
