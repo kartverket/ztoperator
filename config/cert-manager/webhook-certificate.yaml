@@ -1,0 +1,15 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  labels:
+    app.kubernetes.io/name: ztoperator
+  name: webhook-cert
+  namespace: ztoperator-system
+spec:
+  dnsNames:
+    - webhook-service.ztoperator-system.svc
+    - webhook-service.ztoperator-system.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: webhook-selfsigned
+  secretName: webhook-server-cert

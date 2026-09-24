@@ -34,6 +34,11 @@ SHELL = /usr/bin/env bash -o pipefail
 
 ##@ Variables
 
+ALLOWED_LOCAL_EGRESS_HOSTS = test.idporten.no,test.ansattporten.no,test.maskinporten.no,login.microsoftonline.com
+# Pinned by digest so local runs and the api-docs workflow render identically.
+CRDOC_IMAGE                ?= ghcr.io/fybrik/crdoc@sha256:355ef777a45021ee864e613b2234b4f2c6193762e3e0de94a26b66d06cec81c3
+CRDOC_RESOURCES_DIR        := crdoc-resources
+
 KUBERNETES_VERSION			= 1.35.1
 CERT_MANAGER_VERSION		= 1.20.2
 ISTIO_VERSION 				= $(call extract-version,istio.io/client-go)
@@ -99,10 +104,6 @@ isnotrunning: ## Check if ztoperator is NOT running on your host machine (i.e. f
 	@lsof -i :8081 > /dev/null || (echo "✅ ztoperator is not running on your host. Ready to deploy." && exit 0 || echo "❌ ztoperator is running on your host. Please stop it first." && exit 1)
 	@echo "✅ ztoperator is not running."
 
-.PHONY: sourceenv
-sourceenv: ## Source environment variables from config/manager/base/.env file
-	@set -a; [ -f config/manager/base/.env ] && . config/manager/base/.env; set +a
-
 .PHONY: local
 local: cluster ztoperator-namespace cert-manager istio-gateways skiperator mock-oauth2 generate install ## Set up entire local development environment with external dependencies
 
@@ -112,16 +113,25 @@ clean: kind ## Clean up local environment by deleting kind cluster
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	"$(CONTROLLER_GEN)" rbac:roleName=ztoperator crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases output:webhook:artifacts:config=config/webhook/bases
+	"$(CONTROLLER_GEN)" object rbac:roleName=ztoperator crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases output:webhook:artifacts:config=config/webhook/bases
 
-.PHONY: docs
-docs: ## Generate API documentation from CRD bases using crdoc
-	docker run --platform linux/amd64 \
-	  -u $$(id -u):$$(id -g) --rm \
-	  -v $$PWD:/workdir \
-	  ghcr.io/fybrik/crdoc:latest \
-	  --resources /workdir/config/crd/bases \
-	  --output /workdir/api-docs.md
+# Renders api-docs.md from the generated CRDs. crdoc only reads the directory it
+# is pointed at, so the CRDs are staged in one and removed again afterwards.
+.PHONY: apidocs
+apidocs:
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "docker not found on PATH, skipping apidocs"; \
+		exit 0; \
+	fi; \
+	mkdir -p $(CRDOC_RESOURCES_DIR) || exit 1; \
+	cp config/crd/bases/ztoperator.kartverket.no_*.yaml $(CRDOC_RESOURCES_DIR)/ || exit 1; \
+	docker run -u $$(id -u):$$(id -g) --rm -v "$(PWD)":/workdir $(CRDOC_IMAGE) \
+		--resources /workdir/$(CRDOC_RESOURCES_DIR) \
+		--output /workdir/api-docs.md \
+		--template /workdir/.github/crdoc.tmpl; \
+	status=$$?; \
+	rm -rf $(CRDOC_RESOURCES_DIR); \
+	exit $$status
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -152,45 +162,36 @@ build: generate fmt vet ## Build manager binary.
 docker-build: ## Build docker image with the manager.
 	$(CONTAINER_TOOL) build -t ${IMG} .
 
-# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
-# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
-# - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
-# To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
-PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
-.PHONY: docker-buildx
-docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	- $(CONTAINER_TOOL) buildx create --name ztoperator-builder
-	$(CONTAINER_TOOL) buildx use ztoperator-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
-	- $(CONTAINER_TOOL) buildx rm ztoperator-builder
-	rm Dockerfile.cross
-
 ##@ Deployment
 
 ifndef ignore-not-found
   ignore-not-found = false
 endif
 
+.PHONY: ztoperator-service-entry
+ztoperator-service-entry: kubectl ztoperator-namespace ## Create a ServiceEntry for ztoperator with the allowed egress hosts.
+	@hosts_list="$(ALLOWED_LOCAL_EGRESS_HOSTS)"; \
+	hosts_yaml=""; \
+	for host in $$(echo "$$hosts_list" | tr ',' '\n'); do \
+		hosts_yaml="$$hosts_yaml    - $$host\n"; \
+	done; \
+	printf "apiVersion: networking.istio.io/v1\nkind: ServiceEntry\nmetadata:\n  name: ztoperator-egress\n  namespace: ztoperator-system\nspec:\n  exportTo:\n    - .\n  hosts:\n$$hosts_yaml  ports:\n    - name: https\n      number: 443\n      protocol: HTTPS\n  resolution: DNS\n" | \
+	$(KUBECTL) apply --context $(KUBECONTEXT) -f -
+
+
 .PHONY: deploy
-deploy: ensurelocal isnotrunning ztoperator-namespace generate install kustomize docker-build ## Deploy ztoperator and all the required resources for ztoperator to run properly to the kind cluster
+deploy: ensurelocal isnotrunning ztoperator-namespace generate install kustomize docker-build ztoperator-service-entry ## Deploy ztoperator and all the required resources for ztoperator to run properly to the kind cluster
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KIND)" load docker-image ${IMG} --name $(KIND_CLUSTER_NAME)
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
-	"$(KUBECTL)" patch networkpolicy ztoperator-netpol --namespace ztoperator-system --context $(KUBECONTEXT) \
-		--type=json \
-		--patch='[{"op":"add","path":"/spec/egress/-","value":{"ports":[{"port":8080,"protocol":"TCP"}],"to":[{"namespaceSelector":{"matchLabels":{"kubernetes.io/metadata.name":"auth"}},"podSelector":{"matchLabels":{"app":"mock-oauth2"}}}]}}]'
-	"$(KUBECTL)" wait --context $(KUBECONTEXT) --namespace ztoperator-system \
-		--for=condition=Available deployment/ztoperator --timeout=120s
+	"$(KUBECTL)" wait pod --for=condition=ready --timeout=60s -n ztoperator-system -l app=ztoperator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying ztoperator." && exit 1)
+	@echo -e "✅  ztoperator installed in namespace 'ztoperator-system'!"
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy ztoperator and all the resources deployed by ztoperator to the kind cluster. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	@out="$$( "$(KUSTOMIZE)" build config/webhook 2>/dev/null || true )"; \
-	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No manager resources to delete; skipping."; fi
+	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No webhook resources to delete; skipping."; fi
 	@out="$$( "$(KUSTOMIZE)" build config/manager 2>/dev/null || true )"; \
 	if [ -n "$$out" ]; then echo "$$out" | "$(KUBECTL)" delete --context $(KUBECONTEXT) --ignore-not-found=$(ignore-not-found) -f -; else echo "No manager resources to delete; skipping."; fi
 
@@ -323,7 +324,7 @@ ensureztoperatordeployed: kubectl ensurelocal isnotrunning ## Ensure ztoperator 
 .PHONY: ensurerunningordeployed
 ensurerunningordeployed: ## Ensure ztoperator is running on host OR deployed in cluster, but not both
 	@$(MAKE) isrunning >/dev/null 2>&1 && running=1 || running=0; \
-	$(MAKE) ensureztoperatordeployed && deployed=1 || deployed=0; \
+	$(MAKE) ensureztoperatordeployed >/dev/null 2>&1 && deployed=1 || deployed=0; \
 	if [ "$$running" = "1" ] && [ "$$deployed" = "1" ]; then \
 		echo "❌ Ztoperator is both running on the host AND deployed in the cluster. Stop one before continuing."; \
 		exit 1; \

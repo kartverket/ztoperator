@@ -24,6 +24,9 @@ spec:
             - -metrics-bind-address=0.0.0.0:8181
             - -metrics-secure=false
             - -webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
+          env:
+            - name: GOMEMLIMIT
+              value: "230MiB"
           envFrom:
             - configMapRef:
                 name: ztoperator-env
