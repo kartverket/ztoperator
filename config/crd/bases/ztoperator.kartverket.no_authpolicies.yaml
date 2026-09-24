@@ -264,8 +264,10 @@ spec:
                       rule: self.all(k, k.matches('^[a-zA-Z_][a-zA-Z0-9_]*$'))
                   loginPath:
                     description: |-
-                      LoginPath specifies a list of URI paths that should trigger the auto-login behavior.
-                      When a request matches any of these paths, the user will be redirected to log in if not already authenticated.
+                      LoginPath specifies a single path that triggers auto-login behavior.
+                      Auto-login is also triggered for endpoints that require authentication,
+                      unless the matching `authRules` entry sets `denyRedirect: true`.
+                      Requests matching this path will redirect unauthenticated users to log in.
                     maxLength: 1024
                     pattern: ^/.*$
                     type: string
