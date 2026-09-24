@@ -2,8 +2,6 @@ name: Update API-docs
 
 on:
   push:
-    paths:
-      - 'config/crd/bases/**'
     tags:
       - 'v*'
 
@@ -14,11 +12,12 @@ concurrency:
 permissions:
   contents: write
   id-token: write
-  pull-requests: writ
+  pull-requests: write
 
 jobs:
   sync-docs:
     name: Update API docs in skip.kartverket.no
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     runs-on: ubuntu-latest
     steps:
       - name: Get token for skip.kartverket.no
@@ -47,12 +46,20 @@ jobs:
           token: ${{ steps.octo-sts.outputs.token }}
           persist-credentials: false
 
-      - name: Copy generated API docs to target repository
+      - name: Compare generated API docs
+        id: api-docs
         run: |
-          mkdir -p target/docs/08-tilgangsstyring/08-ztoperator
-          cp source/api-docs.md target/docs/08-tilgangsstyring/08-ztoperator/03-api-docs.md
+          target_file=target/docs/08-tilgangsstyring/08-ztoperator/03-api-docs.md
+          if cmp --silent source/api-docs.md "$target_file"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            mkdir -p "$(dirname "$target_file")"
+            cp source/api-docs.md "$target_file"
+          fi
 
       - name: Create Pull Request
+        if: steps.api-docs.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           path: target
