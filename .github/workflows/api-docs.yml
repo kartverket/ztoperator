@@ -1,0 +1,51 @@
+name: Update API-docs
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'config/crd/bases/**'
+
+concurrency:
+  group: api-docs-update
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  run-crdoc:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: ztoperator
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run crdoc Docker container
+        working-directory: ztoperator
+        run: |
+          make apidocs
+
+      - name: Create Pull Request
+        if: github.event_name == 'workflow_dispatch'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          path: ztoperator
+          commit-message: "Update API docs"
+          title: "Update generated API docs"
+          body: |
+            This PR updates the generated API documentation based on CRD changes.
+            
+            Triggered by: ${{ github.event_name }}
+            Commit: ${{ github.sha }}
+          branch: update/api-docs
+          labels: |
+            documentation
+            automated
+          delete-branch: true
