@@ -35,6 +35,9 @@ SHELL = /usr/bin/env bash -o pipefail
 ##@ Variables
 
 ALLOWED_LOCAL_EGRESS_HOSTS = test.idporten.no,test.ansattporten.no,test.maskinporten.no,login.microsoftonline.com
+# Pinned by digest so local runs and the api-docs workflow render identically.
+CRDOC_IMAGE                ?= ghcr.io/fybrik/crdoc@sha256:355ef777a45021ee864e613b2234b4f2c6193762e3e0de94a26b66d06cec81c3
+CRDOC_RESOURCES_DIR        := crdoc-resources
 
 KUBERNETES_VERSION			= 1.35.1
 CERT_MANAGER_VERSION		= 1.20.2
@@ -112,14 +115,23 @@ clean: kind ## Clean up local environment by deleting kind cluster
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	"$(CONTROLLER_GEN)" object rbac:roleName=ztoperator crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases output:webhook:artifacts:config=config/webhook/bases
 
-.PHONY: docs
-docs: ## Generate API documentation from CRD bases using crdoc
-	docker run --platform linux/amd64 \
-	  -u $$(id -u):$$(id -g) --rm \
-	  -v $$PWD:/workdir \
-	  ghcr.io/fybrik/crdoc:latest \
-	  --resources /workdir/config/crd/bases \
-	  --output /workdir/api-docs.md
+# Renders api-docs.md from the generated CRDs. crdoc only reads the directory it
+# is pointed at, so the CRDs are staged in one and removed again afterwards.
+.PHONY: apidocs
+apidocs:
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "docker not found on PATH, skipping apidocs"; \
+		exit 0; \
+	fi; \
+	mkdir -p $(CRDOC_RESOURCES_DIR) || exit 1; \
+	cp config/crd/bases/ztoperator.kartverket.no_*.yaml $(CRDOC_RESOURCES_DIR)/ || exit 1; \
+	docker run -u $$(id -u):$$(id -g) --rm -v "$(PWD)":/workdir $(CRDOC_IMAGE) \
+		--resources /workdir/$(CRDOC_RESOURCES_DIR) \
+		--output /workdir/api-docs.md \
+		--template /workdir/.github/crdoc.tmpl; \
+	status=$$?; \
+	rm -rf $(CRDOC_RESOURCES_DIR); \
+	exit $$status
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
