@@ -176,8 +176,10 @@ type AutoLogin struct {
 	// +kubebuilder:validation:Required
 	Enabled bool `json:"enabled"`
 
-	// LoginPath specifies a list of URI paths that should trigger the auto-login behavior.
-	// When a request matches any of these paths, the user will be redirected to log in if not already authenticated.
+	// LoginPath specifies a single path that triggers auto-login behavior.
+	// Auto-login is also triggered for endpoints that require authentication,
+	// unless the matching `authRules` entry sets `denyRedirect: true`.
+	// Requests matching this path will redirect unauthenticated users to log in.
 	//
 	// +kubebuilder:validation:Pattern=`^/.*$`
 	// +kubebuilder:validation:MaxLength=1024
