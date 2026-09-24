@@ -1,0 +1,71 @@
+name: Update API-docs
+
+on:
+  push:
+    paths:
+      - 'config/crd/bases/**'
+    tags:
+      - 'v*'
+
+concurrency:
+  group: api-docs-update
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: writ
+
+jobs:
+  sync-docs:
+    name: Update API docs in skip.kartverket.no
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get token for skip.kartverket.no
+        uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        id: octo-sts
+        with:
+          scope: kartverket/skip.kartverket.no
+          identity: ztoperator
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: source
+          fetch-depth: 0
+
+      - name: Generate api-docs.md
+        working-directory: source
+        run: |
+          make apidocs
+
+      - name: Checkout target repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: target
+          repository: kartverket/skip.kartverket.no
+          token: ${{ steps.octo-sts.outputs.token }}
+          persist-credentials: false
+
+      - name: Copy generated API docs to target repository
+        run: |
+          mkdir -p target/docs/08-tilgangsstyring/08-ztoperator
+          cp source/api-docs.md target/docs/08-tilgangsstyring/08-ztoperator/03-api-docs.md
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          path: target
+          token: ${{ steps.octo-sts.outputs.token }}
+          commit-message: "Update ztoperator API docs"
+          title: "Update ztoperator API docs"
+          body: |
+            This PR updates the generated ztoperator API documentation.
+
+            Triggered by tag: ${{ github.ref_name }}
+            Source commit: ${{ github.sha }}
+          branch: update-ztoperator-api-docs
+          labels: |
+            documentation
+            automated
+          delete-branch: true
