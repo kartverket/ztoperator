@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/log"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/client-go/tools/events"
@@ -28,7 +28,7 @@ func UpdateAuthPolicyStatus(
 	ctx context.Context,
 	k8sClient client.Client,
 	recorder events.EventRecorder,
-	scope *state.Scope,
+	scope *model.Scope,
 	originalAuthPolicy *ztoperatorv1alpha1.AuthPolicy,
 	controllerResources []reconciliation.ControllerResource,
 ) {
@@ -73,7 +73,7 @@ func UpdateAuthPolicyStatus(
 }
 
 func DetermineReconciliationState(
-	scope *state.Scope,
+	scope *model.Scope,
 	controllerResources []reconciliation.ControllerResource,
 ) ReconciliationState {
 	switch {

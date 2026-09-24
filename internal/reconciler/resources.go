@@ -5,9 +5,9 @@ import (
 	"reflect"
 
 	"github.com/kartverket/ztoperator/internal/names"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/deny"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore"
@@ -23,7 +23,7 @@ import (
 )
 
 // ControllerResources creates all reconcile actions for the given AuthPolicy scope.
-func ControllerResources(scope *state.Scope) []reconciliation.ControllerResource {
+func ControllerResources(scope *model.Scope) []reconciliation.ControllerResource {
 	return []reconciliation.ControllerResource{
 		secretResource(scope),
 		envoyFilterResource(scope),
@@ -38,7 +38,7 @@ func ControllerResources(scope *state.Scope) []reconciliation.ControllerResource
 secretResource reconciles a Secret resource containing a HMAC secret (cookie signing key) and token secret
 (OAuth client secret), if auto-login is enabled. The secrets are used by Envoy during Authorization Code Flow.
 */
-func secretResource(scope *state.Scope) ControllerResourceAdapter[*v1.Secret] {
+func secretResource(scope *model.Scope) ControllerResourceAdapter[*v1.Secret] {
 	desiredResource := secret.GetDesired(
 		scope,
 		buildObjectMeta(scope.AutoLoginConfig.EnvoySecretName, scope.AuthPolicy.Namespace),
@@ -74,7 +74,7 @@ func SecretUpdateFields(current, desired *v1.Secret) {
 envoyFilterResource reconciles an EnvoyFilter resource based on the configured AuthPolicy, enforcing auto-login
 behavior for unauthenticated requests when enabled. The EnvoyFilter handles OAuth2 Authorization Code Flow.
 */
-func envoyFilterResource(scope *state.Scope) ControllerResourceAdapter[*v1alpha4.EnvoyFilter] {
+func envoyFilterResource(scope *model.Scope) ControllerResourceAdapter[*v1alpha4.EnvoyFilter] {
 	autoLoginEnvoyFilterName := names.EnvoyFilter(scope.AuthPolicy.Name)
 	desiredResource := envoyfilter.GetDesired(
 		scope,
@@ -117,7 +117,7 @@ requestAuthenticationResource reconciles a RequestAuthentication resource based 
 defining the JWT authentication requirements and how to forward the original token and output claims to http headers.
 */
 func requestAuthenticationResource(
-	scope *state.Scope,
+	scope *model.Scope,
 ) ControllerResourceAdapter[*istioclientsecurityv1.RequestAuthentication] {
 	requestAuthenticationName := scope.AuthPolicy.Name
 	desiredResource := requestauthentication.GetDesired(
@@ -157,7 +157,7 @@ and BaselineAuth, denying requests that do not satisfy the configured authentica
 precedence over ALLOW policies.
 */
 func denyAuthorizationPolicyResource(
-	scope *state.Scope,
+	scope *model.Scope,
 ) ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
 	denyAuthorizationPolicyName := names.DenyPolicy(scope.AuthPolicy.Name)
 	desiredResource := deny.GetDesired(
@@ -185,7 +185,7 @@ IgnoreAuthRules, allowing requests that satisfy the configured authentication re
 policy.
 */
 func ignoreAuthorizationPolicyResource(
-	scope *state.Scope,
+	scope *model.Scope,
 ) ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
 	ignoreAuthAuthorizationPolicyName := names.IgnorePolicy(scope.AuthPolicy.Name)
 	desiredResource := ignore.GetDesired(
@@ -213,7 +213,7 @@ AuthRules, BaselineAuth and IgnoreAuthRules, allowing requests that satisfy the 
 unless denied by any DENY policy.
 */
 func requireAuthorizationPolicyResource(
-	scope *state.Scope,
+	scope *model.Scope,
 ) ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
 	requireAuthAuthorizationPolicyName := names.RequirePolicy(scope.AuthPolicy.Name)
 	desiredResource := require.GetDesired(

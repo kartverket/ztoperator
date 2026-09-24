@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/log"
+	"github.com/kartverket/ztoperator/pkg/model"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,7 +53,7 @@ type ResourceReconciler[T client.Object] struct {
 	ResourceKind    string
 	ResourceName    string
 	DesiredResource *T
-	Scope           *state.Scope
+	Scope           *model.Scope
 	ShouldUpdate    func(current T, desired T) bool
 	UpdateFields    func(current T, desired T)
 }
@@ -76,7 +76,7 @@ func ReconcileControllerResource[T client.Object](
 	ctx context.Context,
 	k8sClient client.Client,
 	scheme *runtime.Scheme,
-	scope *state.Scope,
+	scope *model.Scope,
 	resourceKind, resourceName string,
 	desired *T,
 	shouldUpdate func(current, desired T) bool,
@@ -212,7 +212,7 @@ func reconcileOnCreate[T client.Object](
 	rLog log.Logger,
 	ctx context.Context,
 	scheme *runtime.Scheme,
-	scope *state.Scope,
+	scope *model.Scope,
 	k8sClient client.Client,
 	desired T,
 	resourceKind, resourceName string,
@@ -260,7 +260,7 @@ func reconcileOnUpdate[T client.Object](
 	rLog log.Logger,
 	ctx context.Context,
 	k8sClient client.Client,
-	scope *state.Scope,
+	scope *model.Scope,
 	desired T,
 	current T,
 	updateFields func(current, desired T),
@@ -297,7 +297,7 @@ func reconcileOnDelete[T client.Object](
 	rLog log.Logger,
 	ctx context.Context,
 	k8sClient client.Client,
-	scope *state.Scope,
+	scope *model.Scope,
 	current T,
 	resourceKind, resourceName string,
 ) (ctrl.Result, error) {

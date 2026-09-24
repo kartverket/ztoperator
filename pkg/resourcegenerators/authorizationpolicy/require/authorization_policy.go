@@ -5,7 +5,7 @@ import (
 	"slices"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	"istio.io/api/security/v1beta1"
@@ -13,7 +13,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
+func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *istioclientsecurityv1.AuthorizationPolicy {
 	if !scope.AuthPolicy.Spec.Enabled {
 		return nil
 	}
@@ -63,7 +63,7 @@ func GetDesired(scope *state.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 Audience and issuer conditions are always included as base conditions.
 Additionally, any conditions specified as baseline auth are also included.
 */
-func constructBaseConditions(scope *state.Scope) []*v1beta1.Condition {
+func constructBaseConditions(scope *model.Scope) []*v1beta1.Condition {
 	audienceAndIssuerConditions := authorizationpolicy.GetAudienceAndIssuerConditionsForAllowPolicy(
 		authorizationpolicy.ConstructAcceptedResources(*scope),
 		scope.IdentityProviderUris.IssuerURI,
@@ -81,7 +81,7 @@ Each auth rule should result in an allow rule for the specified paths, methods a
 Additionally, the audience and issuer conditions are always included.
 */
 func constructSpecifiedPathsAllowRules(
-	scope *state.Scope,
+	scope *model.Scope,
 	audienceAndIssuerConditions []*v1beta1.Condition,
 ) []*v1beta1.Rule {
 	var specifiedPathsAllowRules []*v1beta1.Rule
@@ -120,7 +120,7 @@ All paths and methods not explicitly specified in any auth rule or ignore auth r
 should result in an allow rule with only audience and issuer conditions.
 */
 func constructUnspecifiedPathsAllowRule(
-	scope *state.Scope,
+	scope *model.Scope,
 	audienceAndIssuerConditions []*v1beta1.Condition,
 ) *v1beta1.Rule {
 	allRequestMatchers := append(

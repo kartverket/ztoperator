@@ -27,6 +27,7 @@ import (
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/metrics"
+	"github.com/kartverket/ztoperator/pkg/rest"
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -196,10 +197,10 @@ func main() {
 	}
 
 	if err = (&controller.AuthPolicyReconciler{
-		Client:                 mgr.GetClient(),
-		Scheme:                 mgr.GetScheme(),
-		Recorder:               mgr.GetEventRecorder("authpolicy-controller"),
-		DiscoveryDocumentCache: config.Get().DiscoveryDocumentCache,
+		Client:                    mgr.GetClient(),
+		Scheme:                    mgr.GetScheme(),
+		Recorder:                  mgr.GetEventRecorder("authpolicy-controller"),
+		DiscoveryDocumentResolver: rest.NewDiscoveryDocumentMapResolver(config.Get().DiscoveryDocumentCache),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthPolicy")
 		os.Exit(1)

@@ -5,6 +5,7 @@ FROM scratch
 
 COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-COPY ztoperator /ztoperator
+ARG TARGETPLATFORM
+COPY $TARGETPLATFORM/ztoperator /ztoperator
 USER 65532:65532
 ENTRYPOINT ["/ztoperator"]

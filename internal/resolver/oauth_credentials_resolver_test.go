@@ -23,7 +23,7 @@ func TestResolveOAuthCredentials_WithAutoLoginDisabled_ReturnsEmptyCredentials(t
 	k8sClient := createFakeClientForOauthCredentials()
 
 	// 2. Act
-	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, *authPolicy)
 
 	// 3. Assert
 	require.NoError(t, err, "ResolveOAuthCredentials should not return an error when auto-login is disabled")
@@ -40,7 +40,7 @@ func TestResolveOAuthCredentials_WithNoOAuthCredentialsSpec_ReturnsEmptyCredenti
 	k8sClient := createFakeClientForOauthCredentials()
 
 	// 2. Act
-	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, *authPolicy)
 
 	// 3. Assert
 	require.NoError(t, err, "ResolveOAuthCredentials should not return an error when OAuthCredentials is nil")
@@ -57,7 +57,7 @@ func TestResolveOAuthCredentials_WithMissingSecret_ReturnsError(t *testing.T) {
 	k8sClient := createFakeClientForOauthCredentials()
 
 	// 2. Act
-	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, *authPolicy)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveOAuthCredentials should return an error when secret is missing")
@@ -85,7 +85,7 @@ func TestResolveOAuthCredentials_WithEmptyClientID_ReturnsError(t *testing.T) {
 	k8sClient := createFakeClientForOauthCredentials(secret)
 
 	// 2. Act
-	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, *authPolicy)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveOAuthCredentials should return an error when client ID is empty")
@@ -113,7 +113,7 @@ func TestResolveOAuthCredentials_WithEmptyClientSecret_ReturnsError(t *testing.T
 	k8sClient := createFakeClientForOauthCredentials(secret)
 
 	// 2. Act
-	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, *authPolicy)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveOAuthCredentials should return an error when client secret is empty")
@@ -141,7 +141,7 @@ func TestResolveOAuthCredentials_WithMissingClientIDKey_ReturnsError(t *testing.
 	k8sClient := createFakeClientForOauthCredentials(secret)
 
 	// 2. Act
-	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, *authPolicy)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveOAuthCredentials should return an error when client ID key is missing")
@@ -169,7 +169,7 @@ func TestResolveOAuthCredentials_WithMissingClientSecretKey_ReturnsError(t *test
 	k8sClient := createFakeClientForOauthCredentials(secret)
 
 	// 2. Act
-	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, *authPolicy)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveOAuthCredentials should return an error when client secret key is missing")
@@ -186,7 +186,7 @@ func TestResolveOAuthCredentials_WithNilAutoLogin_ReturnsEmptyCredentials(t *tes
 	k8sClient := createFakeClientForOauthCredentials()
 
 	// 2. Act
-	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, *authPolicy)
 
 	// 3. Assert
 	require.NoError(t, err, "ResolveOAuthCredentials should not return an error when AutoLogin is nil")
@@ -217,7 +217,7 @@ func TestResolveOAuthCredentials_WithValidSecret_ReturnsCredentials(t *testing.T
 	k8sClient := createFakeClientForOauthCredentials(secret)
 
 	// 2. Act
-	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
+	result, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, *authPolicy)
 
 	// 3. Assert
 	require.NoError(t, err, "ResolveOAuthCredentials should not return an error with valid secret")

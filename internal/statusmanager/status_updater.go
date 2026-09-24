@@ -4,6 +4,7 @@ import (
 	"context"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/metrics"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -16,15 +17,18 @@ func UpdateStatus(
 	k8sClient client.Client,
 	authPolicy ztoperatorv1alpha1.AuthPolicy,
 ) error {
+	logger := log.GetLogger(ctx)
 	metrics.DeleteAuthPolicyInfo(types.NamespacedName{
 		Name:      authPolicy.Name,
 		Namespace: authPolicy.Namespace,
 	})
 
-	if err := metrics.RefreshAuthPolicyInfo(ctx, k8sClient, authPolicy); err != nil {
-		return err
+	if refreshMetricsErr := metrics.RefreshAuthPolicyInfo(ctx, k8sClient, authPolicy); refreshMetricsErr != nil {
+		logger.Error(refreshMetricsErr, "failed to refresh auth policy metrics",
+			"name", authPolicy.GetName(),
+			"namespace", authPolicy.GetNamespace(),
+		)
 	}
-
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		latest := &ztoperatorv1alpha1.AuthPolicy{}
 		if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(&authPolicy), latest); err != nil {

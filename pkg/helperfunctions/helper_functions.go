@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
@@ -16,6 +18,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+type ParsedHttpURL struct {
+	Host string
+	Port int32
+	Tls  bool
+}
 
 func LowestNonZeroResult(i, j ctrl.Result) ctrl.Result {
 	switch {
@@ -63,12 +71,37 @@ func GetConfigMap(
 	return configMap, err
 }
 
-func GetParsedURL(uri string) (*url.URL, error) {
-	parsedURL, err := url.Parse(uri)
+func GetParsedHttpURL(raw string) (*ParsedHttpURL, error) {
+	u, err := url.Parse(raw)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse URL %q: %w", raw, err)
 	}
-	return parsedURL, nil
+	if u.Host == "" {
+		return nil, fmt.Errorf("URL %q has no host (did you forget the scheme, e.g. 'http://'?)", raw)
+	}
+	var tls bool
+	switch u.Scheme {
+	case "http":
+		tls = false
+	case "https":
+		tls = true
+	default:
+		return nil, fmt.Errorf("upstream scheme %q not supported (use http or https)", u.Scheme)
+	}
+	host, portStr, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		host = u.Host
+		if tls {
+			portStr = "443"
+		} else {
+			portStr = "80"
+		}
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil, fmt.Errorf("parse upstream port %q: %w", portStr, err)
+	}
+	return &ParsedHttpURL{Host: host, Port: int32(port), Tls: tls}, nil
 }
 
 func GenerateHMACSecret(size int) (*string, error) {

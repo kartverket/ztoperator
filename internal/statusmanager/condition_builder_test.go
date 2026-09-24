@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/internal/statusmanager"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -178,7 +178,7 @@ func TestBuildAuthPolicyCondition_WithDifferentExistingCondition_UpdatesLastTran
 
 func TestBuildDescendantConditions_WithNoDescendants_ReturnsEmptySlice(t *testing.T) {
 	// 1. Arrange
-	descendants := []state.Descendant[client.Object]{}
+	descendants := []model.Descendant[client.Object]{}
 
 	// 2. Act
 	conditions := statusmanager.BuildDescendantConditions(descendants, []metav1.Condition{})
@@ -190,7 +190,7 @@ func TestBuildDescendantConditions_WithNoDescendants_ReturnsEmptySlice(t *testin
 func TestBuildDescendantConditions_WithSuccessfulDescendant_ReturnsTrueCondition(t *testing.T) {
 	// 1. Arrange
 	successMsg := "Resource created successfully"
-	descendants := []state.Descendant[client.Object]{
+	descendants := []model.Descendant[client.Object]{
 		{
 			ID:             "Secret-my-secret",
 			Object:         &v1.Secret{},
@@ -213,7 +213,7 @@ func TestBuildDescendantConditions_WithSuccessfulDescendant_ReturnsTrueCondition
 func TestBuildDescendantConditions_WithFailedDescendant_ReturnsFalseCondition(t *testing.T) {
 	// 1. Arrange
 	errorMsg := "Failed to create resource"
-	descendants := []state.Descendant[client.Object]{
+	descendants := []model.Descendant[client.Object]{
 		{
 			ID:           "Secret-my-secret",
 			Object:       &v1.Secret{},
@@ -235,7 +235,7 @@ func TestBuildDescendantConditions_WithFailedDescendant_ReturnsFalseCondition(t 
 
 func TestBuildDescendantConditions_WithDescendantWithoutMessage_ReturnsUnknownCondition(t *testing.T) {
 	// 1. Arrange
-	descendants := []state.Descendant[client.Object]{
+	descendants := []model.Descendant[client.Object]{
 		{
 			ID:     "Secret-my-secret",
 			Object: &v1.Secret{},
@@ -258,7 +258,7 @@ func TestBuildDescendantConditions_WithMultipleDescendants_ReturnsAllConditions(
 	// 1. Arrange
 	successMsg := "Created"
 	errorMsg := "Failed"
-	descendants := []state.Descendant[client.Object]{
+	descendants := []model.Descendant[client.Object]{
 		{
 			ID:             "Secret-secret-1",
 			Object:         &v1.Secret{},
@@ -288,7 +288,7 @@ func TestBuildDescendantConditions_WithMultipleDescendants_ReturnsAllConditions(
 func TestBuildDescendantConditions_WithNoExistingConditions_SetsNewLastTransitionTime(t *testing.T) {
 	// 1. Arrange
 	successMsg := createdSuccessfullyMessage
-	descendants := []state.Descendant[client.Object]{
+	descendants := []model.Descendant[client.Object]{
 		{
 			ID:             "Secret-my-secret",
 			Object:         &v1.Secret{},
@@ -308,7 +308,7 @@ func TestBuildDescendantConditions_WithNoExistingConditions_SetsNewLastTransitio
 func TestBuildDescendantConditions_WithIdenticalExistingCondition_PreservesLastTransitionTime(t *testing.T) {
 	// 1. Arrange
 	successMsg := createdSuccessfullyMessage
-	descendants := []state.Descendant[client.Object]{
+	descendants := []model.Descendant[client.Object]{
 		{
 			ID:             "Secret-my-secret",
 			Object:         &v1.Secret{},
@@ -338,7 +338,7 @@ func TestBuildDescendantConditions_WithIdenticalExistingCondition_PreservesLastT
 func TestBuildDescendantConditions_WithDifferentExistingCondition_UpdatesLastTransitionTime(t *testing.T) {
 	// 1. Arrange
 	successMsg := createdSuccessfullyMessage
-	descendants := []state.Descendant[client.Object]{
+	descendants := []model.Descendant[client.Object]{
 		{
 			ID:             "Secret-my-secret",
 			Object:         &v1.Secret{},
@@ -368,7 +368,7 @@ func TestBuildDescendantConditions_WithDifferentExistingCondition_UpdatesLastTra
 
 func TestBuildMissingResourceConditions_WithNoMissingResources_ReturnsEmptySlice(t *testing.T) {
 	// 1. Arrange
-	descendants := []state.Descendant[client.Object]{
+	descendants := []model.Descendant[client.Object]{
 		{ID: "Secret-my-secret", Object: &v1.Secret{}},
 	}
 	reconcileFuncs := []reconciliation.ControllerResource{
@@ -384,7 +384,7 @@ func TestBuildMissingResourceConditions_WithNoMissingResources_ReturnsEmptySlice
 
 func TestBuildMissingResourceConditions_WithMissingResource_ReturnsFalseCondition(t *testing.T) {
 	// 1. Arrange
-	descendants := []state.Descendant[client.Object]{}
+	descendants := []model.Descendant[client.Object]{}
 	reconcileFuncs := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "expected-secret", false),
 	}
@@ -402,7 +402,7 @@ func TestBuildMissingResourceConditions_WithMissingResource_ReturnsFalseConditio
 
 func TestBuildMissingResourceConditions_WithNilResource_IgnoresIt(t *testing.T) {
 	// 1. Arrange
-	descendants := []state.Descendant[client.Object]{}
+	descendants := []model.Descendant[client.Object]{}
 	reconcileFuncs := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "some-secret", true),
 	}
@@ -416,7 +416,7 @@ func TestBuildMissingResourceConditions_WithNilResource_IgnoresIt(t *testing.T) 
 
 func TestBuildMissingResourceConditions_WithPartiallyMissingResources_ReturnsOnlyMissing(t *testing.T) {
 	// 1. Arrange
-	descendants := []state.Descendant[client.Object]{
+	descendants := []model.Descendant[client.Object]{
 		{ID: "Secret-present-secret", Object: &v1.Secret{}},
 	}
 	reconcileFuncs := []reconciliation.ControllerResource{
@@ -436,7 +436,7 @@ func TestBuildMissingResourceConditions_WithPartiallyMissingResources_ReturnsOnl
 
 func TestBuildMissingResourceConditions_WithNoExistingConditions_SetsNewLastTransitionTime(t *testing.T) {
 	// 1. Arrange
-	var descendants []state.Descendant[client.Object]
+	var descendants []model.Descendant[client.Object]
 	reconcileFuncs := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "expected-secret", false),
 	}
@@ -452,7 +452,7 @@ func TestBuildMissingResourceConditions_WithNoExistingConditions_SetsNewLastTran
 
 func TestBuildMissingResourceConditions_WithIdenticalExistingCondition_PreservesLastTransitionTime(t *testing.T) {
 	// 1. Arrange
-	var descendants []state.Descendant[client.Object]
+	var descendants []model.Descendant[client.Object]
 	reconcileFuncs := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "expected-secret", false),
 	}
@@ -482,7 +482,7 @@ func TestBuildMissingResourceConditions_WithIdenticalExistingCondition_Preserves
 
 func TestBuildMissingResourceConditions_WithDifferentExistingCondition_UpdatesLastTransitionTime(t *testing.T) {
 	// 1. Arrange
-	var descendants []state.Descendant[client.Object]
+	var descendants []model.Descendant[client.Object]
 	reconcileFuncs := []reconciliation.ControllerResource{
 		createMockReconcileAction("Secret", "expected-secret", false),
 	}
@@ -517,7 +517,7 @@ func TestBuildConditions_IncludesAllConditionTypes(t *testing.T) {
 	reconciliationState := statusmanager.StateReady
 
 	successMsg := createdSuccessfullyMessage
-	descendants := []state.Descendant[client.Object]{
+	descendants := []model.Descendant[client.Object]{
 		{
 			ID:             "Secret-oauth-secret",
 			Object:         &v1.Secret{},

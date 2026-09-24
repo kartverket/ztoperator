@@ -6,7 +6,7 @@ import (
 	"net/url"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
+	"github.com/kartverket/ztoperator/pkg/model"
 )
 
 const (
@@ -45,9 +45,9 @@ var luaScriptTemplate string
 //   - Redirects to the end-session endpoint have the postLogoutRedirectUri
 //     appended as a query parameter when one is configured.
 func GenerateLuaScript(
-	authPolicy *v1alpha1.AuthPolicy,
-	autoLoginConfig state.AutoLoginConfig,
-	identityProviderUris state.IdentityProviderUris,
+	authPolicy v1alpha1.AuthPolicy,
+	autoLoginConfig model.AutoLoginConfig,
+	identityProviderUris model.IdentityProviderUris,
 ) string {
 	ignoreAuthRequestMatchers := IgnoreAuthMatchers(authPolicy.Spec.IgnoreAuthRules)
 	requireAuthRequestMatchers := RequireAuthMatchers(authPolicy.Spec.AuthRules, autoLoginConfig)
@@ -110,7 +110,7 @@ func DenyRedirectMatchers(authRules *[]v1alpha1.RequestAuthRule) []v1alpha1.Requ
 
 func RequireAuthMatchers(
 	authRules *[]v1alpha1.RequestAuthRule,
-	autoLoginConfig state.AutoLoginConfig,
+	autoLoginConfig model.AutoLoginConfig,
 ) []v1alpha1.RequestMatcher {
 	matchers := v1alpha1.GetRequestMatchers(authRules)
 

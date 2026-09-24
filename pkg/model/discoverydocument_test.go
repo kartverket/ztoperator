@@ -1,4 +1,4 @@
-package resolver_test
+package model_test
 
 import (
 	"context"
@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/resolver"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/log"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ func TestWellKnownURIOutsideLoadedDocumentsGivesError(t *testing.T) {
 	)
 
 	// 2. Act
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, rest.NewDefaultDiscoveryDocumentResolver())
+	result, err := model.ToIdentityProviderUris(ctx, *authPolicy, rest.NewDefaultDiscoveryDocumentResolver())
 
 	// 3. Assert
 	require.Error(t, err, "ResolveDiscoveryDocument should return an error for invalid well-known URI")
@@ -49,7 +49,7 @@ func TestMissingIssuerInDiscoveryDocumentGivesError(t *testing.T) {
 	}
 
 	// 2. Act
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+	result, err := model.ToIdentityProviderUris(ctx, *authPolicy, mockResolver)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveDiscoveryDocument should return an error when issuer is missing")
@@ -73,7 +73,7 @@ func TestMissingJwksURIInDiscoveryDocumentGivesError(t *testing.T) {
 	}
 
 	// 2. Act
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+	result, err := model.ToIdentityProviderUris(ctx, *authPolicy, mockResolver)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveDiscoveryDocument should return an error when jwks_uri is missing")
@@ -97,7 +97,7 @@ func TestMissingTokenEndpointInDiscoveryDocumentGivesError(t *testing.T) {
 	}
 
 	// 2. Act
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+	result, err := model.ToIdentityProviderUris(ctx, *authPolicy, mockResolver)
 
 	// 3. Assert
 	require.Error(t, err, "ResolveDiscoveryDocument should return an error when token_endpoint is missing")
@@ -119,7 +119,7 @@ func TestMissingAuthorizationEndpointWithAutoLoginGivesError(t *testing.T) {
 	}
 
 	// 2. Act
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, rest.NewDefaultDiscoveryDocumentResolver())
+	result, err := model.ToIdentityProviderUris(ctx, *authPolicy, rest.NewDefaultDiscoveryDocumentResolver())
 
 	// 3. Assert
 	require.Error(
@@ -145,7 +145,7 @@ func TestMissingAuthorizationEndpointWithoutAutoLoginResolvesSuccessfully(t *tes
 	}
 
 	// 2. Act
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, rest.NewDefaultDiscoveryDocumentResolver())
+	result, err := model.ToIdentityProviderUris(ctx, *authPolicy, rest.NewDefaultDiscoveryDocumentResolver())
 
 	// 3. Assert
 	require.NoError(t, err, "ResolveDiscoveryDocument should not return an error when autologin is disabled")
@@ -173,7 +173,7 @@ func TestValidWellKnownUriResolvesSuccessfully(t *testing.T) {
 	)
 
 	// 2. Act
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, rest.NewDefaultDiscoveryDocumentResolver())
+	result, err := model.ToIdentityProviderUris(ctx, *authPolicy, rest.NewDefaultDiscoveryDocumentResolver())
 
 	// 3. Assert
 	require.NoError(t, err, "ResolveDiscoveryDocument should not return an error for valid well-known URI")
@@ -205,9 +205,9 @@ func TestResolveDiscoveryDocumentUsesCacheWithoutHTTPCall(t *testing.T) {
 		},
 	}
 
-	result, err := resolver.ResolveDiscoveryDocument(
+	result, err := model.ToIdentityProviderUris(
 		ctx,
-		defaultZtoperatorAuthPolicy(wellKnownURI),
+		*defaultZtoperatorAuthPolicy(wellKnownURI),
 		rest.NewDiscoveryDocumentMapResolver(discoveryDocuments),
 	)
 
@@ -257,7 +257,7 @@ func TestDiscoveryDocumentURIWithDoubleQuoteIsRejected(t *testing.T) {
 		},
 	}
 
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+	result, err := model.ToIdentityProviderUris(ctx, *authPolicy, mockResolver)
 
 	require.Error(t, err, "URI with double quote should be rejected")
 	assert.Nil(t, result)
@@ -278,7 +278,7 @@ func TestDiscoveryDocumentURIWithBackslashIsRejected(t *testing.T) {
 		},
 	}
 
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+	result, err := model.ToIdentityProviderUris(ctx, *authPolicy, mockResolver)
 
 	require.Error(t, err, "URI with backslash should be rejected")
 	assert.Nil(t, result)
@@ -299,7 +299,7 @@ func TestDiscoveryDocumentURIWithNewlineIsRejected(t *testing.T) {
 		},
 	}
 
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+	result, err := model.ToIdentityProviderUris(ctx, *authPolicy, mockResolver)
 
 	require.Error(t, err, "URI with newline should be rejected")
 	assert.Nil(t, result)
@@ -320,7 +320,7 @@ func TestDiscoveryDocumentWithNormalURIsResolvesSuccessfully(t *testing.T) {
 		},
 	}
 
-	result, err := resolver.ResolveDiscoveryDocument(ctx, authPolicy, mockResolver)
+	result, err := model.ToIdentityProviderUris(ctx, *authPolicy, mockResolver)
 
 	require.NoError(t, err, "Normal URIs should resolve successfully")
 	require.NotNil(t, result)

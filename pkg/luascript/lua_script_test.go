@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/internal/state"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/luascript"
+	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	lua "github.com/yuin/gopher-lua"
@@ -97,8 +97,8 @@ func readHeaders(t *testing.T, L *lua.LState, handle lua.LValue) map[string]stri
 	return result
 }
 
-func defaultAuthPolicy() *v1alpha1.AuthPolicy {
-	return &v1alpha1.AuthPolicy{
+func defaultAuthPolicy() v1alpha1.AuthPolicy {
+	return v1alpha1.AuthPolicy{
 		Spec: v1alpha1.AuthPolicySpec{
 			Enabled:      true,
 			WellKnownURI: "https://idp.example.com/.well-known/openid-configuration",
@@ -120,8 +120,8 @@ func defaultAuthPolicy() *v1alpha1.AuthPolicy {
 	}
 }
 
-func defaultAutoLoginConfig() state.AutoLoginConfig {
-	return state.AutoLoginConfig{
+func defaultAutoLoginConfig() model.AutoLoginConfig {
+	return model.AutoLoginConfig{
 		Enabled:      true,
 		LoginPath:    helperfunctions.Ptr("/login"),
 		RedirectPath: "/oauth2/callback",
@@ -129,8 +129,8 @@ func defaultAutoLoginConfig() state.AutoLoginConfig {
 	}
 }
 
-func defaultIdpUris() state.IdentityProviderUris {
-	return state.IdentityProviderUris{
+func defaultIdpUris() model.IdentityProviderUris {
+	return model.IdentityProviderUris{
 		AuthorizationURI: "https://idp.example.com/authorize",
 		EndSessionURI:    helperfunctions.Ptr("https://idp.example.com/endsession"),
 	}

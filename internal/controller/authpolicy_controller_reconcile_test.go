@@ -99,10 +99,10 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			Build()
 
 		reconciler = &controller.AuthPolicyReconciler{
-			Client:                 fakeClient,
-			Scheme:                 testScheme,
-			Recorder:               k8sevents.NewFakeRecorder(100),
-			DiscoveryDocumentCache: newBasicDiscoveryCache(),
+			Client:                    fakeClient,
+			Scheme:                    testScheme,
+			Recorder:                  k8sevents.NewFakeRecorder(100),
+			DiscoveryDocumentResolver: rest.NewDiscoveryDocumentMapResolver(newBasicDiscoveryCache()),
 		}
 	})
 
@@ -162,9 +162,9 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 
 	Context("when an existing AuthPolicy is outside the configured allowlist", func() {
 		It("keeps the Invalid status and default deny behavior", func() {
-			reconciler.DiscoveryDocumentCache = map[string]rest.DiscoveryDocument{
+			reconciler.DiscoveryDocumentResolver = rest.NewDiscoveryDocumentMapResolver(map[string]rest.DiscoveryDocument{
 				"https://another-idp.example.com/.well-known/openid-configuration": {},
-			}
+			})
 
 			result, err := reconciler.Reconcile(testCtx, ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: appName, Namespace: namespace},

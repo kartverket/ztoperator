@@ -9,6 +9,7 @@ import (
 	"github.com/kartverket/ztoperator/internal/controller"
 	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	"github.com/kartverket/ztoperator/pkg/rest"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -56,8 +57,8 @@ var _ = Describe("AuthPolicy Controller Watches", Ordered, func() {
 			Client: mgr.GetClient(),
 			Scheme: mgr.GetScheme(),
 			// Large buffer so Eventf never blocks the reconcile
-			Recorder:               k8sevents.NewFakeRecorder(10000),
-			DiscoveryDocumentCache: config.Get().DiscoveryDocumentCache,
+			Recorder:                  k8sevents.NewFakeRecorder(10000),
+			DiscoveryDocumentResolver: rest.NewDiscoveryDocumentMapResolver(config.Get().DiscoveryDocumentCache),
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed())
 
