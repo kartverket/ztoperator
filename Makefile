@@ -65,11 +65,12 @@ HELM ?= $(LOCALBIN)/helm
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
-CHAINSAW_VERSION ?= v0.2.15
+# Temporary pin until Chainsaw publishes a release with Go 1.27 support.
+CHAINSAW_VERSION ?= b7d4a4f5dd45e333add856a5ae9057fc5a57e93a
 CONTROLLER_TOOLS_VERSION ?= v0.21.0
 KUBECTL_VERSION ?= v$(KUBERNETES_VERSION)
 KIND_VERSION ?= v0.31.0
-GOLANGCI_LINT_VERSION ?= v2.12.2
+GOLANGCI_LINT_VERSION ?= v2.13.2
 HELM_VERSION ?= v4.0.0
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
@@ -346,8 +347,7 @@ webhook-test-manifests: kustomize ## Build webhook manifests for envtest into we
 
 .PHONY: istiohelm
 istiohelm: helm ## Fetch helm charts for Istio
-	# Ensure istio helm repo exists
-	"$(HELM)" repo list | grep -q '^istio\s' || (echo "Adding istio helm repo..." && "$(HELM)" repo add istio https://istio-release.storage.googleapis.com/charts)
+	"$(HELM)" repo add istio https://blob.istio.io/istio-release/charts --force-update
 	# Make sure the requested ISTIO_VERSION is available; update index if not
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "Updating Helm repos to fetch Istio charts..." && "$(HELM)" repo update)
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "❌ Istio Helm chart version $(ISTIO_VERSION) not found in repo index." && echo "   Tip: check available versions with: helm search repo istio/gateway --versions" && exit 1)
