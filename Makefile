@@ -185,7 +185,7 @@ deploy: ensurelocal isnotrunning ztoperator-namespace generate install kustomize
 	"$(KIND)" load docker-image ${IMG} --name $(KIND_CLUSTER_NAME)
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
-	"$(KUBECTL)" wait pod --for=condition=ready --timeout=60s -n ztoperator-system -l app=ztoperator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying ztoperator." && exit 1)
+	"$(KUBECTL)" wait pod --for=condition=ready --timeout=120s -n ztoperator-system -l app=ztoperator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying ztoperator." && exit 1)
 	@echo -e "✅  ztoperator installed in namespace 'ztoperator-system'!"
 
 .PHONY: undeploy
