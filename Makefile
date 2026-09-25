@@ -349,8 +349,7 @@ webhook-test-manifests: kustomize ## Build webhook manifests for envtest into we
 
 .PHONY: istiohelm
 istiohelm: helm ## Fetch helm charts for Istio
-	# Ensure istio helm repo exists
-	"$(HELM)" repo list | grep -q '^istio\s' || (echo "Adding istio helm repo..." && "$(HELM)" repo add istio https://istio-release.storage.googleapis.com/charts)
+	"$(HELM)" repo add istio https://blob.istio.io/istio-release/charts --force-update
 	# Make sure the requested ISTIO_VERSION is available; update index if not
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "Updating Helm repos to fetch Istio charts..." && "$(HELM)" repo update)
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "❌ Istio Helm chart version $(ISTIO_VERSION) not found in repo index." && echo "   Tip: check available versions with: helm search repo istio/gateway --versions" && exit 1)
