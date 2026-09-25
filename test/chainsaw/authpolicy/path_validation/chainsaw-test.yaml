@@ -12,22 +12,16 @@ spec:
         istio-injection: enabled
   steps:
     - try:
-        - create:
+        - error:
             file: authpolicy-mixing-path-syntax.yaml
-        - assert:
-            file: authpolicy-mixing-path-syntax-assert.yaml
-        - create:
+        - error:
             file: authpolicy-new-path-syntax-invalid.yaml
-        - assert:
-            file: authpolicy-new-path-syntax-invalid-assert.yaml
         - create:
             file: authpolicy-new-path-syntax-valid.yaml
         - assert:
             file: authpolicy-new-path-syntax-valid-assert.yaml
-        - create:
+        - error:
             file: authpolicy-old-path-syntax-invalid.yaml
-        - assert:
-            file: authpolicy-old-path-syntax-invalid-assert.yaml
         - create:
             file: authpolicy-old-path-syntax-valid.yaml
         - assert:

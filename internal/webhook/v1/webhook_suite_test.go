@@ -12,15 +12,17 @@ import (
 	"time"
 
 	ztoperatorv1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/webhook/authpolicy"
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
+	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
+	k8srest "k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -44,7 +46,7 @@ var (
 	ctx       context.Context
 	cancel    context.CancelFunc
 	k8sClient client.Client
-	cfg       *rest.Config
+	cfg       *k8srest.Config
 	testEnv   *envtest.Environment
 
 	webhookManifestsDir string
@@ -68,9 +70,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Load environment variables
-	err = os.Setenv("ZTOPERATOR_CLUSTER_NAME", "test-cluster")
-	Expect(err).NotTo(HaveOccurred())
-	err = config.Load()
+	Expect(os.Setenv("ZTOPERATOR_CLUSTER_NAME", "test-cluster")).To(Succeed())
+	Expect(os.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", testWellKnownURI)).To(Succeed())
+	err = config.LoadWithResolver(rest.NewDefaultDiscoveryDocumentResolver())
 	Expect(err).NotTo(HaveOccurred())
 
 	webhookManifestsDir, err = buildWebhookManifestsWithKustomize()
@@ -120,6 +122,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = v1.SetupPodWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
+	err = authpolicy.SetupAuthPolicyWebhookWithManager(mgr, config.Get().DiscoveryDocumentCache)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:webhook
@@ -467,3 +471,71 @@ var _ = Describe("Pod validating webhook", func() {
 		)))
 	})
 })
+
+var _ = Describe("AuthPolicy validating webhook", func() {
+	It("allows a valid AuthPolicy on create", func() {
+		authPolicy := newWebhookAuthPolicy("authpolicy-webhook-valid-create", testWellKnownURI)
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, authPolicy) })
+
+		Expect(k8sClient.Create(ctx, authPolicy)).To(Succeed())
+	})
+
+	It("rejects an AuthPolicy whose wellKnownURI is not in the allowlist on create", func() {
+		authPolicy := newWebhookAuthPolicy(
+			"authpolicy-webhook-disallowed-create",
+			"https://not-configured.example.com/.well-known/openid-configuration",
+		)
+
+		err := k8sClient.Create(ctx, authPolicy)
+
+		Expect(err).To(MatchError(ContainSubstring("is not in the configured allowlist")))
+	})
+
+	It("rejects an AuthPolicy with invalid paths on create", func() {
+		authPolicy := newWebhookAuthPolicy("authpolicy-webhook-invalid-path-create", testWellKnownURI)
+		authPolicy.Spec.AuthRules = &[]ztoperatorv1.RequestAuthRule{{
+			RequestMatcher: ztoperatorv1.RequestMatcher{Paths: []string{"/api?query"}},
+		}}
+
+		err := k8sClient.Create(ctx, authPolicy)
+
+		Expect(err).To(MatchError(ContainSubstring("invalid string literal")))
+	})
+
+	It("rejects an invalid wellKnownURI on update", func() {
+		authPolicy := newWebhookAuthPolicy("authpolicy-webhook-invalid-update", testWellKnownURI)
+		Expect(k8sClient.Create(ctx, authPolicy)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, authPolicy) })
+
+		authPolicy.Spec.WellKnownURI = "https://not-configured.example.com/.well-known/openid-configuration"
+
+		err := k8sClient.Update(ctx, authPolicy)
+
+		Expect(err).To(MatchError(ContainSubstring("is not in the configured allowlist")))
+	})
+
+	It("allows a valid AuthPolicy update", func() {
+		authPolicy := newWebhookAuthPolicy("authpolicy-webhook-valid-update", testWellKnownURI)
+		Expect(k8sClient.Create(ctx, authPolicy)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, authPolicy) })
+
+		authPolicy.Spec.AuthRules = &[]ztoperatorv1.RequestAuthRule{{
+			RequestMatcher: ztoperatorv1.RequestMatcher{Paths: []string{"/admin"}},
+		}}
+
+		Expect(k8sClient.Update(ctx, authPolicy)).To(Succeed())
+	})
+})
+
+func newWebhookAuthPolicy(name, wellKnownURI string) *ztoperatorv1.AuthPolicy {
+	return &ztoperatorv1.AuthPolicy{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+		Spec: ztoperatorv1.AuthPolicySpec{
+			Enabled:      true,
+			WellKnownURI: wellKnownURI,
+			Selector: ztoperatorv1.WorkloadSelector{
+				MatchLabels: map[string]string{"app": "application"},
+			},
+		},
+	}
+}

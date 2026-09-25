@@ -118,7 +118,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	var scope *model.Scope
-	if validationErr := validateAuthPolicy(ctx, authPolicy); validationErr != nil {
+	if validationErr := validateAuthPolicy(ctx, authPolicy, r.DiscoveryDocumentResolver); validationErr != nil {
 		validationErrorMessage := validationErr.Error()
 		scope = &model.Scope{
 			AuthPolicy:             *authPolicy,
@@ -262,14 +262,29 @@ func resolveAuthPolicy(
 
 // validateAuthPolicy performs domain-level validation on the AuthPolicy spec that cannot
 // be expressed by CRD markers alone. It returns nil when the spec is valid.
-func validateAuthPolicy(ctx context.Context, authPolicy *ztoperatorv1alpha1.AuthPolicy) error {
+func validateAuthPolicy(
+	ctx context.Context,
+	authPolicy *ztoperatorv1alpha1.AuthPolicy,
+	discoveryDocumentResolver rest.DiscoveryDocumentResolver,
+) error {
 	rLog := log.GetLogger(ctx)
 
-	rLog.Debug("Validating WellKnownURI for AuthPolicy", "namespace", authPolicy.Namespace, "name", authPolicy.Name)
-	if err := validation.ValidateWellKnownURI(authPolicy.Spec.WellKnownURI); err != nil {
+	rLog.Debug("Validating AuthPolicy wellKnownURI against configured allowlist", "namespace", authPolicy.Namespace, "name", authPolicy.Name)
+	if discoveryDocumentResolver == nil {
+		err := fmt.Errorf("wellKnownURI %q is not in the configured allowlist", authPolicy.Spec.WellKnownURI)
 		rLog.Error(
 			err,
-			"wellKnownURI validation failed for AuthPolicy",
+			"wellKnownURI allowlist validation failed for AuthPolicy",
+			"namespace", authPolicy.Namespace,
+			"name", authPolicy.Name,
+		)
+		return err
+	}
+	if _, err := discoveryDocumentResolver.GetOAuthDiscoveryDocument(authPolicy.Spec.WellKnownURI, rLog); err != nil {
+		err := fmt.Errorf("wellKnownURI %q is not in the configured allowlist", authPolicy.Spec.WellKnownURI)
+		rLog.Error(
+			err,
+			"wellKnownURI allowlist validation failed for AuthPolicy",
 			"namespace", authPolicy.Namespace,
 			"name", authPolicy.Name,
 		)

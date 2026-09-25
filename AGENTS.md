@@ -40,7 +40,7 @@ Controller.Reconcile()
   ├─ Fetch AuthPolicy
   ├─ resolveAuthPolicy()         ← Resolvers (internal/resolver/)
   │   ├─ ResolveOAuthCredentials   (reads Secret for clientID/clientSecret)
-  │   ├─ ResolveDiscoveryDocument  (fetches .well-known OIDC endpoint → issuer, jwks, token, auth, endsession URIs)
+  │   ├─ ResolveDiscoveryDocument  (reads the eagerly loaded .well-known OIDC document → issuer, jwks, token, auth, endsession URIs)
   │   ├─ ResolveAutoLoginConfig    (builds Lua script config, sane defaults for redirect/logout paths)
   │   └─ ResolveAudiences          (static values or from ConfigMap/Secret references)
   ├─ validateAuthPolicy()        ← Validators (pkg/validation/)
@@ -73,7 +73,8 @@ Controller.Reconcile()
 | `internal/eventhandler/pod/` | Watches Pods → enqueues all AuthPolicies in the same namespace for re-reconciliation |
 | `internal/eventhandler/secret/` | Watches Secrets → same re-reconciliation trigger |
 | `internal/eventhandler/configmap/` | Watches ConfigMaps → same re-reconciliation trigger |
-| `internal/webhook/` | Admission webhooks: `pod_webhook.go` (mutating) and `authpolicy_config.go` (validating/defaulting) |
+| `internal/webhook/v1/` | Pod admission webhook and AuthPolicy lookup/configuration helpers |
+| `internal/webhook/authpolicy/` | AuthPolicy validating admission webhook and its Ginkgo test suite |
 | `pkg/resourcegenerators/` | Desired-state generators for each child resource type |
 | `pkg/resourcegenerators/envoyfilter/` | EnvoyFilter generation (OAuth2 filter + Lua filter config patches) |
 | `pkg/resourcegenerators/authorizationpolicy/` | Split into `deny/`, `ignore/`, `require/` sub-packages |
@@ -83,8 +84,8 @@ Controller.Reconcile()
 | `pkg/validation/` | Path validation (RFC 3986, template patterns `{*}` / `{**}`), pod annotation validation; `path_classifier.go` distinguishes exact/prefix/template paths, `path_transformation.go` normalises them before matching |
 | `pkg/reconciliation/` | `ControllerResource` interface and generic `ReconcilerAdapter[T]` / `ResourceReconciler[T]` types |
 | `pkg/metrics/` | Prometheus gauge `ztoperator_authpolicy_info` with labels: name, namespace, state, owner, issuer, enabled, auto_login_enabled, protected_pod |
-| `pkg/rest/` | OIDC discovery document HTTP client (uses resty); `DiscoveryDocumentResolver` interface in `client.go` is the main test seam injected into the controller; pre-seeded static map of known providers in `dto.go` |
-| `pkg/config/` | Env-based config via `envconfig` (currently just `ZTOPERATOR_GIT_REF`) |
+| `pkg/rest/` | OIDC discovery document types and resolvers (HTTP startup fetching and map-backed reconciliation lookups); pre-seeded provider documents in `dto.go` are used by tests and the default fixture resolver |
+| `pkg/config/` | Env-based config via `envconfig`; configured well-known URIs are fetched and cached as discovery documents during startup |
 | `pkg/log/` | Thin wrapper around `logr.Logger` with Debug/Info/Warning/Error levels |
 | `pkg/helperfunctions/` | Shared utilities (ObjectMeta builder, URL parsing, pod lookup, generic `Ptr()`, etc.) |
 
@@ -207,7 +208,7 @@ The Lua script (`pkg/luascript/ztoperator.lua`) is embedded at compile time via 
 - **RFC 8707**: `acceptedResources` implements Resource Indicators for audience-restricted access tokens.
 - **RP-Initiated Logout**: `autoLogin.logoutPath` triggers redirect to the IdP's `end_session_endpoint`.
 - **Known Norwegian IdPs**: ID-porten, Ansattporten (hardcoded well-known URIs in CRD CEL validation to enforce `acceptedResources`).
-- **Pre-seeded Discovery Documents**: `pkg/rest/dto.go` contains a hardcoded static map of well-known URIs to discovery documents for mock-oauth2 (entraid, smapi, maskinporten), Microsoft Entra ID, ID-porten, and Maskinporten. This avoids live HTTP lookups for known providers.
+- **Pre-seeded Discovery Documents**: `pkg/rest/dto.go` contains a hardcoded static map of well-known URIs to discovery documents for mock-oauth2 (entraid, smapi, maskinporten), Microsoft Entra ID, ID-porten, and Maskinporten. These fixtures are used by tests and the default fixture resolver; production startup fetches every configured URI over HTTP.
 
 ### Skiperator Integration
 

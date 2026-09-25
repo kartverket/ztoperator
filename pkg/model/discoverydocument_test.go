@@ -2,6 +2,8 @@ package model_test
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
@@ -14,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestInvalidWellKnownUriGivesError(t *testing.T) {
+func TestWellKnownURIOutsideLoadedDocumentsGivesError(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. Arrange
@@ -182,6 +184,36 @@ func TestValidWellKnownUriResolvesSuccessfully(t *testing.T) {
 	assert.NotNil(t, result.TokenURI, "TokenURI should not be nil")
 	assert.NotNil(t, result.AuthorizationURI, "AuthorizationURI should not be nil")
 	assert.NotNil(t, result.EndSessionURI, "EndSessionURI should not be nil")
+}
+
+func TestResolveDiscoveryDocumentUsesCacheWithoutHTTPCall(t *testing.T) {
+	ctx := context.Background()
+	requestReceived := false
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		requestReceived = true
+	}))
+	defer server.Close()
+
+	wellKnownURI := server.URL + "/.well-known/openid-configuration"
+	discoveryDocuments := map[string]rest.DiscoveryDocument{
+		wellKnownURI: {
+			Issuer:                helperfunctions.Ptr("https://idp.example.com"),
+			JwksURI:               helperfunctions.Ptr("https://idp.example.com/jwks"),
+			TokenEndpoint:         helperfunctions.Ptr("https://idp.example.com/token"),
+			AuthorizationEndpoint: helperfunctions.Ptr("https://idp.example.com/authorize"),
+			EndSessionEndpoint:    helperfunctions.Ptr("https://idp.example.com/endsession"),
+		},
+	}
+
+	result, err := model.ToIdentityProviderUris(
+		ctx,
+		*defaultZtoperatorAuthPolicy(wellKnownURI),
+		rest.NewDiscoveryDocumentMapResolver(discoveryDocuments),
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.False(t, requestReceived)
 }
 
 func defaultZtoperatorAuthPolicy(
