@@ -12,8 +12,6 @@ spec:
         istio-injection: enabled
   steps:
     - try:
-        - create:
+        - error:
             file: authpolicy-invalid.yaml
-        - assert:
-            file: authpolicy-invalid-assert.yaml
 

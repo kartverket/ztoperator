@@ -8,6 +8,7 @@ import (
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/pkg/config"
+	"github.com/kartverket/ztoperator/pkg/rest"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	istionetworkingv1 "istio.io/client-go/pkg/apis/networking/v1"
@@ -15,7 +16,7 @@ import (
 	securityv1 "istio.io/client-go/pkg/apis/security/v1"
 
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
+	k8srest "k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -30,7 +31,7 @@ var (
 	ctx       context.Context
 	cancel    context.CancelFunc
 	testEnv   *envtest.Environment
-	cfg       *rest.Config
+	cfg       *k8srest.Config
 	k8sClient client.Client
 )
 
@@ -56,7 +57,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Load environment variables
-	err = config.Load()
+	Expect(os.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration")).To(Succeed())
+	err = config.LoadWithResolver(rest.NewDefaultDiscoveryDocumentResolver())
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme

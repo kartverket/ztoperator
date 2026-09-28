@@ -2,7 +2,6 @@ package controller_test
 
 import (
 	"context"
-	"errors"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/controller"
@@ -46,6 +45,13 @@ func newBasicDiscoveryResolver() *fakeDiscoveryDocumentResolver {
 			AuthorizationEndpoint: helperfunctions.Ptr("https://idp.example.com/authorize"),
 			EndSessionEndpoint:    helperfunctions.Ptr("https://idp.example.com/endsession"),
 		},
+	}
+}
+
+func newBasicDiscoveryCache() map[string]rest.DiscoveryDocument {
+	const wellKnownURI = "https://idp.example.com/.well-known/openid-configuration"
+	return map[string]rest.DiscoveryDocument{
+		wellKnownURI: *newBasicDiscoveryResolver().document,
 	}
 }
 
@@ -96,7 +102,7 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			Client:                    fakeClient,
 			Scheme:                    testScheme,
 			Recorder:                  k8sevents.NewFakeRecorder(100),
-			DiscoveryDocumentResolver: newBasicDiscoveryResolver(),
+			DiscoveryDocumentResolver: rest.NewDiscoveryDocumentMapResolver(newBasicDiscoveryCache()),
 		}
 	})
 
@@ -154,37 +160,32 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 		})
 	})
 
-	Context("when the discovery document resolver returns an error", func() {
-		It("returns the error, sets status to Failed, and does not create child resources", func() {
-			By("configuring the resolver to return an error")
-			resolveErr := errors.New("discovery resolver failed")
-			reconciler.DiscoveryDocumentResolver = &fakeDiscoveryDocumentResolver{err: resolveErr}
+	Context("when an existing AuthPolicy is outside the configured allowlist", func() {
+		It("keeps the Invalid status and default deny behavior", func() {
+			reconciler.DiscoveryDocumentResolver = rest.NewDiscoveryDocumentMapResolver(map[string]rest.DiscoveryDocument{
+				"https://another-idp.example.com/.well-known/openid-configuration": {},
+			})
 
-			By("reconciling the AuthPolicy")
 			result, err := reconciler.Reconcile(testCtx, ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: appName, Namespace: namespace},
 			})
-			Expect(err).To(MatchError(ContainSubstring(resolveErr.Error())))
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
 
-			By("verifying status is set to Failed")
 			updatedPolicy := &ztoperatorv1alpha1.AuthPolicy{}
 			Expect(fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, updatedPolicy)).To(Succeed())
-			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseFailed))
+			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseInvalid))
 			Expect(updatedPolicy.Status.Ready).To(BeFalse())
-			Expect(updatedPolicy.Status.Message).To(ContainSubstring(resolveErr.Error()))
-			Expect(updatedPolicy.Status.ObservedGeneration).To(Equal(int64(1)))
+			Expect(updatedPolicy.Status.Message).To(ContainSubstring("is not in the configured allowlist"))
 
-			By("verifying no child resources were created")
-			ra := &securityv1.RequestAuthentication{}
-			Expect(apierrors.IsNotFound(
-				fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, ra),
-			)).To(BeTrue())
-
-			requirePolicy := &securityv1.AuthorizationPolicy{}
-			Expect(apierrors.IsNotFound(
-				fakeClient.Get(testCtx, types.NamespacedName{Name: names.RequirePolicy(appName), Namespace: namespace}, requirePolicy),
-			)).To(BeTrue())
+			denyPolicy := &securityv1.AuthorizationPolicy{}
+			Expect(fakeClient.Get(testCtx, types.NamespacedName{
+				Name:      names.DenyPolicy(appName),
+				Namespace: namespace,
+			}, denyPolicy)).To(Succeed())
+			Expect(denyPolicy.Spec.Rules).To(HaveLen(1))
+			Expect(denyPolicy.Spec.Rules[0].To).To(HaveLen(1))
+			Expect(denyPolicy.Spec.Rules[0].To[0].Operation.Paths).To(Equal([]string{"*"}))
 		})
 	})
 })

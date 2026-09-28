@@ -1,4 +1,4 @@
-package rest
+package rest_test
 
 import (
 	"net/http"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	ztlog "github.com/kartverket/ztoperator/pkg/log"
+	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/stretchr/testify/require"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -14,14 +15,14 @@ import (
 func TestGetOAuthDiscoveryDocument_ReturnsCachedDocumentForKnownURI(t *testing.T) {
 	t.Parallel()
 
-	resolver := NewDefaultDiscoveryDocumentResolver()
+	resolver := rest.NewDefaultDiscoveryDocumentResolver()
 	uri := "https://idporten.no/.well-known/openid-configuration"
 
 	doc, err := resolver.GetOAuthDiscoveryDocument(uri, testLogger())
 	require.NoError(t, err, "expected no error for cached URI")
 	require.NotNil(t, doc, "expected discovery document, got nil")
 
-	want := GetWellknownURIToDiscoveryDocument()[uri]
+	want := rest.GetWellknownURIToDiscoveryDocument()[uri]
 	assertStringPtrEqual(t, "issuer", doc.Issuer, want.Issuer)
 	assertStringPtrEqual(t, "authorization_endpoint", doc.AuthorizationEndpoint, want.AuthorizationEndpoint)
 	assertStringPtrEqual(t, "token_endpoint", doc.TokenEndpoint, want.TokenEndpoint)
@@ -44,7 +45,7 @@ func TestGetOAuthDiscoveryDocument_FetchesUnknownURIOverHTTP(t *testing.T) {
 	}))
 	defer server.Close()
 
-	resolver := NewDefaultDiscoveryDocumentResolver()
+	resolver := rest.NewHTTPDiscoveryDocumentResolver()
 
 	doc, err := resolver.GetOAuthDiscoveryDocument(server.URL+"/.well-known/openid-configuration", testLogger())
 	require.NoError(t, err, "expected no error when fetching discovery document")
@@ -65,7 +66,7 @@ func TestGetOAuthDiscoveryDocument_ReturnsErrorForNon200Response(t *testing.T) {
 	}))
 	defer server.Close()
 
-	resolver := NewDefaultDiscoveryDocumentResolver()
+	resolver := rest.NewHTTPDiscoveryDocumentResolver()
 
 	doc, err := resolver.GetOAuthDiscoveryDocument(server.URL+"/.well-known/openid-configuration", testLogger())
 	if err == nil {

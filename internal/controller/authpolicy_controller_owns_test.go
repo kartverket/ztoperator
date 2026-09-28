@@ -9,7 +9,9 @@ import (
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/controller"
 	"github.com/kartverket/ztoperator/internal/names"
+	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	"github.com/kartverket/ztoperator/pkg/rest"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
@@ -20,7 +22,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	k8sevents "k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/config"
+	ctrlconfig "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -51,7 +53,7 @@ var _ = Describe("AuthPolicy Controller Owns", Ordered, func() {
 			Metrics: metricsserver.Options{BindAddress: "0"},
 			// Without SkipNameValidation, the second manager to start in the test binary
 			// would otherwise fail with "controller with name authpolicy already exists".
-			Controller: config.Controller{SkipNameValidation: helperfunctions.Ptr(true)},
+			Controller: ctrlconfig.Controller{SkipNameValidation: helperfunctions.Ptr(true)},
 		})
 		Expect(err).NotTo(HaveOccurred())
 
@@ -60,7 +62,7 @@ var _ = Describe("AuthPolicy Controller Owns", Ordered, func() {
 			Scheme: mgr.GetScheme(),
 			// Large buffer so Eventf never blocks the reconcile
 			Recorder:                  k8sevents.NewFakeRecorder(10000),
-			DiscoveryDocumentResolver: newBasicDiscoveryResolver(),
+			DiscoveryDocumentResolver: rest.NewDiscoveryDocumentMapResolver(config.Get().DiscoveryDocumentCache),
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed())
 
