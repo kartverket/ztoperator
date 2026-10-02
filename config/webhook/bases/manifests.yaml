@@ -10,6 +10,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-ztoperator-kartverket-no-v1alpha1-authpolicy
+  failurePolicy: Fail
+  name: vauthpolicy-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - ztoperator.kartverket.no
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - authpolicies
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate--v1-pod
   failurePolicy: Fail
   name: vpod-v1.kb.io

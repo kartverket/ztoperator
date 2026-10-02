@@ -7,7 +7,9 @@ import (
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/controller"
+	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	"github.com/kartverket/ztoperator/pkg/rest"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -16,7 +18,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	k8sevents "k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/config"
+	ctrlconfig "sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
@@ -47,7 +49,7 @@ var _ = Describe("AuthPolicy Controller Watches", Ordered, func() {
 			Metrics: metricsserver.Options{BindAddress: "0"},
 			// Without SkipNameValidation, the second manager to start in the test binary
 			// would otherwise fail with "controller with name authpolicy already exists".
-			Controller: config.Controller{SkipNameValidation: helperfunctions.Ptr(true)},
+			Controller: ctrlconfig.Controller{SkipNameValidation: helperfunctions.Ptr(true)},
 		})
 		Expect(err).NotTo(HaveOccurred())
 
@@ -56,7 +58,8 @@ var _ = Describe("AuthPolicy Controller Watches", Ordered, func() {
 			Scheme: mgr.GetScheme(),
 			// Large buffer so Eventf never blocks the reconcile
 			Recorder:                  k8sevents.NewFakeRecorder(10000),
-			DiscoveryDocumentResolver: newBasicDiscoveryResolver(),
+			AllowedWellKnownURIs:      config.Get().AllowedWellKnownURIs,
+			DiscoveryDocumentResolver: rest.NewDefaultDiscoveryDocumentResolver(),
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed())
 
@@ -75,7 +78,7 @@ var _ = Describe("AuthPolicy Controller Watches", Ordered, func() {
 			},
 			Spec: ztoperatorv1alpha1.AuthPolicySpec{
 				Enabled:      true,
-				WellKnownURI: "https://idp.example.com/.well-known/openid-configuration",
+				WellKnownURI: "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration",
 				Selector: ztoperatorv1alpha1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": authPolicyName},
 				},

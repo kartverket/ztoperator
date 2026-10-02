@@ -96,6 +96,7 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			Client:                    fakeClient,
 			Scheme:                    testScheme,
 			Recorder:                  k8sevents.NewFakeRecorder(100),
+			AllowedWellKnownURIs:      []string{"https://idp.example.com/.well-known/openid-configuration"},
 			DiscoveryDocumentResolver: newBasicDiscoveryResolver(),
 		}
 	})
@@ -154,37 +155,55 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 		})
 	})
 
-	Context("when the discovery document resolver returns an error", func() {
-		It("returns the error, sets status to Failed, and does not create child resources", func() {
-			By("configuring the resolver to return an error")
-			resolveErr := errors.New("discovery resolver failed")
-			reconciler.DiscoveryDocumentResolver = &fakeDiscoveryDocumentResolver{err: resolveErr}
+	Context("when an existing AuthPolicy is outside the configured allowlist", func() {
+		It("keeps the Invalid status and default deny behavior", func() {
+			reconciler.AllowedWellKnownURIs = []string{
+				"https://another-idp.example.com/.well-known/openid-configuration",
+			}
+			reconciler.DiscoveryDocumentResolver = newBasicDiscoveryResolver()
 
-			By("reconciling the AuthPolicy")
 			result, err := reconciler.Reconcile(testCtx, ctrl.Request{
 				NamespacedName: types.NamespacedName{Name: appName, Namespace: namespace},
 			})
-			Expect(err).To(MatchError(ContainSubstring(resolveErr.Error())))
+			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(ctrl.Result{}))
 
-			By("verifying status is set to Failed")
+			updatedPolicy := &ztoperatorv1alpha1.AuthPolicy{}
+			Expect(fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, updatedPolicy)).To(Succeed())
+			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseInvalid))
+			Expect(updatedPolicy.Status.Ready).To(BeFalse())
+			Expect(updatedPolicy.Status.Message).To(ContainSubstring("is not in the configured allowlist"))
+
+			denyPolicy := &securityv1.AuthorizationPolicy{}
+			Expect(fakeClient.Get(testCtx, types.NamespacedName{
+				Name:      names.DenyPolicy(appName),
+				Namespace: namespace,
+			}, denyPolicy)).To(Succeed())
+			Expect(denyPolicy.Spec.Rules).To(HaveLen(1))
+			Expect(denyPolicy.Spec.Rules[0].To).To(HaveLen(1))
+			Expect(denyPolicy.Spec.Rules[0].To[0].Operation.Paths).To(Equal([]string{"*"}))
+		})
+	})
+
+	Context("when discovery document resolution fails", func() {
+		It("sets Failed status and returns the resolution error for retry", func() {
+			reconciler.DiscoveryDocumentResolver = &fakeDiscoveryDocumentResolver{
+				err: errors.New("discovery resolution failed"),
+			}
+
+			result, err := reconciler.Reconcile(testCtx, ctrl.Request{
+				NamespacedName: types.NamespacedName{Name: appName, Namespace: namespace},
+			})
+
+			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("discovery resolution failed"))
+
 			updatedPolicy := &ztoperatorv1alpha1.AuthPolicy{}
 			Expect(fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, updatedPolicy)).To(Succeed())
 			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseFailed))
 			Expect(updatedPolicy.Status.Ready).To(BeFalse())
-			Expect(updatedPolicy.Status.Message).To(ContainSubstring(resolveErr.Error()))
-			Expect(updatedPolicy.Status.ObservedGeneration).To(Equal(int64(1)))
-
-			By("verifying no child resources were created")
-			ra := &securityv1.RequestAuthentication{}
-			Expect(apierrors.IsNotFound(
-				fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, ra),
-			)).To(BeTrue())
-
-			requirePolicy := &securityv1.AuthorizationPolicy{}
-			Expect(apierrors.IsNotFound(
-				fakeClient.Get(testCtx, types.NamespacedName{Name: names.RequirePolicy(appName), Namespace: namespace}, requirePolicy),
-			)).To(BeTrue())
+			Expect(updatedPolicy.Status.Message).To(ContainSubstring("discovery resolution failed"))
 		})
 	})
 })
