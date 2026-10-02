@@ -33,6 +33,13 @@ func GetWellknownURIToDiscoveryDocument() map[string]DiscoveryDocument {
 			JwksURI:               helperfunctions.Ptr("http://mock-oauth2.auth:8080/maskinporten/jwks"),
 			EndSessionEndpoint:    helperfunctions.Ptr("http://mock-oauth2.auth:8080/maskinporten/endsession"),
 		},
+		"http://mock-oauth2.auth:8080/ztoperator/.well-known/openid-configuration": {
+			Issuer:                helperfunctions.Ptr("http://mock-oauth2.auth:8080/ztoperator"),
+			AuthorizationEndpoint: helperfunctions.Ptr("http://mock-oauth2.auth:8080/ztoperator/authorize"),
+			TokenEndpoint:         helperfunctions.Ptr("http://mock-oauth2.auth:8080/ztoperator/token"),
+			JwksURI:               helperfunctions.Ptr("http://mock-oauth2.auth:8080/ztoperator/jwks"),
+			EndSessionEndpoint:    helperfunctions.Ptr("http://mock-oauth2.auth:8080/ztoperator/endsession"),
+		},
 		"https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0/.well-known/openid-configuration": {
 			Issuer: helperfunctions.Ptr(
 				"https://login.microsoftonline.com/7f74c8a2-43ce-46b2-b0e8-b6306cba73a3/v2.0",
