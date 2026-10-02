@@ -16,7 +16,7 @@ import (
 	securityv1 "istio.io/client-go/pkg/apis/security/v1"
 
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
+	k8srest "k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -31,7 +31,7 @@ var (
 	ctx       context.Context
 	cancel    context.CancelFunc
 	testEnv   *envtest.Environment
-	cfg       *rest.Config
+	cfg       *k8srest.Config
 	k8sClient client.Client
 )
 
@@ -57,6 +57,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Load environment variables
+	Expect(os.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration")).To(Succeed())
 	err = config.Load()
 	Expect(err).NotTo(HaveOccurred())
 
