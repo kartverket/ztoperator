@@ -229,9 +229,6 @@ func resolveAuthPolicy(
 			authPolicy.Name,
 		),
 	)
-	if discoveryDocumentResolver == nil {
-		return nil, fmt.Errorf("discovery document resolver is not configured")
-	}
 	var identityProviderUris, errIdentityProviderUris = resolver.ResolveDiscoveryDocument(
 		ctx,
 		authPolicy,
