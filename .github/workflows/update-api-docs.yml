@@ -49,7 +49,7 @@ jobs:
       - name: Compare generated API docs
         id: api-docs
         run: |
-          target_file=target/docs/08-tilgangsstyring/08-ztoperator/03-api-docs.md
+          target_file=target/docs/08-tilgangsstyring/08-ztoperator/04-api-docs.md
           if cmp --silent source/api-docs.md "$target_file"; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
