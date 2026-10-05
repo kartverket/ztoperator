@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/kartverket/ztoperator/pkg/rest"
 	"github.com/kelseyhightower/envconfig"
 )
 
@@ -37,17 +36,10 @@ func validateConfig(loaded Config) error {
 	if len(loaded.AllowedWellKnownURIs) == 0 {
 		return errors.New("at least one well-known URI must be configured")
 	}
-	staticDocuments := rest.GetWellknownURIToDiscoveryDocument()
 	for _, uri := range loaded.AllowedWellKnownURIs {
 		parsedURI, err := url.Parse(uri)
 		if err != nil || parsedURI.Host == "" || (parsedURI.Scheme != "http" && parsedURI.Scheme != "https") {
 			return fmt.Errorf("well-known URI %q must be a valid http or https URL", uri)
-		}
-		if _, exists := staticDocuments[uri]; !exists {
-			return fmt.Errorf(
-				"well-known URI %q is not present in the static discovery-document list",
-				uri,
-			)
 		}
 	}
 	return nil

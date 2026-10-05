@@ -9,10 +9,10 @@ import (
 
 const (
 	configTestURI1 = "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration"
-	configTestURI2 = "http://mock-oauth2.auth:8080/smapi/.well-known/openid-configuration"
+	configTestURI2 = "https://ansattporten.no/.well-known/openid-configuration"
 )
 
-func TestLoadAcceptsConfiguredStaticDiscoveryDocuments(t *testing.T) {
+func TestLoadAcceptsConfiguredWellKnownURIs(t *testing.T) {
 	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", configTestURI1+","+configTestURI2)
 	t.Setenv("ZTOPERATOR_GIT_REF", "test")
 
@@ -20,13 +20,6 @@ func TestLoadAcceptsConfiguredStaticDiscoveryDocuments(t *testing.T) {
 	loaded := config.Get()
 	require.Equal(t, []string{configTestURI1, configTestURI2}, loaded.AllowedWellKnownURIs)
 	require.Equal(t, "test", loaded.GitRef)
-}
-
-func TestLoadRejectsURIThatIsNotInStaticDiscoveryDocuments(t *testing.T) {
-	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", "https://idp.example.com/.well-known/openid-configuration")
-
-	err := config.Load()
-	require.ErrorContains(t, err, "is not present in the static discovery-document list")
 }
 
 func TestGetReturnsDefensiveAllowlistCopy(t *testing.T) {
