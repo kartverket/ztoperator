@@ -39,6 +39,7 @@ type AuthPolicyReconciler struct {
 	client.Client
 	Scheme                    *runtime.Scheme
 	Recorder                  events.EventRecorder
+	AllowedWellKnownURIs      []string
 	DiscoveryDocumentResolver rest.DiscoveryDocumentResolver
 }
 
@@ -118,7 +119,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	var scope *model.Scope
-	if validationErr := validateAuthPolicy(ctx, authPolicy); validationErr != nil {
+	if validationErr := validateAuthPolicy(ctx, authPolicy, r.AllowedWellKnownURIs); validationErr != nil {
 		validationErrorMessage := validationErr.Error()
 		scope = &model.Scope{
 			AuthPolicy:             *authPolicy,
@@ -262,14 +263,19 @@ func resolveAuthPolicy(
 
 // validateAuthPolicy performs domain-level validation on the AuthPolicy spec that cannot
 // be expressed by CRD markers alone. It returns nil when the spec is valid.
-func validateAuthPolicy(ctx context.Context, authPolicy *ztoperatorv1alpha1.AuthPolicy) error {
+func validateAuthPolicy(
+	ctx context.Context,
+	authPolicy *ztoperatorv1alpha1.AuthPolicy,
+	allowedWellKnownURIs []string,
+) error {
 	rLog := log.GetLogger(ctx)
 
-	rLog.Debug("Validating WellKnownURI for AuthPolicy", "namespace", authPolicy.Namespace, "name", authPolicy.Name)
-	if err := validation.ValidateWellKnownURI(authPolicy.Spec.WellKnownURI); err != nil {
+	rLog.Debug("Validating AuthPolicy wellKnownURI against configured allowlist", "namespace", authPolicy.Namespace, "name", authPolicy.Name)
+	if !containsWellKnownURI(allowedWellKnownURIs, authPolicy.Spec.WellKnownURI) {
+		err := fmt.Errorf("wellKnownURI %q is not in the configured allowlist", authPolicy.Spec.WellKnownURI)
 		rLog.Error(
 			err,
-			"wellKnownURI validation failed for AuthPolicy",
+			"wellKnownURI allowlist validation failed for AuthPolicy",
 			"namespace", authPolicy.Namespace,
 			"name", authPolicy.Name,
 		)
@@ -288,4 +294,13 @@ func validateAuthPolicy(ctx context.Context, authPolicy *ztoperatorv1alpha1.Auth
 	}
 
 	return nil
+}
+
+func containsWellKnownURI(allowedWellKnownURIs []string, uri string) bool {
+	for _, allowedURI := range allowedWellKnownURIs {
+		if allowedURI == uri {
+			return true
+		}
+	}
+	return false
 }

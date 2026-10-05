@@ -5,6 +5,11 @@ metadata:
   annotations:
     cert-manager.io/inject-ca-from: "ztoperator-system/webhook-cert"
 webhooks:
+  - name: vauthpolicy-v1alpha1.kb.io
+    clientConfig:
+      service:
+        name: webhook-service
+        namespace: ztoperator-system
   - name: vpod-v1.kb.io
     clientConfig:
       service:
@@ -28,4 +33,4 @@ webhooks:
           object != null &&
           object.metadata != null &&
           ('labels' in object.metadata) &&
-          ('application.skiperator.no/app-name' in object.metadata.labels)    
+          ('application.skiperator.no/app-name' in object.metadata.labels)
