@@ -79,6 +79,9 @@ var _ = Describe("AuthPolicy Controller Watches", Ordered, func() {
 			Spec: ztoperatorv1alpha1.AuthPolicySpec{
 				Enabled:      true,
 				WellKnownURI: "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration",
+				AllowedAudiences: []ztoperatorv1alpha1.AllowedAudience{{
+					Value: helperfunctions.Ptr("entraid_server"),
+				}},
 				Selector: ztoperatorv1alpha1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": authPolicyName},
 				},

@@ -13,6 +13,8 @@ import (
 )
 
 func getValidAuthPolicy() *ztoperatorv1alpha1.AuthPolicy {
+	audience := "test-audience"
+
 	return &ztoperatorv1alpha1.AuthPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "auth-policy",
@@ -21,6 +23,9 @@ func getValidAuthPolicy() *ztoperatorv1alpha1.AuthPolicy {
 		Spec: ztoperatorv1alpha1.AuthPolicySpec{
 			Enabled:      true,
 			WellKnownURI: "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration",
+			AllowedAudiences: []ztoperatorv1alpha1.AllowedAudience{
+				{Value: &audience},
+			},
 			Selector: ztoperatorv1alpha1.WorkloadSelector{
 				MatchLabels: map[string]string{"app": "application"},
 			},
@@ -41,6 +46,16 @@ var _ = Describe("AuthPolicy CRD", func() {
 					_ = k8sClient.Delete(testCtx, &authPolicy)
 				}
 			}
+		})
+
+		It("should reject creates when allowedAudiences is missing", func() {
+			authPolicy := getValidAuthPolicy()
+			authPolicy.Spec.AllowedAudiences = nil
+
+			err := k8sClient.Create(testCtx, authPolicy)
+			Expect(err).To(HaveOccurred())
+			Expect(apierrors.IsInvalid(err)).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("allowedAudiences must be non-empty"))
 		})
 
 		It("should reject updates when audience has both value and valueFrom", func() {

@@ -15,6 +15,7 @@ import (
 	"github.com/kartverket/ztoperator/internal/webhook/authpolicy"
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
+	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -253,6 +254,9 @@ var _ = Describe("Pod validating webhook", func() {
 			},
 			Spec: ztoperatorv1.AuthPolicySpec{
 				WellKnownURI: testWellKnownURI,
+				AllowedAudiences: []ztoperatorv1.AllowedAudience{{
+					Value: helperfunctions.Ptr("entraid_server"),
+				}},
 				Selector: ztoperatorv1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": skiperatorAppName},
 				},
@@ -328,6 +332,9 @@ var _ = Describe("Pod validating webhook", func() {
 			},
 			Spec: ztoperatorv1.AuthPolicySpec{
 				WellKnownURI: testWellKnownURI,
+				AllowedAudiences: []ztoperatorv1.AllowedAudience{{
+					Value: helperfunctions.Ptr("entraid_server"),
+				}},
 				Selector: ztoperatorv1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": skiperatorAppName},
 				},
@@ -374,6 +381,9 @@ var _ = Describe("Pod validating webhook", func() {
 			},
 			Spec: ztoperatorv1.AuthPolicySpec{
 				WellKnownURI: testWellKnownURI,
+				AllowedAudiences: []ztoperatorv1.AllowedAudience{{
+					Value: helperfunctions.Ptr("entraid_server"),
+				}},
 				Selector: ztoperatorv1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": skiperatorAppName + "not"},
 				},
@@ -420,6 +430,9 @@ var _ = Describe("Pod validating webhook", func() {
 			},
 			Spec: ztoperatorv1.AuthPolicySpec{
 				WellKnownURI: testWellKnownURI,
+				AllowedAudiences: []ztoperatorv1.AllowedAudience{{
+					Value: helperfunctions.Ptr("entraid_server"),
+				}},
 				Selector: ztoperatorv1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": skiperatorAppName},
 				},
@@ -532,6 +545,9 @@ func newWebhookAuthPolicy(name, wellKnownURI string) *ztoperatorv1.AuthPolicy {
 		Spec: ztoperatorv1.AuthPolicySpec{
 			Enabled:      true,
 			WellKnownURI: wellKnownURI,
+			AllowedAudiences: []ztoperatorv1.AllowedAudience{{
+				Value: helperfunctions.Ptr("entraid_server"),
+			}},
 			Selector: ztoperatorv1.WorkloadSelector{
 				MatchLabels: map[string]string{"app": "application"},
 			},

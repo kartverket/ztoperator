@@ -7,6 +7,7 @@ import (
 // AuthPolicySpec defines the desired state of AuthPolicy.
 //
 // +kubebuilder:validation:XValidation:message="acceptedResources must be non-empty when using Ansattporten or ID-Porten",rule="!(self.wellKnownURI in ['https://test.idporten.no/.well-known/openid-configuration', 'https://idporten.no/.well-known/openid-configuration', 'https://test.ansattporten.no/.well-known/openid-configuration', 'https://ansattporten.no/.well-known/openid-configuration']) || (has(self.acceptedResources) && self.acceptedResources.size() > 0)"
+// +kubebuilder:validation:XValidation:message="allowedAudiences must be non-empty",rule="has(self.allowedAudiences) && self.allowedAudiences.size() > 0"
 // +kubebuilder:validation:XValidation:message="oAuthCredentials must be set when autoLogin is enabled",rule="!has(self.autoLogin) || !self.autoLogin.enabled || has(self.oAuthCredentials)"
 // +kubebuilder:validation:XValidation:message="oAuthCredentials cannot be set unless autoLogin is configured",rule="!has(self.oAuthCredentials) || has(self.autoLogin)"
 type AuthPolicySpec struct {
@@ -35,9 +36,7 @@ type AuthPolicySpec struct {
 	WellKnownURI string `json:"wellKnownURI"`
 
 	// AllowedAudiences defines the allowed audience (`aud`) values in the JWT.
-	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
-	//
-	// The normative behaviour for an OAuth / OIDC-compliant identity provider is to validate the presence of one or more client IDs as allowed audiences.
+	// At least one audience must be configured, and one of the listed values must be present in the token's `aud` claim for validation to succeed.
 	//
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=32

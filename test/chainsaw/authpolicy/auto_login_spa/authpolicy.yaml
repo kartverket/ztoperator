@@ -4,6 +4,8 @@ metadata:
   name: auth-policy
 spec:
   enabled: true
+  allowedAudiences:
+    - value: entraid_server
   ignoreAuthRules:
     - paths:
         - /*

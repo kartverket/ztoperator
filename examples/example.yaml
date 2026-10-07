@@ -53,6 +53,8 @@ spec:
       app: app
   enabled: true
   wellKnownURI: http://mock-oauth2.auth:8080/ztoperator/.well-known/openid-configuration
+  allowedAudiences:
+    - value: entraid_server
   autoLogin:
     enabled: true
     scopes:

@@ -97,6 +97,19 @@ spec:
         - GET
 ```
 
+### Audiences
+
+`allowedAudiences` is required and must contain at least one value. The value must match an
+`aud` claim in the JWT. If multiple values are configured, at least one of them must match.
+
+Without `allowedAudiences`, any valid token issued by the configured identity provider could
+previously access the service, including tokens issued for another integration. This is a
+breaking change: existing `AuthPolicy` resources without an audience must be updated.
+
+For Microsoft Entra ID and ID-porten, use the audience value that is actually present in the
+token issued for the application. `acceptedResources` can control resource indicators for
+providers that support RFC 8707, but does not replace `allowedAudiences`.
+
 ## 🧪 Local Development
 
 Refer to [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to run and test Ztoperator locally.
