@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/metrics"
 
 	v1 "k8s.io/api/core/v1"
@@ -92,6 +93,9 @@ var _ = Describe("AuthPolicy Controller", func() {
 			Spec: ztoperatorv1alpha1.AuthPolicySpec{
 				Enabled:      true,
 				WellKnownURI: wellKnownURI,
+				AllowedAudiences: []ztoperatorv1alpha1.AllowedAudience{{
+					Value: helperfunctions.Ptr("test-audience"),
+				}},
 				Selector: ztoperatorv1alpha1.WorkloadSelector{
 					MatchLabels: map[string]string{
 						"app": "test-app",
@@ -150,6 +154,9 @@ var _ = Describe("AuthPolicy Controller", func() {
 			Spec: ztoperatorv1alpha1.AuthPolicySpec{
 				Enabled:      true,
 				WellKnownURI: wellKnownURI,
+				AllowedAudiences: []ztoperatorv1alpha1.AllowedAudience{{
+					Value: helperfunctions.Ptr("test-audience"),
+				}},
 				Selector: ztoperatorv1alpha1.WorkloadSelector{
 					MatchLabels: map[string]string{
 						"app": "test-app-with-pod",
@@ -184,6 +191,9 @@ var _ = Describe("AuthPolicy Controller", func() {
 			Spec: ztoperatorv1alpha1.AuthPolicySpec{
 				Enabled:      true,
 				WellKnownURI: wellKnownURI,
+				AllowedAudiences: []ztoperatorv1alpha1.AllowedAudience{{
+					Value: helperfunctions.Ptr("test-audience"),
+				}},
 				Selector: ztoperatorv1alpha1.WorkloadSelector{
 					MatchLabels: map[string]string{
 						"app": "test-app-delete",

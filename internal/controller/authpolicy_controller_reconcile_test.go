@@ -80,6 +80,9 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			Spec: ztoperatorv1alpha1.AuthPolicySpec{
 				Enabled:      true,
 				WellKnownURI: "https://idp.example.com/.well-known/openid-configuration",
+				AllowedAudiences: []ztoperatorv1alpha1.AllowedAudience{{
+					Value: helperfunctions.Ptr("test-audience"),
+				}},
 				Selector: ztoperatorv1alpha1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": appName},
 				},

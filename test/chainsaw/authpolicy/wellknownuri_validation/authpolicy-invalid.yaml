@@ -4,6 +4,8 @@ metadata:
   name: invalid-well-known-uri
 spec:
   enabled: true
+  allowedAudiences:
+    - value: entraid_server
   wellKnownURI: https:///path
   selector:
     matchLabels:
