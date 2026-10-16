@@ -64,9 +64,9 @@ spec:
               allowedAudiences:
                 description: |-
                   AllowedAudiences defines the allowed audience (`aud`) values in the JWT.
-                  At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
-
-                  The normative behaviour for an OAuth / OIDC-compliant identity provider is to validate the presence of one or more client IDs as allowed audiences.
+                  At least one audience must be configured for identity providers that require audience restriction, and one of the listed values must be present in the token's `aud` claim for validation to succeed.
+                  Values may be configured directly or referenced from a Secret or ConfigMap in the same namespace.
+                  References are resolved during reconciliation.
                 items:
                   description: |-
                     AllowedAudience defines an audience that is validated against the `aud` claim in the JWT.

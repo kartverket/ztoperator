@@ -2,9 +2,6 @@ apiVersion: ztoperator.kartverket.no/v1alpha1
 kind: AuthPolicy
 metadata:
   name: auth-policy
-  labels:
-    ztoperator.kartverket.no/controller: authpolicy
-    app.kubernetes.io/managed-by: ztoperator
 status:
   phase: Failed
   ready: false

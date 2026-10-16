@@ -97,6 +97,27 @@ spec:
         - GET
 ```
 
+### Audiences
+
+`allowedAudiences` is required for identity providers configured in
+`ZTOPERATOR_AUDIENCE_REQUIRED_WELL_KNOWN_URIS`. This should include Microsoft Entra ID, ID-porten,
+and Ansattporten. It is optional for Maskinporten, which uses scopes rather than an `aud` claim for
+access restriction. If multiple audiences are configured, at least one of them must match the
+token's `aud` claim.
+
+Audience values can be configured directly or referenced from a `Secret` or `ConfigMap`. References
+are resolved during reconciliation, so the referenced resource does not need to exist before the
+`AuthPolicy` is created. An unresolved reference causes reconciliation to fail until it is available.
+
+Without `allowedAudiences`, any valid token issued by the configured identity provider could
+previously access the service, including tokens issued for another integration. This is a
+breaking change for Entra ID, ID-porten, and Ansattporten: existing `AuthPolicy` resources without
+an audience must be updated.
+
+For Microsoft Entra ID, ID-porten, and Ansattporten, use the audience value that is actually
+present in the token issued for the application. `acceptedResources` can control resource
+indicators for providers that support RFC 8707, but does not replace `allowedAudiences`.
+
 ## 🧪 Local Development
 
 Refer to [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to run and test Ztoperator locally.
