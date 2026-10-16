@@ -14,27 +14,33 @@ const (
 
 func TestLoadAcceptsConfiguredWellKnownURIs(t *testing.T) {
 	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", configTestURI1+","+configTestURI2)
+	t.Setenv("ZTOPERATOR_AUDIENCE_REQUIRED_WELL_KNOWN_URIS", configTestURI1)
 	t.Setenv("ZTOPERATOR_GIT_REF", "test")
 
 	require.NoError(t, config.Load())
 	loaded := config.Get()
 	require.Equal(t, []string{configTestURI1, configTestURI2}, loaded.AllowedWellKnownURIs)
+	require.Equal(t, []string{configTestURI1}, loaded.AudienceRequiredWellKnownURIs)
 	require.Equal(t, "test", loaded.GitRef)
 }
 
 func TestGetReturnsDefensiveAllowlistCopy(t *testing.T) {
 	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", configTestURI1)
+	t.Setenv("ZTOPERATOR_AUDIENCE_REQUIRED_WELL_KNOWN_URIS", configTestURI1)
 
 	require.NoError(t, config.Load())
 	loaded := config.Get()
 	loaded.AllowedWellKnownURIs[0] = "https://mutated.example.com/.well-known/openid-configuration"
+	loaded.AudienceRequiredWellKnownURIs[0] = "https://mutated.example.com/.well-known/openid-configuration"
 
 	fresh := config.Get()
 	require.Equal(t, []string{configTestURI1}, fresh.AllowedWellKnownURIs)
+	require.Equal(t, []string{configTestURI1}, fresh.AudienceRequiredWellKnownURIs)
 }
 
 func TestLoadRequiresConfiguredWellKnownEndpoints(t *testing.T) {
 	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", "")
+	t.Setenv("ZTOPERATOR_AUDIENCE_REQUIRED_WELL_KNOWN_URIS", "")
 
 	err := config.Load()
 	require.Error(t, err)
@@ -42,8 +48,27 @@ func TestLoadRequiresConfiguredWellKnownEndpoints(t *testing.T) {
 
 func TestLoadRejectsInvalidWellKnownURIConfiguration(t *testing.T) {
 	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", "not-a-uri")
+	t.Setenv("ZTOPERATOR_AUDIENCE_REQUIRED_WELL_KNOWN_URIS", "")
 
 	err := config.Load()
 
 	require.ErrorContains(t, err, "must be a valid http or https URL")
+}
+
+func TestLoadRejectsInvalidAudienceRequiredWellKnownURI(t *testing.T) {
+	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", configTestURI1)
+	t.Setenv("ZTOPERATOR_AUDIENCE_REQUIRED_WELL_KNOWN_URIS", "not-a-uri")
+
+	err := config.Load()
+
+	require.ErrorContains(t, err, "must be a valid http or https URL")
+}
+
+func TestLoadRequiresAudienceRequiredURIsToBeAllowed(t *testing.T) {
+	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", configTestURI1)
+	t.Setenv("ZTOPERATOR_AUDIENCE_REQUIRED_WELL_KNOWN_URIS", configTestURI2)
+
+	err := config.Load()
+
+	require.ErrorContains(t, err, "is not in the configured allowlist")
 }
