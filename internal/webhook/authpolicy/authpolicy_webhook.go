@@ -16,16 +16,24 @@ import (
 // AuthPolicyCustomValidator validates AuthPolicy objects before they are
 // persisted by the Kubernetes API server.
 type AuthPolicyCustomValidator struct {
-	AllowedWellKnownURIs []string
+	AllowedWellKnownURIs          []string
+	AudienceRequiredWellKnownURIs []string
 }
 
 var _ admission.Validator[*ztoperatorv1alpha1.AuthPolicy] = &AuthPolicyCustomValidator{}
 
 // SetupAuthPolicyWebhookWithManager registers the AuthPolicy validating
 // webhook with the configured well-known URI allowlist.
-func SetupAuthPolicyWebhookWithManager(mgr ctrl.Manager, allowedWellKnownURIs []string) error {
+func SetupAuthPolicyWebhookWithManager(
+	mgr ctrl.Manager,
+	allowedWellKnownURIs []string,
+	audienceRequiredWellKnownURIs []string,
+) error {
 	return ctrl.NewWebhookManagedBy(mgr, &ztoperatorv1alpha1.AuthPolicy{}).
-		WithValidator(&AuthPolicyCustomValidator{AllowedWellKnownURIs: allowedWellKnownURIs}).
+		WithValidator(&AuthPolicyCustomValidator{
+			AllowedWellKnownURIs:          allowedWellKnownURIs,
+			AudienceRequiredWellKnownURIs: audienceRequiredWellKnownURIs,
+		}).
 		Complete()
 }
 
@@ -33,14 +41,14 @@ func (v *AuthPolicyCustomValidator) ValidateCreate(
 	_ context.Context,
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
 ) (admission.Warnings, error) {
-	return nil, validateAuthPolicy(authPolicy, v.AllowedWellKnownURIs)
+	return nil, validateAuthPolicy(authPolicy, v.AllowedWellKnownURIs, v.AudienceRequiredWellKnownURIs)
 }
 
 func (v *AuthPolicyCustomValidator) ValidateUpdate(
 	_ context.Context,
 	_, newAuthPolicy *ztoperatorv1alpha1.AuthPolicy,
 ) (admission.Warnings, error) {
-	return nil, validateAuthPolicy(newAuthPolicy, v.AllowedWellKnownURIs)
+	return nil, validateAuthPolicy(newAuthPolicy, v.AllowedWellKnownURIs, v.AudienceRequiredWellKnownURIs)
 }
 
 func (v *AuthPolicyCustomValidator) ValidateDelete(
@@ -53,6 +61,7 @@ func (v *AuthPolicyCustomValidator) ValidateDelete(
 func validateAuthPolicy(
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
 	allowedWellKnownURIs []string,
+	audienceRequiredWellKnownURIs []string,
 ) error {
 	if authPolicy == nil {
 		return errors.New("AuthPolicy must not be nil")
@@ -61,7 +70,14 @@ func validateAuthPolicy(
 	if !containsWellKnownURI(allowedWellKnownURIs, authPolicy.Spec.WellKnownURI) {
 		return fmt.Errorf("wellKnownURI %q is not in the configured allowlist", authPolicy.Spec.WellKnownURI)
 	}
-	return validation.ValidatePaths(authPolicy.GetPaths())
+	if containsWellKnownURI(audienceRequiredWellKnownURIs, authPolicy.Spec.WellKnownURI) &&
+		len(authPolicy.Spec.AllowedAudiences) == 0 {
+		return fmt.Errorf("allowedAudiences must be non-empty for wellKnownURI %q", authPolicy.Spec.WellKnownURI)
+	}
+	if err := validation.ValidatePaths(authPolicy.GetPaths()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func containsWellKnownURI(allowedWellKnownURIs []string, uri string) bool {

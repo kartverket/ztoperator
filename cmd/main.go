@@ -217,6 +217,7 @@ func main() {
 		if err := authpolicy.SetupAuthPolicyWebhookWithManager(
 			mgr,
 			loadedConfig.AllowedWellKnownURIs,
+			loadedConfig.AudienceRequiredWellKnownURIs,
 		); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "AuthPolicy")
 			os.Exit(1)
