@@ -29,9 +29,13 @@ spec:
             file: authpolicy-with-illegal-audience-valueref-configmap.yaml
         - assert:
             file: authpolicy-with-illegal-audience-valueref-assert.yaml
+        - assert:
+            file: authpolicy-with-allowed-audience-assert.yaml
         - create:
             file: empty-audience-secret.yaml
         - update:
             file: authpolicy-with-illegal-audience-valueref-secret.yaml
         - assert:
             file: authpolicy-with-illegal-audience-valueref-assert.yaml
+        - assert:
+            file: authpolicy-with-allowed-audience-assert.yaml
