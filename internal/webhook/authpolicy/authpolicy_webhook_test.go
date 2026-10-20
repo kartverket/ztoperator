@@ -10,19 +10,56 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const webhookAllowedURI = "https://idp.example.com/.well-known/openid-configuration"
+const (
+	webhookAllowedURI  = "https://idp.example.com/.well-known/openid-configuration"
+	webhookOptionalURI = "https://optional-idp.example.com/.well-known/openid-configuration"
+)
 
 var _ = Describe("AuthPolicy validator", func() {
 	var validator *authpolicy.AuthPolicyCustomValidator
 
 	BeforeEach(func() {
-		validator = newAuthPolicyValidator()
+		validator = &authpolicy.AuthPolicyCustomValidator{}
 	})
 
-	It("accepts an allowed URI without requiring a cached discovery document", func() {
-		warnings, err := validator.ValidateCreate(context.Background(), validWebhookAuthPolicy())
+	It("accepts a static audience", func() {
+		authPolicy := validWebhookAuthPolicy()
+		audience := "my-audience"
+		authPolicy.Spec.AllowedAudiences = []ztoperatorv1alpha1.AllowedAudience{{Value: &audience}}
 
-		Expect(warnings).To(BeEmpty())
+		_, err := validator.ValidateCreate(context.Background(), authPolicy)
+
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("accepts unresolved ConfigMap and Secret audience references", func() {
+		authPolicy := validWebhookAuthPolicy()
+		authPolicy.Spec.AllowedAudiences = []ztoperatorv1alpha1.AllowedAudience{
+			{ValueFrom: configMapAudienceRef("missing-config", "audience")},
+			{ValueFrom: secretAudienceRef("missing-secret")},
+		}
+
+		_, err := validator.ValidateCreate(context.Background(), authPolicy)
+
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("rejects a missing audience for a configured identity provider", func() {
+		authPolicy := validWebhookAuthPolicy()
+		authPolicy.Spec.AllowedAudiences = nil
+
+		_, err := validator.ValidateCreate(context.Background(), authPolicy)
+
+		Expect(err).To(MatchError(ContainSubstring("allowedAudiences must be non-empty")))
+	})
+
+	It("accepts a missing audience for an identity provider that does not require it", func() {
+		authPolicy := validWebhookAuthPolicy()
+		authPolicy.Spec.WellKnownURI = webhookOptionalURI
+		authPolicy.Spec.AllowedAudiences = nil
+
+		_, err := validator.ValidateCreate(context.Background(), authPolicy)
+
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -59,6 +96,16 @@ var _ = Describe("AuthPolicy validator", func() {
 		Expect(updateErr).To(HaveOccurred())
 	})
 
+	It("rejects updates that remove a required audience", func() {
+		oldAuthPolicy := validWebhookAuthPolicy()
+		newAuthPolicy := oldAuthPolicy.DeepCopy()
+		newAuthPolicy.Spec.AllowedAudiences = nil
+
+		_, err := validator.ValidateUpdate(context.Background(), oldAuthPolicy, newAuthPolicy)
+
+		Expect(err).To(MatchError(ContainSubstring("allowedAudiences must be non-empty")))
+	})
+
 	It("accepts a valid AuthPolicy update", func() {
 		oldAuthPolicy := validWebhookAuthPolicy()
 		newAuthPolicy := oldAuthPolicy.DeepCopy()
@@ -73,18 +120,28 @@ var _ = Describe("AuthPolicy validator", func() {
 	})
 })
 
-func newAuthPolicyValidator() *authpolicy.AuthPolicyCustomValidator {
-	return &authpolicy.AuthPolicyCustomValidator{
-		AllowedWellKnownURIs: []string{webhookAllowedURI},
+func configMapAudienceRef(name, key string) *ztoperatorv1alpha1.ValueFrom {
+	return &ztoperatorv1alpha1.ValueFrom{
+		ConfigMapKeyRef: &ztoperatorv1alpha1.KeyRef{Name: name, Key: key},
+	}
+}
+
+func secretAudienceRef(name string) *ztoperatorv1alpha1.ValueFrom {
+	return &ztoperatorv1alpha1.ValueFrom{
+		SecretKeyRef: &ztoperatorv1alpha1.KeyRef{Name: name, Key: "audience"},
 	}
 }
 
 func validWebhookAuthPolicy() *ztoperatorv1alpha1.AuthPolicy {
+	audience := "my-audience"
 	return &ztoperatorv1alpha1.AuthPolicy{
 		ObjectMeta: metav1.ObjectMeta{Name: "auth-policy", Namespace: "default"},
 		Spec: ztoperatorv1alpha1.AuthPolicySpec{
 			Enabled:      true,
 			WellKnownURI: webhookAllowedURI,
+			AllowedAudiences: []ztoperatorv1alpha1.AllowedAudience{
+				{Value: &audience},
+			},
 			Selector: ztoperatorv1alpha1.WorkloadSelector{
 				MatchLabels: map[string]string{"app": "application"},
 			},

@@ -19,7 +19,6 @@ import (
 	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/kartverket/ztoperator/pkg/rest"
-	"github.com/kartverket/ztoperator/pkg/validation"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
 	v1 "k8s.io/api/core/v1"
@@ -39,7 +38,6 @@ type AuthPolicyReconciler struct {
 	client.Client
 	Scheme                    *runtime.Scheme
 	Recorder                  events.EventRecorder
-	AllowedWellKnownURIs      []string
 	DiscoveryDocumentResolver rest.DiscoveryDocumentResolver
 }
 
@@ -118,27 +116,16 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	var scope *model.Scope
-	if validationErr := validateAuthPolicy(ctx, authPolicy, r.AllowedWellKnownURIs); validationErr != nil {
-		validationErrorMessage := validationErr.Error()
-		scope = &model.Scope{
-			AuthPolicy:             *authPolicy,
-			InvalidConfig:          true,
-			ValidationErrorMessage: &validationErrorMessage,
+	scope, err := resolveAuthPolicy(ctx, r.Client, *authPolicy, r.DiscoveryDocumentResolver)
+	if err != nil {
+		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))
+		authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
+		authPolicy.Status.Message = err.Error()
+		updateStatusOnResolveFailedErr := statusmanager.UpdateStatus(ctx, r.Client, *authPolicy)
+		if updateStatusOnResolveFailedErr != nil {
+			return ctrl.Result{}, updateStatusOnResolveFailedErr
 		}
-	} else {
-		resolvedScope, err := resolveAuthPolicy(ctx, r.Client, *authPolicy, r.DiscoveryDocumentResolver)
-		if err != nil {
-			rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))
-			authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
-			authPolicy.Status.Message = err.Error()
-			updateStatusOnResolveFailedErr := statusmanager.UpdateStatus(ctx, r.Client, *authPolicy)
-			if updateStatusOnResolveFailedErr != nil {
-				return ctrl.Result{}, updateStatusOnResolveFailedErr
-			}
-			return reconcile.Result{}, err
-		}
-		scope = resolvedScope
+		return reconcile.Result{}, err
 	}
 
 	controllerResources := reconciler.ControllerResources(scope)
@@ -259,48 +246,4 @@ func resolveAuthPolicy(
 		OAuthCredentials:     *oAuthCredentials,
 		IdentityProviderUris: *identityProviderUris,
 	}, nil
-}
-
-// validateAuthPolicy performs domain-level validation on the AuthPolicy spec that cannot
-// be expressed by CRD markers alone. It returns nil when the spec is valid.
-func validateAuthPolicy(
-	ctx context.Context,
-	authPolicy *ztoperatorv1alpha1.AuthPolicy,
-	allowedWellKnownURIs []string,
-) error {
-	rLog := log.GetLogger(ctx)
-
-	rLog.Debug("Validating AuthPolicy wellKnownURI against configured allowlist", "namespace", authPolicy.Namespace, "name", authPolicy.Name)
-	if !containsWellKnownURI(allowedWellKnownURIs, authPolicy.Spec.WellKnownURI) {
-		err := fmt.Errorf("wellKnownURI %q is not in the configured allowlist", authPolicy.Spec.WellKnownURI)
-		rLog.Error(
-			err,
-			"wellKnownURI allowlist validation failed for AuthPolicy",
-			"namespace", authPolicy.Namespace,
-			"name", authPolicy.Name,
-		)
-		return err
-	}
-
-	rLog.Debug("Validating paths for AuthPolicy", "namespace", authPolicy.Namespace, "name", authPolicy.Name)
-	if err := validation.ValidatePaths(authPolicy.GetPaths()); err != nil {
-		rLog.Error(
-			err,
-			"path validation failed for AuthPolicy",
-			"namespace", authPolicy.Namespace,
-			"name", authPolicy.Name,
-		)
-		return err
-	}
-
-	return nil
-}
-
-func containsWellKnownURI(allowedWellKnownURIs []string, uri string) bool {
-	for _, allowedURI := range allowedWellKnownURIs {
-		if allowedURI == uri {
-			return true
-		}
-	}
-	return false
 }
