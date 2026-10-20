@@ -270,20 +270,26 @@ gateway-api-crds: kubectl ## Install Gateway API CRDs (standard channel — incl
 	  crd/listenersets.gateway.networking.k8s.io
 
 .PHONY: install-istio
-install-istio: ## Install istio
+install-istio: gateway-api-crds ## Install istio
 	@echo "⬇️ Downloading Istio..."
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
 	@echo "⛵️  Installing Istio on Kubernetes cluster..."
-	@./istio-$(ISTIO_VERSION)/bin/istioctl install --context $(KUBECONTEXT) -y --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal &> /dev/null
+	@./istio-$(ISTIO_VERSION)/bin/istioctl install --context $(KUBECONTEXT) -y --set meshConfig.accessLogFile=/dev/stdout --set profile=ambient
 	@rm -rf istio-$(ISTIO_VERSION)
 	@echo "✅  Istio installation complete."
 
 .PHONY: istio-gateways
-istio-gateways: istiohelm install-istio ## Install istio gateways
+istio-gateways: kubectl istiohelm install-istio ## Install istio ingress gateways (Legacy + Gateway API)
 	@echo "⛵️ Creating istio-gateways namespace..."
-	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) &> /dev/null || true
-	@echo "⬇️  Installing istio-gateways"
-	"$(HELM)" install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) -n istio-gateways --kube-context $(KUBECONTEXT) --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	@"$(KUBECTL)" create namespace istio-gateways --context $(KUBECONTEXT) &> /dev/null || true
+	@echo "⬇️  Installing legacy istio-ingressgateway (routingProvider=Legacy)"
+	"$(HELM)" upgrade --install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) \
+	  -n istio-gateways --kube-context $(KUBECONTEXT) \
+	  --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	@echo "⬇️  Installing Gateway API gateways (routingProvider=Standard)"
+	"$(KUBECTL)" apply --context $(KUBECONTEXT) -f config/istio/gateways.yaml
+	"$(KUBECTL)" wait gateway istio-external istio-internal -n istio-gateways \
+	  --for=condition=Programmed --timeout=120s --context $(KUBECONTEXT)
 	@echo "✅  Istio gateways installed."
 
 .PHONY: cert-manager
@@ -361,9 +367,10 @@ webhook-test-manifests: kustomize ## Build webhook manifests for envtest into we
 
 .PHONY: istiohelm
 istiohelm: helm ## Fetch helm charts for Istio
-	"$(HELM)" repo add istio https://blob.istio.io/istio-release/charts --force-update
+	# Ensure istio helm repo exists
+	"$(HELM)" repo list | grep -q '^istio\s' || (echo "Adding istio helm repo..." && $(HELM) repo add istio https://istio-release.r2.istio.io/charts)
 	# Make sure the requested ISTIO_VERSION is available; update index if not
-	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "Updating Helm repos to fetch Istio charts..." && "$(HELM)" repo update)
+	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "Updating Helm repos to fetch Istio charts..." && $(HELM) repo update)
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "❌ Istio Helm chart version $(ISTIO_VERSION) not found in repo index." && echo "   Tip: check available versions with: helm search repo istio/gateway --versions" && exit 1)
 
 .PHONY: kustomize

@@ -11,14 +11,14 @@ spec:
   containers:
     - name: app-without-annotation
   initContainers:
-    - name: istio-init
+    - name: istio-validation
     - name: istio-proxy
 status:
   containerStatuses:
     - name: app-without-annotation
       ready: true
   initContainerStatuses:
-    - name: istio-init
+    - name: istio-validation
       ready: true
     - name: istio-proxy
       ready: true
