@@ -10,6 +10,6 @@ package crd
 //go:generate urlcrd -outdir=./bases -url=https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/config/crd/skiperator.kartverket.no_applications.yaml
 
 // Istio CRDs
-//go:generate urlcrd -outdir=./bases -kind=RequestAuthentication -url=https://raw.githubusercontent.com/istio/api/refs/tags/1.30.0/kubernetes/customresourcedefinitions.gen.yaml
-//go:generate urlcrd -outdir=./bases -kind=AuthorizationPolicy -url=https://raw.githubusercontent.com/istio/api/refs/tags/1.30.0/kubernetes/customresourcedefinitions.gen.yaml
-//go:generate urlcrd -outdir=./bases -kind=EnvoyFilter -url=https://raw.githubusercontent.com/istio/api/refs/tags/1.30.0/kubernetes/customresourcedefinitions.gen.yaml
+//go:generate urlcrd -outdir=./bases -kind=RequestAuthentication -url=https://raw.githubusercontent.com/istio/api/refs/tags/1.31.2/kubernetes/customresourcedefinitions.gen.yaml
+//go:generate urlcrd -outdir=./bases -kind=AuthorizationPolicy -url=https://raw.githubusercontent.com/istio/api/refs/tags/1.31.2/kubernetes/customresourcedefinitions.gen.yaml
+//go:generate urlcrd -outdir=./bases -kind=EnvoyFilter -url=https://raw.githubusercontent.com/istio/api/refs/tags/1.31.2/kubernetes/customresourcedefinitions.gen.yaml
