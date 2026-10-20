@@ -7,7 +7,7 @@ package crd
 //go:generate -command urlcrd go run ../../hack/url2crd
 
 // Skiperator Application CRD
-//go:generate urlcrd -outdir=./bases -url=https://raw.githubusercontent.com/kartverket/skiperator/refs/heads/main/config/crd/skiperator.kartverket.no_applications.yaml
+//go:generate urlcrd -outdir=./bases -url=https://raw.githubusercontent.com/kartverket/skiperator/refs/tags/v2.19.0/config/crd/skiperator.kartverket.no_applications.yaml
 
 // Istio CRDs
 //go:generate urlcrd -outdir=./bases -kind=RequestAuthentication -url=https://raw.githubusercontent.com/istio/api/refs/tags/1.31.2/kubernetes/customresourcedefinitions.gen.yaml

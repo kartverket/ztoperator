@@ -72,6 +72,8 @@ KUBECTL_VERSION ?= v$(KUBERNETES_VERSION)
 KIND_VERSION ?= v0.31.0
 GOLANGCI_LINT_VERSION ?= v2.13.2
 HELM_VERSION ?= v4.0.0
+SKIPERATOR_VERSION ?= v2.19.0
+GATEWAY_API_VERSION ?= v1.6.2
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
@@ -252,9 +254,20 @@ ztoperator-namespace: kubectl ## Create ztoperator-system namespace in the clust
 .PHONY: skiperator
 skiperator: ## Install Skiperator on k8s cluster
 	@echo -e "🤞  Installing Skiperator..."
-	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash ./scripts/install-skiperator.sh
+	@KUBECONTEXT=$(KUBECONTEXT) SKIPERATOR_VERSION=$(SKIPERATOR_VERSION) GATEWAY_API_VERSION=$(GATEWAY_API_VERSION) \
+	  /bin/bash ./scripts/install-skiperator.sh
 	"$(KUBECTL)" wait pod --for=condition=ready --timeout=30s -n skiperator-system -l app=skiperator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying Skiperator." && exit 1)
 	@echo -e "✅  Skiperator installed in namespace 'skiperator-system'!"
+
+.PHONY: gateway-api-crds
+gateway-api-crds: kubectl ## Install Gateway API CRDs (standard channel — includes ListenerSet)
+	@echo "⬇️  Installing Gateway API $(GATEWAY_API_VERSION) CRDs..."
+	"$(KUBECTL)" apply --context $(KUBECONTEXT) --server-side --force-conflicts \
+	  -f https://github.com/kubernetes-sigs/gateway-api/releases/download/$(GATEWAY_API_VERSION)/standard-install.yaml
+	"$(KUBECTL)" wait --for=condition=Established --timeout=60s --context $(KUBECONTEXT) \
+	  crd/gateways.gateway.networking.k8s.io \
+	  crd/httproutes.gateway.networking.k8s.io \
+	  crd/listenersets.gateway.networking.k8s.io
 
 .PHONY: install-istio
 install-istio: ## Install istio
