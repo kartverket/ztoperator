@@ -1,6 +1,6 @@
 module github.com/kartverket/ztoperator
 
-go 1.27.1
+go 1.27.3
 
 require (
 	github.com/go-logr/logr v1.4.4

@@ -15,3 +15,11 @@ updates:
       day: "monday"
       time: "08:00"
       timezone: "Europe/Oslo"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Oslo"
