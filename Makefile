@@ -47,6 +47,14 @@ KIND_IMAGE					= kindest/node:v$(KUBERNETES_VERSION)
 KIND_CLUSTER_NAME          ?= ztoperator
 KUBECONTEXT                ?= kind-$(KIND_CLUSTER_NAME)
 LOCAL_WEBHOOK_CERTS_DIR	   ?= webhook-certs
+HOSTS_FILE				   ?= /etc/hosts
+GATEWAY					   ?= istio-external
+GATEWAY_NS 				   ?= istio-gateways
+GATEWAY_PORTS 			   ?= 443:443 80:80
+GATEWAY_FORWARD_PID        ?= /tmp/ztoperator-gateway-forward.pid
+GATEWAY_FORWARD_LOG        ?= /tmp/ztoperator-gateway-forward.log
+KUBEFWD_PID                ?= /tmp/ztoperator-kubefwd.pid
+KUBEFWD_LOG                ?= /tmp/ztoperator-kubefwd.log
 
 ## Location to install dependencies to
 LOCALBIN ?= $(shell pwd)/bin
@@ -62,6 +70,8 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 HELM ?= $(LOCALBIN)/helm
+KUBEFWD ?= $(LOCALBIN)/kubefwd
+JQ ?= $(LOCALBIN)/jq
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
@@ -72,6 +82,10 @@ KUBECTL_VERSION ?= v$(KUBERNETES_VERSION)
 KIND_VERSION ?= v0.31.0
 GOLANGCI_LINT_VERSION ?= v2.13.2
 HELM_VERSION ?= v4.0.0
+SKIPERATOR_VERSION ?= v2.19.0
+GATEWAY_API_VERSION ?= v1.6.2
+KUBEFWD_VERSION ?= 1.25.15
+JQ_VERSION ?= 1.8.1
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
@@ -107,6 +121,19 @@ isnotrunning: ## Check if ztoperator is NOT running on your host machine (i.e. f
 
 .PHONY: local
 local: cluster ztoperator-namespace cert-manager istio-gateways skiperator mock-oauth2 generate install ## Set up entire local development environment with external dependencies
+
+EXAMPLE_MANIFEST ?= examples/example.yaml
+EXAMPLE_HOST     ?= demo.localdev
+
+.PHONY: example
+example: kubectl ensurelocal ensurerunningordeployed ## Deploy examples/example.yaml and expose it on https://demo.localdev (gateway forward runs in the background)
+	@echo -e "🤞  Applying $(EXAMPLE_MANIFEST)..."
+	@"$(KUBECTL)" apply -f "$(EXAMPLE_MANIFEST)" --context $(KUBECONTEXT)
+	@echo -e "✅  Applied $(EXAMPLE_MANIFEST)"
+	@$(MAKE) --no-print-directory mock-oauth2-ingress
+	@$(MAKE) --no-print-directory host-entry host=$(EXAMPLE_HOST)
+	@$(MAKE) --no-print-directory gateway-forward GATEWAY_PORTS="443:443 80:80"
+	@echo -e "🌐  Open https://$(EXAMPLE_HOST)  (stop the forward with 'make gateway-forward-stop')"
 
 .PHONY: clean
 clean: kind ## Clean up local environment by deleting kind cluster
@@ -252,25 +279,47 @@ ztoperator-namespace: kubectl ## Create ztoperator-system namespace in the clust
 .PHONY: skiperator
 skiperator: ## Install Skiperator on k8s cluster
 	@echo -e "🤞  Installing Skiperator..."
-	@KUBECONTEXT=$(KUBECONTEXT) /bin/bash ./scripts/install-skiperator.sh
+	@KUBECONTEXT=$(KUBECONTEXT) SKIPERATOR_VERSION=$(SKIPERATOR_VERSION) GATEWAY_API_VERSION=$(GATEWAY_API_VERSION) \
+	  /bin/bash ./scripts/install-skiperator.sh
 	"$(KUBECTL)" wait pod --for=condition=ready --timeout=30s -n skiperator-system -l app=skiperator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying Skiperator." && exit 1)
 	@echo -e "✅  Skiperator installed in namespace 'skiperator-system'!"
 
+.PHONY: gateway-api-crds
+gateway-api-crds: kubectl ## Install Gateway API CRDs (standard channel — includes ListenerSet)
+	@echo "⬇️  Installing Gateway API $(GATEWAY_API_VERSION) CRDs..."
+	"$(KUBECTL)" apply --context $(KUBECONTEXT) --server-side --force-conflicts \
+	  -f https://github.com/kubernetes-sigs/gateway-api/releases/download/$(GATEWAY_API_VERSION)/standard-install.yaml
+	"$(KUBECTL)" wait --for=condition=Established --timeout=60s --context $(KUBECONTEXT) \
+	  crd/gateways.gateway.networking.k8s.io \
+	  crd/httproutes.gateway.networking.k8s.io \
+	  crd/listenersets.gateway.networking.k8s.io
+
 .PHONY: install-istio
-install-istio: ## Install istio
+install-istio: gateway-api-crds ## Install istio
 	@echo "⬇️ Downloading Istio..."
 	@curl -L https://istio.io/downloadIstio | ISTIO_VERSION=$(ISTIO_VERSION) TARGET_ARCH=$(ARCH) sh -
 	@echo "⛵️  Installing Istio on Kubernetes cluster..."
-	@./istio-$(ISTIO_VERSION)/bin/istioctl install --context $(KUBECONTEXT) -y --set meshConfig.accessLogFile=/dev/stdout --set profile=minimal &> /dev/null
+	@# Strict gateway merging is disabled so Skiperator's Legacy (Istio Gateway) and
+	@# Standard (Gateway API) routing can both be served by the Gateway API managed gateways.
+	@./istio-$(ISTIO_VERSION)/bin/istioctl install --context $(KUBECONTEXT) -y \
+	  --set meshConfig.accessLogFile=/dev/stdout \
+	  --set profile=ambient \
+	  --set values.pilot.env.PILOT_ENABLE_STRICT_GATEWAY_MERGING=false
 	@rm -rf istio-$(ISTIO_VERSION)
 	@echo "✅  Istio installation complete."
 
 .PHONY: istio-gateways
-istio-gateways: istiohelm install-istio ## Install istio gateways
+istio-gateways: kubectl istiohelm install-istio ## Install istio ingress gateways (Legacy + Gateway API)
 	@echo "⛵️ Creating istio-gateways namespace..."
-	@kubectl create namespace istio-gateways --context $(KUBECONTEXT) &> /dev/null || true
-	@echo "⬇️  Installing istio-gateways"
-	"$(HELM)" install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) -n istio-gateways --kube-context $(KUBECONTEXT) --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	@"$(KUBECTL)" create namespace istio-gateways --context $(KUBECONTEXT) &> /dev/null || true
+	@echo "⬇️  Installing legacy istio-ingressgateway (routingProvider=Legacy)"
+	"$(HELM)" upgrade --install istio-ingressgateway istio/gateway --version v$(ISTIO_VERSION) \
+	  -n istio-gateways --kube-context $(KUBECONTEXT) \
+	  --set labels.app=istio-ingress-external --set labels.istio=ingressgateway
+	@echo "⬇️  Installing Gateway API gateways (routingProvider=Standard)"
+	"$(KUBECTL)" apply --context $(KUBECONTEXT) -f config/istio/gateways.yaml
+	"$(KUBECTL)" wait gateway istio-external istio-internal -n istio-gateways \
+	  --for=condition=Programmed --timeout=120s --context $(KUBECONTEXT)
 	@echo "✅  Istio gateways installed."
 
 .PHONY: cert-manager
@@ -294,17 +343,204 @@ mock-oauth2: ## Deployinh Mock-OAuth service in auth namespace
 ##@ Helpers
 
 .PHONY: mock-token
-mock-token: ensureflox ensurekubefwd ## Retrieves a JWT issued by mock-oauth2
-	@command -v jq >/dev/null 2>&1 || { echo -e "❌  jq is required (used to parse JSON). Please install jq and try again."; exit 1; }
-	@token=$$(curl -s -X POST "http://mock-oauth2.auth:8080/entraid/token" \
+mock-token: ## Retrieves a JWT issued by mock-oauth2
+	@JQ_OUTPUT=$$($(MAKE) jq 2>&1); \
+	if [ $$? -ne 0 ]; then echo "$$JQ_OUTPUT"; exit 1; fi
+	@ENSURE_OUTPUT=$$($(MAKE) ensuremockoauth2isreachable 2>&1); \
+	if [ $$? -ne 0 ]; then echo "$$ENSURE_OUTPUT"; exit 1; fi
+	@token=$$(curl -s -X POST "http://mock-oauth2.auth:8080/accesserator/token" \
 		-d "grant_type=authorization_code" \
-		-d "code=entraid_user" \
-		-d "client_id=something" | jq -r '.access_token // empty'); \
+		-d "code=code" \
+		-d "client_id=something" | "$(JQ)" -r '.access_token // empty'); \
 	if [ -z "$$token" ]; then \
-		echo -e "❌  No access_token found in response"; \
+		echo -e "❌  No access_token found in response" >&2; \
 		exit 1; \
 	fi; \
 	echo "$$token"
+
+.PHONY: mock-oauth2-ingress
+mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd running in the background (stop with 'make mock-oauth2-ingress-stop')
+	@KUBEFWD=$$(command -v kubefwd 2>/dev/null || echo "$(KUBEFWD)"); \
+	if [ ! -x "$$KUBEFWD" ]; then \
+		echo -e "❌  kubefwd not found. Install it or run 'make kubefwd'."; \
+		exit 1; \
+	fi; \
+	echo -e "🔍  Checking if mock-oauth2 is running in the cluster..."; \
+	"$(KUBECTL)" wait pod --for=condition=Ready --timeout=10s -n auth -l app=mock-oauth2 --context $(KUBECONTEXT) 2>/dev/null || { \
+		echo -e "❌  mock-oauth2 is not ready. Deploy it first with 'make mock-oauth2'."; \
+		exit 1; \
+	}; \
+	echo -e "✅  mock-oauth2 is ready"; \
+	STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration 2>/dev/null || echo "000"); \
+	if [ "$$STATUS" = "200" ]; then \
+		echo -e "✅  mock-oauth2 is reachable on http://mock-oauth2.auth:8080"; \
+		exit 0; \
+	fi; \
+	echo -e "⚠️   mock-oauth2 is not reachable (HTTP $$STATUS). Starting kubefwd in the background (requires sudo)..."; \
+	sudo -v || { echo -e "❌  sudo authentication failed"; exit 1; }; \
+	if pgrep -x "kubefwd" >/dev/null 2>&1; then \
+		echo -e "⏳  Stopping existing kubefwd..."; \
+		sudo pkill -x "kubefwd" || true; \
+		sleep 1; \
+	fi; \
+	rm -f "$(KUBEFWD_PID)"; \
+	nohup sudo -E "$$KUBEFWD" svc -n auth --context $(KUBECONTEXT) \
+		> "$(KUBEFWD_LOG)" 2>&1 & \
+	echo $$! > "$(KUBEFWD_PID)"; \
+	echo -e "⏳  Waiting for kubefwd to establish connections..."; \
+	for i in $$(seq 1 15); do \
+		sleep 2; \
+		if ! ps -p "$$(cat "$(KUBEFWD_PID)")" > /dev/null 2>&1; then \
+			echo -e "❌  kubefwd exited. See $(KUBEFWD_LOG):"; \
+			tail -n 20 "$(KUBEFWD_LOG)"; \
+			rm -f "$(KUBEFWD_PID)"; \
+			exit 1; \
+		fi; \
+		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration 2>/dev/null || echo "000"); \
+		if [ "$$STATUS" = "200" ]; then \
+			echo -e "✅  mock-oauth2 is now reachable on http://mock-oauth2.auth:8080 (kubefwd PID $$(cat "$(KUBEFWD_PID)"), log: $(KUBEFWD_LOG))"; \
+			echo -e "ℹ️   Stop it with: make mock-oauth2-ingress-stop"; \
+			exit 0; \
+		fi; \
+	done; \
+	echo -e "❌  mock-oauth2 is still not reachable. Check $(KUBEFWD_LOG) for details."; \
+	exit 1
+
+.PHONY: mock-oauth2-ingress-stop
+mock-oauth2-ingress-stop: ## Stop the background kubefwd started by 'make mock-oauth2-ingress'
+	@if [ -f "$(KUBEFWD_PID)" ] && ps -p "$$(cat "$(KUBEFWD_PID)")" > /dev/null 2>&1; then \
+		echo -e "🛑  Stopping kubefwd (PID $$(cat "$(KUBEFWD_PID)"), requires sudo)"; \
+		sudo kill "$$(cat "$(KUBEFWD_PID)")" || true; \
+	elif pgrep -x "kubefwd" >/dev/null 2>&1; then \
+		echo -e "🛑  Stopping kubefwd (no PID file, requires sudo)"; \
+		sudo pkill -x "kubefwd" || true; \
+	else \
+		echo -e "✅  kubefwd is not running, nothing to stop"; \
+	fi; \
+	rm -f "$(KUBEFWD_PID)"
+
+.PHONY: host-entry
+host-entry: ## Point a hostname at 127.0.0.1 in /etc/hosts. Usage: make host-entry host=foo.bar
+	$(if $(strip $(host)),,$(error host is not set. Usage: make host-entry host=<HOSTNAME>))
+	@marker="# ztoperator-managed"; \
+	if awk -v h="$(host)" '!/^[[:space:]]*#/ { for (i = 2; i <= NF; i++) if ($$i == h) { found = 1; exit } } END { exit(found ? 0 : 1) }' "$(HOSTS_FILE)"; then \
+	   echo "✅  '$(host)' is already in $(HOSTS_FILE), nothing to do"; \
+	   exit 0; \
+	fi; \
+	echo "🤞  Adding '$(host)' to $(HOSTS_FILE) (requires sudo)"; \
+	printf '127.0.0.1\t%s\t%s\n' "$(host)" "$$marker" | sudo tee -a "$(HOSTS_FILE)" > /dev/null; \
+	echo "✅  Added: 127.0.0.1 $(host)  $$marker"; \
+	case "$(host)" in \
+	   *.skip.statkart.no|*.kartverket-intern.cloud) \
+	      echo "ℹ️   Skiperator routes this hostname through the internal gateway. Reach it with:"; \
+	      echo "    make gateway-forward GATEWAY=istio-internal" ;; \
+	   *) \
+	      echo "ℹ️   Reach it with:"; \
+	      echo "    make gateway-forward" ;; \
+	esac
+
+.PHONY: host-entry-clean
+host-entry-clean: ## Remove /etc/hosts entries added by 'make host-entry'. All of them, or one: make host-entry-clean host=foo.bar
+	@marker="# ztoperator-managed"; \
+	matches=$$(awk -v m="$$marker" -v h="$(strip $(host))" \
+	   'function hostmatch() { for (i = 2; i <= NF; i++) if ($$i == h) return 1; return 0 } \
+	    index($$0, m) > 0 && (h == "" || hostmatch())' "$(HOSTS_FILE)"); \
+	if [ -z "$$matches" ]; then \
+	   if [ -n "$(strip $(host))" ]; then \
+	      echo "✅  No entry for '$(host)' managed by ztoperator in $(HOSTS_FILE), nothing to do"; \
+	   else \
+	      echo "✅  No entries managed by ztoperator in $(HOSTS_FILE), nothing to do"; \
+	   fi; \
+	   exit 0; \
+	fi; \
+	echo "🧹  Removing from $(HOSTS_FILE) (requires sudo):"; \
+	echo "$$matches" | sed 's/^/      /'; \
+	tmp=$$(mktemp); \
+	awk -v m="$$marker" -v h="$(strip $(host))" \
+	   'function hostmatch() { for (i = 2; i <= NF; i++) if ($$i == h) return 1; return 0 } \
+	    !(index($$0, m) > 0 && (h == "" || hostmatch()))' "$(HOSTS_FILE)" > "$$tmp"; \
+	if [ ! -s "$$tmp" ]; then \
+	   echo "❌  Refusing to write an empty $(HOSTS_FILE) - aborting, nothing changed"; \
+	   rm -f "$$tmp"; \
+	   exit 1; \
+	fi; \
+	sudo tee "$(HOSTS_FILE)" < "$$tmp" > /dev/null; \
+	rm -f "$$tmp"; \
+	echo "✅  Removed $$(printf '%s\n' "$$matches" | wc -l | tr -d ' ') entry/entries from $(HOSTS_FILE)"
+
+.PHONY: gateway-forward
+gateway-forward: kubectl ## Forward the istio gateway to localhost in the background (stop with 'make gateway-forward-stop'). Override: GATEWAY=istio-internal GATEWAY_PORTS="8443:443 80:80"
+	@if [ -f "$(GATEWAY_FORWARD_PID)" ] && ps -p "$$(cat "$(GATEWAY_FORWARD_PID)")" > /dev/null 2>&1; then \
+	   echo "✅  Gateway forward already running (PID $$(cat "$(GATEWAY_FORWARD_PID)"), log: $(GATEWAY_FORWARD_LOG))"; \
+	   echo "ℹ️   Restart with: make gateway-forward-stop gateway-forward"; \
+	   exit 0; \
+	fi; \
+	rm -f "$(GATEWAY_FORWARD_PID)"; \
+	echo "🔍  Checking gateway '$(GATEWAY)' in namespace '$(GATEWAY_NS)'..."; \
+	"$(KUBECTL)" wait gateway $(GATEWAY) -n $(GATEWAY_NS) --for=condition=Programmed \
+	   --timeout=30s --context $(KUBECONTEXT) > /dev/null 2>&1 || { \
+	   echo "❌  Gateway '$(GATEWAY)' is not Programmed. Install it with 'make istio-gateways'."; \
+	   exit 1; \
+	}; \
+	svc="$(GATEWAY)-istio"; \
+	"$(KUBECTL)" get svc "$$svc" -n $(GATEWAY_NS) --context $(KUBECONTEXT) > /dev/null 2>&1 || { \
+	   echo "❌  Service '$$svc' not found in $(GATEWAY_NS)."; \
+	   exit 1; \
+	}; \
+	for mapping in $(GATEWAY_PORTS); do \
+	   port="$${mapping%%:*}"; \
+	   if lsof -nP -iTCP:"$$port" -sTCP:LISTEN > /dev/null 2>&1; then \
+	      echo "❌  Local port $$port is already in use. Stop whatever holds it, or pass GATEWAY_PORTS."; \
+	      exit 1; \
+	   fi; \
+	done; \
+	hosts=$$("$(KUBECTL)" get httproutes -A --context $(KUBECONTEXT) \
+	   -o jsonpath='{range .items[*]}{range .spec.hostnames[*]}{@}{"\n"}{end}{end}' 2>/dev/null | sort -u); \
+	if [ -n "$$hosts" ]; then \
+	   echo "🌐  Hostnames routed by this cluster:"; \
+	   for h in $$hosts; do \
+	      if awk -v h="$$h" '!/^[[:space:]]*#/ { for (i = 2; i <= NF; i++) if ($$i == h) { found = 1; exit } } END { exit(found ? 0 : 1) }' $(HOSTS_FILE); then \
+	         echo "      https://$$h"; \
+	      else \
+	         echo "      https://$$h   ⚠️  not in $(HOSTS_FILE) - run 'make host-entry host=$$h'"; \
+	      fi; \
+	   done; \
+	fi; \
+	echo "🔌  Forwarding $(GATEWAY_PORTS) from $$svc in the background (sudo needed for ports below 1024)"; \
+	sudo -v || { echo "❌  sudo authentication failed"; exit 1; }; \
+	nohup sudo KUBECONFIG="$$HOME/.kube/config" "$(KUBECTL)" port-forward \
+	   -n $(GATEWAY_NS) "svc/$$svc" $(GATEWAY_PORTS) --context $(KUBECONTEXT) \
+	   > "$(GATEWAY_FORWARD_LOG)" 2>&1 & \
+	echo $$! > "$(GATEWAY_FORWARD_PID)"; \
+	for mapping in $(GATEWAY_PORTS); do \
+	   port="$${mapping%%:*}"; \
+	   for i in $$(seq 1 20); do \
+	      lsof -nP -iTCP:"$$port" -sTCP:LISTEN > /dev/null 2>&1 && break; \
+	      if ! ps -p "$$(cat "$(GATEWAY_FORWARD_PID)")" > /dev/null 2>&1; then \
+	         echo "❌  Port-forward exited. See $(GATEWAY_FORWARD_LOG):"; \
+	         tail -n 20 "$(GATEWAY_FORWARD_LOG)"; \
+	         rm -f "$(GATEWAY_FORWARD_PID)"; \
+	         exit 1; \
+	      fi; \
+	      sleep 0.5; \
+	   done; \
+	done; \
+	echo "✅  Gateway forward running (PID $$(cat "$(GATEWAY_FORWARD_PID)"), log: $(GATEWAY_FORWARD_LOG))"; \
+	echo "ℹ️   Stop it with: make gateway-forward-stop"
+
+.PHONY: gateway-forward-stop
+gateway-forward-stop: ## Stop the background gateway port-forward started by 'make gateway-forward'
+	@if [ ! -f "$(GATEWAY_FORWARD_PID)" ]; then \
+	   echo "✅  No gateway forward PID file found, nothing to stop"; \
+	   exit 0; \
+	fi; \
+	pid=$$(cat "$(GATEWAY_FORWARD_PID)"); \
+	if ps -p "$$pid" > /dev/null 2>&1; then \
+	   echo "🛑  Stopping gateway forward (PID $$pid, requires sudo)"; \
+	   sudo kill "$$pid" || true; \
+	fi; \
+	rm -f "$(GATEWAY_FORWARD_PID)"; \
+	echo "✅  Gateway forward stopped"
 
 .PHONY: ensurelocal
 ensurelocal: kind kubectl ## Ensure local environment is set up with necessary tools and kind cluster is running
@@ -348,9 +584,10 @@ webhook-test-manifests: kustomize ## Build webhook manifests for envtest into we
 
 .PHONY: istiohelm
 istiohelm: helm ## Fetch helm charts for Istio
-	"$(HELM)" repo add istio https://blob.istio.io/istio-release/charts --force-update
+	# Ensure istio helm repo exists
+	"$(HELM)" repo list | grep -q '^istio\s' || (echo "Adding istio helm repo..." && $(HELM) repo add istio https://istio-release.r2.istio.io/charts)
 	# Make sure the requested ISTIO_VERSION is available; update index if not
-	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "Updating Helm repos to fetch Istio charts..." && "$(HELM)" repo update)
+	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "Updating Helm repos to fetch Istio charts..." && $(HELM) repo update)
 	"$(HELM)" search repo istio/gateway --versions | grep -q "$(ISTIO_VERSION)" || (echo "❌ Istio Helm chart version $(ISTIO_VERSION) not found in repo index." && echo "   Tip: check available versions with: helm search repo istio/gateway --versions" && exit 1)
 
 .PHONY: kustomize
@@ -418,6 +655,60 @@ $(KUBECTL): $(LOCALBIN)
 	curl -L -o "$(KUBECTL)" "$$url"; \
 	chmod +x "$(KUBECTL)"; \
 	echo "✅ kubectl installed at $(KUBECTL)"
+
+.PHONY: jq
+jq: $(JQ) ## Download jq locally if necessary.
+$(JQ): $(LOCALBIN)
+	@set -e; \
+	if [ -x "$(JQ)" ]; then \
+		echo "✅ jq already exists at $(JQ)"; \
+		exit 0; \
+	fi; \
+	os=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+	arch=$$(uname -m); \
+	case "$$arch" in \
+		x86_64|amd64) arch=amd64 ;; \
+		aarch64|arm64) arch=arm64 ;; \
+		*) echo "❌ Unsupported architecture: $$arch" >&2; exit 1 ;; \
+	esac; \
+	case "$$os" in \
+		linux) binary="jq-linux-$${arch}" ;; \
+		darwin) binary="jq-macos-$${arch}" ;; \
+		*) echo "❌ Unsupported OS: $$os" >&2; exit 1 ;; \
+	esac; \
+	url="https://github.com/jqlang/jq/releases/download/jq-$(JQ_VERSION)/$${binary}"; \
+	echo "Downloading jq $(JQ_VERSION) from $$url"; \
+	curl -L -o "$(JQ)" "$$url"; \
+	chmod +x "$(JQ)"; \
+	echo "✅ jq installed at $(JQ)"
+
+.PHONY: kubefwd
+kubefwd: $(KUBEFWD) ## Download kubefwd locally if necessary.
+$(KUBEFWD): $(LOCALBIN)
+	@set -e; \
+	if [ -x "$(KUBEFWD)" ]; then \
+		echo "✅ kubefwd already exists at $(KUBEFWD)"; \
+		exit 0; \
+	fi; \
+	os=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+	arch=$$(uname -m); \
+	case "$$arch" in \
+		x86_64|amd64) arch=x86_64 ;; \
+		aarch64|arm64) arch=arm64 ;; \
+		*) echo "❌ Unsupported architecture: $$arch" >&2; exit 1 ;; \
+	esac; \
+	case "$$os" in \
+		linux) os_name=Linux ;; \
+		darwin) os_name=Darwin ;; \
+		*) echo "❌ Unsupported OS: $$os" >&2; exit 1 ;; \
+	esac; \
+	url="https://github.com/txn2/kubefwd/releases/download/v$(KUBEFWD_VERSION)/kubefwd_$${os_name}_$${arch}.tar.gz"; \
+	echo "Downloading kubefwd $(KUBEFWD_VERSION) from $$url"; \
+	curl -L -o kubefwd.tar.gz "$$url"; \
+	tar -xzf kubefwd.tar.gz -C "$(LOCALBIN)" kubefwd; \
+	chmod +x "$(KUBEFWD)"; \
+	rm kubefwd.tar.gz; \
+	echo "✅ kubefwd installed at $(KUBEFWD)"
 
 .PHONY: setup-envtest
 setup-envtest: envtest ## Download the binaries required for ENVTEST in the local bin directory.
@@ -524,19 +815,20 @@ chainsaw-ensure-dir: ## Ensure that the 'dir' variable is set when running 'make
 # Makes the test setup be in sync with what the operator itself uses.
 extract-version = $(shell cat go.mod | grep $(1) | awk '{$$1=$$1};1' | cut -d' ' -f2 | sed 's/^v//')
 
-ensureflox: ## Ensure Flox is installed and activated
-	@if ! command -v "flox" >/dev/null 2>&1; then \
-		echo -e "❌  Flox is not installed. Please install Flox (https://flox.dev/docs/install-flox/) and try again."; \
+ensuremockoauth2isreachable: kubefwd ## Ensure kubefwd is installed and running and that mock-oauth2 is reachable
+	@KUBEFWD_PIDS=$$(pgrep -f "kubefwd( |$$)" 2>/dev/null); \
+	if [ -z "$$KUBEFWD_PIDS" ]; then \
+		echo -e "❌  mock-oauth2 ingress is not configured."; \
+		echo -e "    Configure it with 'make mock-oauth2-ingress'"; \
 		exit 1; \
 	fi
-ifndef FLOX_ENV
-	echo -e "❌  Flox is not activated. Please activate flox with 'flox activate' and try again." && exit 1
-endif
-
-ensurekubefwd: ensureflox ## Ensure kubefwd is installed and running
-	@pgrep -f "kubefwd( |$$)" >/dev/null 2>&1 || { \
-		echo -e "❌  kubefwd is not running."; \
-		echo -e "    Start it in another terminal with:"; \
-		echo -e "      sudo kubefwd svc -n <namespace> --context $(KUBECONTEXT)"; \
+	@echo "Verifying mock-oauth2 is reachable via kubefwd..."
+	@HTTP_STATUS=$$(curl -s -o /dev/null -w "%{http_code}" http://mock-oauth2:8080/accesserator/.well-known/openid-configuration); \
+	if [ "$$HTTP_STATUS" = "200" ]; then \
+		echo -e "✅  mock-oauth2 is reachable (HTTP 200)"; \
+	else \
+		echo -e "❌  mock-oauth2 returned HTTP $$HTTP_STATUS (expected 200)."; \
+		echo -e "    Make sure mock-oauth2 is running and that forwarding is configured."; \
+		echo -e "    This can be done with 'make mock-oauth2' and 'make mock-oauth2-ingress' respectively."; \
 		exit 1; \
-	}
+	fi
