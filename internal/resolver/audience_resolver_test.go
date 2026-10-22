@@ -301,6 +301,20 @@ func TestResolveAudiences_WithBothConfigMapAndSecretRef_ReturnsError(t *testing.
 	assert.Contains(t, err.Error(), "cannot get value from both ConfigMap and Secret")
 }
 
+func TestResolveAudiences_WithEmptyValueFrom_ReturnsError(t *testing.T) {
+	ctx := context.Background()
+	allowedAudiences := []ztoperatorv1alpha1.AllowedAudience{
+		{ValueFrom: &ztoperatorv1alpha1.ValueFrom{}},
+	}
+	k8sClient := createFakeClientForAudiences()
+
+	result, err := resolver.ResolveAudiences(ctx, k8sClient, "default", allowedAudiences)
+
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "both configMapKeyRef and secretKeyRef cannot be nil")
+}
+
 func TestResolveAudiences_WithEmptyConfigMapValue_ReturnsError(t *testing.T) {
 	ctx := context.Background()
 

@@ -85,6 +85,19 @@ var _ = Describe("AuthPolicy validator", func() {
 		Expect(err.Error()).To(ContainSubstring("must start with '/'"))
 	})
 
+	It("rejects a nil AuthPolicy", func() {
+		_, err := validator.ValidateCreate(context.Background(), nil)
+
+		Expect(err).To(MatchError("AuthPolicy must not be nil"))
+	})
+
+	It("allows deleting an AuthPolicy", func() {
+		warnings, err := validator.ValidateDelete(context.Background(), nil)
+
+		Expect(warnings).To(BeEmpty())
+		Expect(err).NotTo(HaveOccurred())
+	})
+
 	It("rejects invalid AuthPolicy creates and updates", func() {
 		invalid := validWebhookAuthPolicy()
 		invalid.Spec.WellKnownURI = "https://not-allowed.example.com/.well-known/openid-configuration"
