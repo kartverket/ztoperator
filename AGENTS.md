@@ -274,7 +274,7 @@ See [CONTRIBUTING.md#managing-dependencies-and-patching-vulnerabilities](CONTRIB
 - **Tests**: `.github/workflows/test-and-compare-code-coverage.yml`, `.github/workflows/test-chainsaw.yml`.
 - **Lint**: `.github/workflows/golangci-lint.yml`.
 - **Releases**: `.github/workflows/release-version.yaml` with GoReleaser (`.goreleaser.yaml`).
-- **Dependency updates**: Dependabot for `gomod` and `github-actions` (weekly on Monday 08:00 Europe/Oslo).
+- **Dependency updates**: Dependabot for `gomod`, `github-actions` and `docker` (weekly on Monday 08:00 Europe/Oslo).
 
 ## Important Constraints
 
