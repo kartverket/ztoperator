@@ -206,16 +206,13 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthPolicy")
 		os.Exit(1)
 	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := v1.SetupPodWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Pod")
-			os.Exit(1)
-		}
-		if err := authpolicy.SetupAuthPolicyWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "AuthPolicy")
-			os.Exit(1)
-		}
+	if err := v1.SetupPodWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "Pod")
+		os.Exit(1)
+	}
+	if err := authpolicy.SetupAuthPolicyWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "AuthPolicy")
+		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 

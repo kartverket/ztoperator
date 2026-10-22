@@ -106,7 +106,8 @@ Ztoperator is configured through environment variables:
 |---|---|
 | `ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS` | Required JSON object containing the allowed OAuth providers. Each provider specifies its `wellKnownURI` and whether audience validation is required (`requireAudience`). |
 | `ZTOPERATOR_GIT_REF` | Git reference used in links to documentation. Defaults to `main`. |
-| `ENABLE_WEBHOOKS` | Set to `false` to disable webhooks. Webhooks are enabled by default. |
+
+Ztoperator always runs with webhooks enabled.
 
 Example provider configuration:
 
