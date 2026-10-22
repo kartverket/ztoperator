@@ -1,3 +1,6 @@
+# CA bundle for the final image, pinned separately so trust store fixes don't wait on the Go image
+FROM alpine:3.24@sha256:71e9b7bae160ba167fa17414401b94cbcdaf3c32feeab9298bd794a2a0614c35 AS certs
+
 # Build the manager binary
 FROM golang:1.27.1-alpine3.24@sha256:4cb7ac979db5fcc41cae44b2227ba5ab8a51e8807f40d9ba4dee20a0ad960b5b AS builder
 ARG TARGETOS
@@ -28,7 +31,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o zt
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM scratch
 WORKDIR /
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /workspace/ztoperator .
 USER 65532:65532
 
