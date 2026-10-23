@@ -1,26 +1,28 @@
-name: Check linting
+name: Lint PR
+
 on:
   pull_request:
-    branches: [main]
     paths:
-      - api/**
-      - cmd/**
-      - internal/**
-      - pkg/**
-      - .github/workflows/golangci-lint.yml
+      - '**/*.go'
+      - go.mod
+      - go.sum
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
-  golangci:
-    name: lint
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+
+      - name: Run golangci-lint with Reviewdog
+        uses: reviewdog/action-golangci-lint@284129a3ac23bc5d8ac1522e0b6511df74a8836d # v2.10.2
         with:
-          go-version-file: go.mod
-      - name: Lint project
-        run: make lint
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          level: warning
+          fail_level: warning
+          golangci_lint_flags: "--timeout=10m"
+          go_version_file: go.mod
