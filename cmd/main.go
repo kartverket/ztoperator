@@ -107,7 +107,6 @@ func main() {
 		setupLog.Error(configLoadErr, "unable to load config")
 		os.Exit(1)
 	}
-	loadedConfig := config.Get()
 	discoveryResolver := rest.NewDefaultDiscoveryDocumentResolver()
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
@@ -202,25 +201,18 @@ func main() {
 		Client:                    mgr.GetClient(),
 		Scheme:                    mgr.GetScheme(),
 		Recorder:                  mgr.GetEventRecorder("authpolicy-controller"),
-		AllowedWellKnownURIs:      loadedConfig.AllowedWellKnownURIs,
 		DiscoveryDocumentResolver: discoveryResolver,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthPolicy")
 		os.Exit(1)
 	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := v1.SetupPodWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "Pod")
-			os.Exit(1)
-		}
-		if err := authpolicy.SetupAuthPolicyWebhookWithManager(
-			mgr,
-			loadedConfig.AllowedWellKnownURIs,
-		); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "AuthPolicy")
-			os.Exit(1)
-		}
+	if err := v1.SetupPodWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "Pod")
+		os.Exit(1)
+	}
+	if err := authpolicy.SetupAuthPolicyWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "AuthPolicy")
+		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 

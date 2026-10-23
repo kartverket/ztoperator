@@ -35,9 +35,8 @@ type AuthPolicySpec struct {
 	WellKnownURI string `json:"wellKnownURI"`
 
 	// AllowedAudiences defines the allowed audience (`aud`) values in the JWT.
-	// At least one of the listed audience values must be present in the token's `aud` claim for validation to succeed.
-	//
-	// The normative behaviour for an OAuth / OIDC-compliant identity provider is to validate the presence of one or more client IDs as allowed audiences.
+	// If multiple audiences are configured, a token is accepted when at least one configured value
+	// matches an audience in the token's `aud` claim.
 	//
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=32

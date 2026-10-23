@@ -80,6 +80,9 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			Spec: ztoperatorv1alpha1.AuthPolicySpec{
 				Enabled:      true,
 				WellKnownURI: "https://idp.example.com/.well-known/openid-configuration",
+				AllowedAudiences: []ztoperatorv1alpha1.AllowedAudience{{
+					Value: helperfunctions.Ptr("test-audience"),
+				}},
 				Selector: ztoperatorv1alpha1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": appName},
 				},
@@ -96,7 +99,6 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			Client:                    fakeClient,
 			Scheme:                    testScheme,
 			Recorder:                  k8sevents.NewFakeRecorder(100),
-			AllowedWellKnownURIs:      []string{"https://idp.example.com/.well-known/openid-configuration"},
 			DiscoveryDocumentResolver: newBasicDiscoveryResolver(),
 		}
 	})
@@ -155,36 +157,6 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 		})
 	})
 
-	Context("when an existing AuthPolicy is outside the configured allowlist", func() {
-		It("keeps the Invalid status and default deny behavior", func() {
-			reconciler.AllowedWellKnownURIs = []string{
-				"https://another-idp.example.com/.well-known/openid-configuration",
-			}
-			reconciler.DiscoveryDocumentResolver = newBasicDiscoveryResolver()
-
-			result, err := reconciler.Reconcile(testCtx, ctrl.Request{
-				NamespacedName: types.NamespacedName{Name: appName, Namespace: namespace},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
-
-			updatedPolicy := &ztoperatorv1alpha1.AuthPolicy{}
-			Expect(fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, updatedPolicy)).To(Succeed())
-			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseInvalid))
-			Expect(updatedPolicy.Status.Ready).To(BeFalse())
-			Expect(updatedPolicy.Status.Message).To(ContainSubstring("is not in the configured allowlist"))
-
-			denyPolicy := &securityv1.AuthorizationPolicy{}
-			Expect(fakeClient.Get(testCtx, types.NamespacedName{
-				Name:      names.DenyPolicy(appName),
-				Namespace: namespace,
-			}, denyPolicy)).To(Succeed())
-			Expect(denyPolicy.Spec.Rules).To(HaveLen(1))
-			Expect(denyPolicy.Spec.Rules[0].To).To(HaveLen(1))
-			Expect(denyPolicy.Spec.Rules[0].To[0].Operation.Paths).To(Equal([]string{"*"}))
-		})
-	})
-
 	Context("when discovery document resolution fails", func() {
 		It("sets Failed status and returns the resolution error for retry", func() {
 			reconciler.DiscoveryDocumentResolver = &fakeDiscoveryDocumentResolver{
@@ -204,6 +176,49 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseFailed))
 			Expect(updatedPolicy.Status.Ready).To(BeFalse())
 			Expect(updatedPolicy.Status.Message).To(ContainSubstring("discovery resolution failed"))
+		})
+	})
+
+	Context("when a resolved audience reference is deleted", func() {
+		It("sets Failed status and keeps the last successfully reconciled resources", func() {
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "audience-secret", Namespace: namespace},
+				Data:       map[string][]byte{"audience": []byte("resolved-audience")},
+			}
+			Expect(fakeClient.Create(testCtx, secret)).To(Succeed())
+
+			authPolicy := &ztoperatorv1alpha1.AuthPolicy{}
+			policyKey := types.NamespacedName{Name: appName, Namespace: namespace}
+			Expect(fakeClient.Get(testCtx, policyKey, authPolicy)).To(Succeed())
+			authPolicy.Spec.AllowedAudiences = []ztoperatorv1alpha1.AllowedAudience{{
+				ValueFrom: &ztoperatorv1alpha1.ValueFrom{
+					SecretKeyRef: &ztoperatorv1alpha1.KeyRef{Name: secret.Name, Key: "audience"},
+				},
+			}}
+			Expect(fakeClient.Update(testCtx, authPolicy)).To(Succeed())
+
+			request := ctrl.Request{NamespacedName: policyKey}
+			_, err := reconciler.Reconcile(testCtx, request)
+			Expect(err).NotTo(HaveOccurred())
+
+			requestAuthentication := &securityv1.RequestAuthentication{}
+			Expect(fakeClient.Get(testCtx, policyKey, requestAuthentication)).To(Succeed())
+			Expect(requestAuthentication.Spec.JwtRules[0].Audiences).To(Equal([]string{"resolved-audience"}))
+
+			Expect(fakeClient.Delete(testCtx, secret)).To(Succeed())
+
+			_, err = reconciler.Reconcile(testCtx, request)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to resolve audiences"))
+
+			updatedPolicy := &ztoperatorv1alpha1.AuthPolicy{}
+			Expect(fakeClient.Get(testCtx, policyKey, updatedPolicy)).To(Succeed())
+			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseFailed))
+
+			unchangedRequestAuthentication := &securityv1.RequestAuthentication{}
+			Expect(fakeClient.Get(testCtx, policyKey, unchangedRequestAuthentication)).To(Succeed())
+			Expect(unchangedRequestAuthentication.Spec.JwtRules[0].Audiences).
+				To(Equal([]string{"resolved-audience"}))
 		})
 	})
 })

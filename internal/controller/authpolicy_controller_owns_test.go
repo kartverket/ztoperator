@@ -9,7 +9,6 @@ import (
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/controller"
 	"github.com/kartverket/ztoperator/internal/names"
-	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/rest"
 	. "github.com/onsi/ginkgo/v2"
@@ -62,7 +61,6 @@ var _ = Describe("AuthPolicy Controller Owns", Ordered, func() {
 			Scheme: mgr.GetScheme(),
 			// Large buffer so Eventf never blocks the reconcile
 			Recorder:                  k8sevents.NewFakeRecorder(10000),
-			AllowedWellKnownURIs:      config.Get().AllowedWellKnownURIs,
 			DiscoveryDocumentResolver: rest.NewDefaultDiscoveryDocumentResolver(),
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed())

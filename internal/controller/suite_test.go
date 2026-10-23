@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
-	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/metrics"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -54,11 +53,6 @@ var _ = BeforeSuite(func() {
 	err = v1alpha3.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = securityv1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Load environment variables
-	Expect(os.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration")).To(Succeed())
-	err = config.Load()
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme

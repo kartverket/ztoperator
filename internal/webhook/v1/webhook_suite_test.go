@@ -15,6 +15,7 @@ import (
 	"github.com/kartverket/ztoperator/internal/webhook/authpolicy"
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
+	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,9 +37,10 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 const (
-	authPolicyName    = "auth-policy"
-	skiperatorAppName = "skiperator-app"
-	testWellKnownURI  = "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration"
+	authPolicyName           = "auth-policy"
+	skiperatorAppName        = "skiperator-app"
+	testWellKnownURI         = "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration"
+	testOptionalWellKnownURI = "http://mock-oauth2.auth:8080/maskinporten/.well-known/openid-configuration"
 )
 
 var (
@@ -70,7 +72,11 @@ var _ = BeforeSuite(func() {
 
 	// Load environment variables
 	Expect(os.Setenv("ZTOPERATOR_CLUSTER_NAME", "test-cluster")).To(Succeed())
-	Expect(os.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", testWellKnownURI)).To(Succeed())
+	providers := `{
+		"required": {"wellKnownURI": "` + testWellKnownURI + `", "requireAudience": true},
+		"optional": {"wellKnownURI": "` + testOptionalWellKnownURI + `", "requireAudience": false}
+	}`
+	Expect(os.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", providers)).To(Succeed())
 	err = config.Load()
 	Expect(err).NotTo(HaveOccurred())
 
@@ -122,7 +128,7 @@ var _ = BeforeSuite(func() {
 
 	err = v1.SetupPodWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
-	err = authpolicy.SetupAuthPolicyWebhookWithManager(mgr, config.Get().AllowedWellKnownURIs)
+	err = authpolicy.SetupAuthPolicyWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:webhook
@@ -253,6 +259,9 @@ var _ = Describe("Pod validating webhook", func() {
 			},
 			Spec: ztoperatorv1.AuthPolicySpec{
 				WellKnownURI: testWellKnownURI,
+				AllowedAudiences: []ztoperatorv1.AllowedAudience{{
+					Value: helperfunctions.Ptr("entraid_server"),
+				}},
 				Selector: ztoperatorv1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": skiperatorAppName},
 				},
@@ -328,6 +337,9 @@ var _ = Describe("Pod validating webhook", func() {
 			},
 			Spec: ztoperatorv1.AuthPolicySpec{
 				WellKnownURI: testWellKnownURI,
+				AllowedAudiences: []ztoperatorv1.AllowedAudience{{
+					Value: helperfunctions.Ptr("entraid_server"),
+				}},
 				Selector: ztoperatorv1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": skiperatorAppName},
 				},
@@ -374,6 +386,9 @@ var _ = Describe("Pod validating webhook", func() {
 			},
 			Spec: ztoperatorv1.AuthPolicySpec{
 				WellKnownURI: testWellKnownURI,
+				AllowedAudiences: []ztoperatorv1.AllowedAudience{{
+					Value: helperfunctions.Ptr("entraid_server"),
+				}},
 				Selector: ztoperatorv1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": skiperatorAppName + "not"},
 				},
@@ -420,6 +435,9 @@ var _ = Describe("Pod validating webhook", func() {
 			},
 			Spec: ztoperatorv1.AuthPolicySpec{
 				WellKnownURI: testWellKnownURI,
+				AllowedAudiences: []ztoperatorv1.AllowedAudience{{
+					Value: helperfunctions.Ptr("entraid_server"),
+				}},
 				Selector: ztoperatorv1.WorkloadSelector{
 					MatchLabels: map[string]string{"app": skiperatorAppName},
 				},
@@ -479,6 +497,36 @@ var _ = Describe("AuthPolicy validating webhook", func() {
 		Expect(k8sClient.Create(ctx, authPolicy)).To(Succeed())
 	})
 
+	It("allows an AuthPolicy whose audience Secret does not exist yet", func() {
+		authPolicy := newWebhookAuthPolicy("authpolicy-webhook-missing-audience", testWellKnownURI)
+		authPolicy.Spec.AllowedAudiences = []ztoperatorv1.AllowedAudience{{
+			ValueFrom: &ztoperatorv1.ValueFrom{
+				SecretKeyRef: &ztoperatorv1.KeyRef{Name: "missing-secret", Key: "audience"},
+			},
+		}}
+
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, authPolicy) })
+
+		Expect(k8sClient.Create(ctx, authPolicy)).To(Succeed())
+	})
+
+	It("rejects an AuthPolicy without audiences when the identity provider requires them", func() {
+		authPolicy := newWebhookAuthPolicy("authpolicy-webhook-audience-required", testWellKnownURI)
+		authPolicy.Spec.AllowedAudiences = nil
+
+		err := k8sClient.Create(ctx, authPolicy)
+
+		Expect(err).To(MatchError(ContainSubstring("allowedAudiences must be non-empty")))
+	})
+
+	It("allows an AuthPolicy without audiences when the identity provider does not require them", func() {
+		authPolicy := newWebhookAuthPolicy("authpolicy-webhook-audience-optional", testOptionalWellKnownURI)
+		authPolicy.Spec.AllowedAudiences = nil
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, authPolicy) })
+
+		Expect(k8sClient.Create(ctx, authPolicy)).To(Succeed())
+	})
+
 	It("rejects an AuthPolicy whose wellKnownURI is not in the allowlist on create", func() {
 		authPolicy := newWebhookAuthPolicy(
 			"authpolicy-webhook-disallowed-create",
@@ -532,6 +580,9 @@ func newWebhookAuthPolicy(name, wellKnownURI string) *ztoperatorv1.AuthPolicy {
 		Spec: ztoperatorv1.AuthPolicySpec{
 			Enabled:      true,
 			WellKnownURI: wellKnownURI,
+			AllowedAudiences: []ztoperatorv1.AllowedAudience{{
+				Value: helperfunctions.Ptr("entraid_server"),
+			}},
 			Selector: ztoperatorv1.WorkloadSelector{
 				MatchLabels: map[string]string{"app": "application"},
 			},

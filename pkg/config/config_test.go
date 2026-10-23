@@ -12,38 +12,69 @@ const (
 	configTestURI2 = "https://ansattporten.no/.well-known/openid-configuration"
 )
 
-func TestLoadAcceptsConfiguredWellKnownURIs(t *testing.T) {
-	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", configTestURI1+","+configTestURI2)
+func TestLoadAcceptsConfiguredOAuthProviders(t *testing.T) {
+	t.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", `{
+		"entraid": {"wellKnownURI": "`+configTestURI1+`", "requireAudience": true},
+		"ansattporten": {"wellKnownURI": "`+configTestURI2+`", "requireAudience": false}
+	}`)
 	t.Setenv("ZTOPERATOR_GIT_REF", "test")
 
 	require.NoError(t, config.Load())
 	loaded := config.Get()
-	require.Equal(t, []string{configTestURI1, configTestURI2}, loaded.AllowedWellKnownURIs)
+	require.Equal(t, config.OAuthProvider{
+		WellKnownURI:    configTestURI1,
+		RequireAudience: true,
+	}, loaded.AllowedOAuthProviders["entraid"])
+	require.Equal(t, config.OAuthProvider{
+		WellKnownURI:    configTestURI2,
+		RequireAudience: false,
+	}, loaded.AllowedOAuthProviders["ansattporten"])
 	require.Equal(t, "test", loaded.GitRef)
 }
 
-func TestGetReturnsDefensiveAllowlistCopy(t *testing.T) {
-	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", configTestURI1)
-
-	require.NoError(t, config.Load())
-	loaded := config.Get()
-	loaded.AllowedWellKnownURIs[0] = "https://mutated.example.com/.well-known/openid-configuration"
-
-	fresh := config.Get()
-	require.Equal(t, []string{configTestURI1}, fresh.AllowedWellKnownURIs)
-}
-
-func TestLoadRequiresConfiguredWellKnownEndpoints(t *testing.T) {
-	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", "")
+func TestLoadRequiresConfiguredOAuthProviders(t *testing.T) {
+	t.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", `{}`)
 
 	err := config.Load()
-	require.Error(t, err)
+
+	require.ErrorContains(t, err, "at least one OAuth provider must be configured")
 }
 
-func TestLoadRejectsInvalidWellKnownURIConfiguration(t *testing.T) {
-	t.Setenv("ZTOPERATOR_ALLOWED_WELL_KNOWN_URIS", "not-a-uri")
+func TestLoadRejectsInvalidProviderJSON(t *testing.T) {
+	t.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", `{invalid}`)
+
+	err := config.Load()
+
+	require.ErrorContains(t, err, "invalid character")
+}
+
+func TestLoadRejectsInvalidWellKnownURI(t *testing.T) {
+	t.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", `{
+		"invalid": {"wellKnownURI": "not-a-uri", "requireAudience": true}
+	}`)
 
 	err := config.Load()
 
 	require.ErrorContains(t, err, "must be a valid http or https URL")
+}
+
+func TestLoadRejectsEmptyProviderName(t *testing.T) {
+	t.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", `{
+		"": {"wellKnownURI": "`+configTestURI1+`", "requireAudience": true}
+	}`)
+
+	err := config.Load()
+
+	require.ErrorContains(t, err, "OAuth provider name must not be empty")
+}
+
+func TestLoadRejectsDuplicateWellKnownURI(t *testing.T) {
+	t.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", `{
+		"first": {"wellKnownURI": "`+configTestURI1+`", "requireAudience": true},
+		"second": {"wellKnownURI": "`+configTestURI1+`", "requireAudience": false}
+	}`)
+
+	err := config.Load()
+
+	require.ErrorContains(t, err, "is configured for both OAuth provider")
 }

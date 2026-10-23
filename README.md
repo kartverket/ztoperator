@@ -10,6 +10,7 @@ At the heart of Ztoperator is the custom resource definition (**CRD**) `AuthPoli
 
 - [✨ Core Functionality](#-core-functionality)
 - [🔧 Example AuthPolicy](#-example-authpolicy)
+- [⚙️ Configuration](#️-configuration)
 - [🧪 Local Development](#-local-development)
 - [🔍 How Ztoperator Works](#-how-ztoperator-works)
 - [⚡️ Istio Compatibility](#️-istio-compatibility)
@@ -96,6 +97,35 @@ spec:
       methods:
         - GET
 ```
+
+## ⚙️ Configuration
+
+Ztoperator is configured through environment variables:
+
+| Variable | Description |
+|---|---|
+| `ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS` | Required JSON object containing the allowed OAuth providers. Each provider specifies its `wellKnownURI` and whether audience validation is required (`requireAudience`). |
+| `ZTOPERATOR_GIT_REF` | Git reference used in links to documentation. Defaults to `main`. |
+
+Ztoperator always runs with webhooks enabled.
+
+Example provider configuration:
+
+```yaml
+ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS: |
+  {
+    "login.microsoftonline.com": {
+      "wellKnownURI": "https://login.microsoftonline.com/example/v2.0/.well-known/openid-configuration",
+      "requireAudience": true
+    },
+    "test.maskinporten.no": {
+      "wellKnownURI": "https://test.maskinporten.no/.well-known/oauth-authorization-server",
+      "requireAudience": false
+    }
+  }
+```
+
+When `requireAudience` is enabled, the webhook requires `allowedAudiences` in the `AuthPolicy`.
 
 ## 🧪 Local Development
 
