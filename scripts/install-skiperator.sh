@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-KUBECONTEXT=${KUBECONTEXT:-"kind-accesserator"}
+KUBECONTEXT=${KUBECONTEXT:-"kind-ztoperator"}
 SKIPERATOR_VERSION=${SKIPERATOR_VERSION:-"v2.19.0"}
 # Versions below are the ones skiperator v2.19.0 builds against (see its go.mod)
 PROMETHEUS_VERSION=${PROMETHEUS_VERSION:-"v0.94.0"}

@@ -348,7 +348,7 @@ mock-token: ## Retrieves a JWT issued by mock-oauth2
 	if [ $$? -ne 0 ]; then echo "$$JQ_OUTPUT"; exit 1; fi
 	@ENSURE_OUTPUT=$$($(MAKE) ensuremockoauth2isreachable 2>&1); \
 	if [ $$? -ne 0 ]; then echo "$$ENSURE_OUTPUT"; exit 1; fi
-	@token=$$(curl -s -X POST "http://mock-oauth2.auth:8080/accesserator/token" \
+	@token=$$(curl -s -X POST "http://mock-oauth2.auth:8080/ztoperator/token" \
 		-d "grant_type=authorization_code" \
 		-d "code=code" \
 		-d "client_id=something" | "$(JQ)" -r '.access_token // empty'); \
@@ -371,7 +371,7 @@ mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd runn
 		exit 1; \
 	}; \
 	echo -e "✅  mock-oauth2 is ready"; \
-	STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration 2>/dev/null || echo "000"); \
+	STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://mock-oauth2.auth:8080/ztoperator/.well-known/openid-configuration 2>/dev/null || echo "000"); \
 	if [ "$$STATUS" = "200" ]; then \
 		echo -e "✅  mock-oauth2 is reachable on http://mock-oauth2.auth:8080"; \
 		exit 0; \
@@ -396,7 +396,7 @@ mock-oauth2-ingress: kubefwd ## Ensure mock-oauth2 is reachable via kubefwd runn
 			rm -f "$(KUBEFWD_PID)"; \
 			exit 1; \
 		fi; \
-		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://mock-oauth2.auth:8080/accesserator/.well-known/openid-configuration 2>/dev/null || echo "000"); \
+		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://mock-oauth2.auth:8080/ztoperator/.well-known/openid-configuration 2>/dev/null || echo "000"); \
 		if [ "$$STATUS" = "200" ]; then \
 			echo -e "✅  mock-oauth2 is now reachable on http://mock-oauth2.auth:8080 (kubefwd PID $$(cat "$(KUBEFWD_PID)"), log: $(KUBEFWD_LOG))"; \
 			echo -e "ℹ️   Stop it with: make mock-oauth2-ingress-stop"; \
@@ -823,7 +823,7 @@ ensuremockoauth2isreachable: kubefwd ## Ensure kubefwd is installed and running 
 		exit 1; \
 	fi
 	@echo "Verifying mock-oauth2 is reachable via kubefwd..."
-	@HTTP_STATUS=$$(curl -s -o /dev/null -w "%{http_code}" http://mock-oauth2:8080/accesserator/.well-known/openid-configuration); \
+	@HTTP_STATUS=$$(curl -s -o /dev/null -w "%{http_code}" http://mock-oauth2:8080/ztoperator/.well-known/openid-configuration); \
 	if [ "$$HTTP_STATUS" = "200" ]; then \
 		echo -e "✅  mock-oauth2 is reachable (HTTP 200)"; \
 	else \
