@@ -2,14 +2,11 @@ package controller_test
 
 import (
 	"context"
-	"errors"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/controller"
 	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
-	"github.com/kartverket/ztoperator/pkg/log"
-	"github.com/kartverket/ztoperator/pkg/rest"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
@@ -24,30 +21,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
-
-type fakeDiscoveryDocumentResolver struct {
-	document *rest.DiscoveryDocument
-	err      error
-}
-
-func (f *fakeDiscoveryDocumentResolver) GetOAuthDiscoveryDocument(
-	_ string,
-	_ log.Logger,
-) (*rest.DiscoveryDocument, error) {
-	return f.document, f.err
-}
-
-func newBasicDiscoveryResolver() *fakeDiscoveryDocumentResolver {
-	return &fakeDiscoveryDocumentResolver{
-		document: &rest.DiscoveryDocument{
-			Issuer:                helperfunctions.Ptr("https://idp.example.com"),
-			JwksURI:               helperfunctions.Ptr("https://idp.example.com/jwks"),
-			TokenEndpoint:         helperfunctions.Ptr("https://idp.example.com/token"),
-			AuthorizationEndpoint: helperfunctions.Ptr("https://idp.example.com/authorize"),
-			EndSessionEndpoint:    helperfunctions.Ptr("https://idp.example.com/endsession"),
-		},
-	}
-}
 
 var _ = Describe("AuthPolicy Controller Reconcile", func() {
 	var (
@@ -79,7 +52,7 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			},
 			Spec: ztoperatorv1alpha1.AuthPolicySpec{
 				Enabled:      true,
-				WellKnownURI: "https://idp.example.com/.well-known/openid-configuration",
+				WellKnownURI: "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration",
 				AllowedAudiences: []ztoperatorv1alpha1.AllowedAudience{{
 					Value: helperfunctions.Ptr("test-audience"),
 				}},
@@ -96,10 +69,9 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			Build()
 
 		reconciler = &controller.AuthPolicyReconciler{
-			Client:                    fakeClient,
-			Scheme:                    testScheme,
-			Recorder:                  k8sevents.NewFakeRecorder(100),
-			DiscoveryDocumentResolver: newBasicDiscoveryResolver(),
+			Client:   fakeClient,
+			Scheme:   testScheme,
+			Recorder: k8sevents.NewFakeRecorder(100),
 		}
 	})
 
@@ -114,8 +86,8 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			ra := &securityv1.RequestAuthentication{}
 			Expect(fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, ra)).To(Succeed())
 			Expect(ra.Spec.GetJwtRules()).To(HaveLen(1))
-			Expect(ra.Spec.GetJwtRules()[0].GetIssuer()).To(Equal("https://idp.example.com"))
-			Expect(ra.Spec.GetJwtRules()[0].GetJwksUri()).To(Equal("https://idp.example.com/jwks"))
+			Expect(ra.Spec.GetJwtRules()[0].GetIssuer()).To(Equal("http://mock-oauth2.auth:8080/entraid"))
+			Expect(ra.Spec.GetJwtRules()[0].GetJwksUri()).To(Equal("http://mock-oauth2.auth:8080/entraid/jwks"))
 			Expect(ra.Spec.GetSelector().GetMatchLabels()).To(Equal(map[string]string{"app": appName}))
 
 			owner := &ztoperatorv1alpha1.AuthPolicy{}
@@ -154,28 +126,6 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseReady))
 			Expect(updatedPolicy.Status.Ready).To(BeTrue())
 			Expect(updatedPolicy.Status.ObservedGeneration).To(Equal(int64(1)))
-		})
-	})
-
-	Context("when discovery document resolution fails", func() {
-		It("sets Failed status and returns the resolution error for retry", func() {
-			reconciler.DiscoveryDocumentResolver = &fakeDiscoveryDocumentResolver{
-				err: errors.New("discovery resolution failed"),
-			}
-
-			result, err := reconciler.Reconcile(testCtx, ctrl.Request{
-				NamespacedName: types.NamespacedName{Name: appName, Namespace: namespace},
-			})
-
-			Expect(result).To(Equal(ctrl.Result{}))
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("discovery resolution failed"))
-
-			updatedPolicy := &ztoperatorv1alpha1.AuthPolicy{}
-			Expect(fakeClient.Get(testCtx, types.NamespacedName{Name: appName, Namespace: namespace}, updatedPolicy)).To(Succeed())
-			Expect(updatedPolicy.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseFailed))
-			Expect(updatedPolicy.Status.Ready).To(BeFalse())
-			Expect(updatedPolicy.Status.Message).To(ContainSubstring("discovery resolution failed"))
 		})
 	})
 

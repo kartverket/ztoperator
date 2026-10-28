@@ -63,6 +63,21 @@ var _ = Describe("AuthPolicy validator", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	It("rejects auto-login when the provider lacks required endpoints", func() {
+		authPolicy := validWebhookAuthPolicy()
+		authPolicy.Spec.WellKnownURI = webhookOptionalURI
+		authPolicy.Spec.AutoLogin = &ztoperatorv1alpha1.AutoLogin{Enabled: true}
+		authPolicy.Spec.OAuthCredentials = &ztoperatorv1alpha1.OAuthCredentials{
+			SecretRef:       "oauth-credentials",
+			ClientIDKey:     "client-id",
+			ClientSecretKey: "client-secret",
+		}
+
+		_, err := validator.ValidateCreate(context.Background(), authPolicy)
+
+		Expect(err).To(MatchError(ContainSubstring("does not support authorization endpoint")))
+	})
+
 	It("rejects a URI outside the configured allowlist", func() {
 		authPolicy := validWebhookAuthPolicy()
 		authPolicy.Spec.WellKnownURI = "https://other.example.com/.well-known/openid-configuration"

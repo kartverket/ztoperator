@@ -60,6 +60,17 @@ func validateAuthPolicy(authPolicy *ztoperatorv1alpha1.AuthPolicy) error {
 	if provider.RequireAudience && len(authPolicy.Spec.AllowedAudiences) == 0 {
 		return fmt.Errorf("allowedAudiences must be non-empty for wellKnownURI %q", authPolicy.Spec.WellKnownURI)
 	}
+	if authPolicy.Spec.AutoLogin != nil && authPolicy.Spec.AutoLogin.Enabled {
+		if provider.AuthorizationEndpoint == "" || provider.EndSessionEndpoint == "" {
+			return fmt.Errorf(
+				"issuer %s for AuthPolicy with name %s/%s does not support authorization endpoint "+
+					"or end session endpoint required for autologin",
+				provider.Issuer,
+				authPolicy.Namespace,
+				authPolicy.Name,
+			)
+		}
+	}
 	if err := validation.ValidatePaths(authPolicy.GetPaths()); err != nil {
 		return err
 	}
