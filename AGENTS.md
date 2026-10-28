@@ -40,7 +40,7 @@ Controller.Reconcile()
   ├─ Fetch AuthPolicy
   ├─ resolveAuthPolicy()         ← Resolvers (internal/resolver/)
   │   ├─ ResolveOAuthCredentials   (reads Secret for clientID/clientSecret)
-  │   ├─ ResolveDiscoveryDocument  (fetches .well-known OIDC endpoint → issuer, jwks, token, auth, endsession URIs)
+  │   ├─ ResolveDiscoveryDocument  (reads configured issuer, jwks, token, auth, endsession URIs)
   │   ├─ ResolveAutoLoginConfig    (builds Lua script config, sane defaults for redirect/logout paths)
   │   └─ ResolveAudiences          (static values or from ConfigMap/Secret references)
   ├─ validateAuthPolicy()        ← Validators (pkg/validation/)
@@ -83,8 +83,8 @@ Controller.Reconcile()
 | `pkg/validation/` | Path validation (RFC 3986, template patterns `{*}` / `{**}`), pod annotation validation; `path_classifier.go` distinguishes exact/prefix/template paths, `path_transformation.go` normalises them before matching |
 | `pkg/reconciliation/` | `ControllerResource` interface and generic `ReconcilerAdapter[T]` / `ResourceReconciler[T]` types |
 | `pkg/metrics/` | Prometheus gauge `ztoperator_authpolicy_info` with labels: name, namespace, state, owner, issuer, enabled, auto_login_enabled, protected_pod |
-| `pkg/rest/` | OIDC discovery document HTTP client (uses resty); `DiscoveryDocumentResolver` interface in `client.go` is the main test seam injected into the controller; pre-seeded static map of known providers in `dto.go` |
-| `pkg/config/` | Env-based config via `envconfig` (currently just `ZTOPERATOR_GIT_REF`) |
+| `pkg/config/` | Env-based config via `envconfig`, including the allowed OAuth providers and their discovery endpoint values |
+| `pkg/model/` | Resolved controller models and configured OIDC discovery values |
 | `pkg/log/` | Thin wrapper around `logr.Logger` with Debug/Info/Warning/Error levels |
 | `pkg/helperfunctions/` | Shared utilities (ObjectMeta builder, URL parsing, pod lookup, generic `Ptr()`, etc.) |
 
@@ -203,11 +203,11 @@ The Lua script (`pkg/luascript/ztoperator.lua`) is embedded at compile time via 
 
 ### OAuth 2.0 / OIDC Standards
 
-- **OIDC Discovery**: `wellKnownURI` fetches the `.well-known/openid-configuration` document.
+- **OIDC Discovery**: endpoint values returned by providers' discovery documents are configured in `ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS`; the operator does not fetch `wellKnownURI` at runtime.
 - **RFC 8707**: `acceptedResources` implements Resource Indicators for audience-restricted access tokens.
 - **RP-Initiated Logout**: `autoLogin.logoutPath` triggers redirect to the IdP's `end_session_endpoint`.
 - **Known Norwegian IdPs**: ID-porten, Ansattporten (hardcoded well-known URIs in CRD CEL validation to enforce `acceptedResources`).
-- **Pre-seeded Discovery Documents**: `pkg/rest/dto.go` contains a hardcoded static map of well-known URIs to discovery documents for mock-oauth2 (entraid, smapi, maskinporten), Microsoft Entra ID, ID-porten, and Maskinporten. This avoids live HTTP lookups for known providers.
+- **Configured Discovery Documents**: every allowed provider supplies `issuer`, `tokenEndpoint`, and `jwksURI`; `authorizationEndpoint` and `endSessionEndpoint` are required when auto-login is enabled.
 
 ### Skiperator Integration
 
@@ -232,7 +232,7 @@ The operator validates these annotations and sets the AuthPolicy to `Invalid` ph
 - **Flox**: Development environment manager (`.flox/env/manifest.toml`). `flox activate` sets up everything.
 - **Kind**: Local Kubernetes cluster (`kind-ztoperator` context).
 - Components installed locally: Istio, cert-manager, Skiperator, mock-oauth2-server.
-- Env vars: `.env` file (currently just `ZTOPERATOR_GIT_REF`).
+- Env vars: `config/manager/base/.env` contains `ZTOPERATOR_GIT_REF` and `ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS`.
 - IDE run configs: `.run/Ztoperator.run.xml`, `.run/Setup.run.xml` (JetBrains GoLand/IntelliJ).
 
 ### Key Make Targets
