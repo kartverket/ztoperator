@@ -171,6 +171,22 @@ func TestLoadRejectsInvalidOptionalProviderEndpoint(t *testing.T) {
 	require.ErrorContains(t, err, "authorizationEndpoint")
 }
 
+func TestLoadRejectsInvalidEndSessionEndpoint(t *testing.T) {
+	t.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", `{
+		"invalid-end-session": {
+			"wellKnownURI": "`+configTestURI1+`",
+			"issuer": "`+configTestIssuer+`",
+			"tokenEndpoint": "https://issuer.example.com/token",
+			"jwksURI": "https://issuer.example.com/jwks",
+			"endSessionEndpoint": "not-a-uri"
+		}
+	}`)
+
+	err := config.Load()
+
+	require.ErrorContains(t, err, "endSessionEndpoint")
+}
+
 func TestLoadRejectsUnsafeProviderEndpoint(t *testing.T) {
 	t.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", `{
 		"unsafe": {

@@ -20,8 +20,10 @@ var _ = BeforeSuite(func() {
 			"wellKnownURI": "` + webhookAllowedURI + `",
 			"requireAudience": true,
 			"issuer": "https://required.example.com",
+			"authorizationEndpoint": "https://required.example.com/authorize",
 			"tokenEndpoint": "https://required.example.com/token",
-			"jwksURI": "https://required.example.com/jwks"
+			"jwksURI": "https://required.example.com/jwks",
+			"endSessionEndpoint": "https://required.example.com/logout"
 		},
 		"optional": {
 			"wellKnownURI": "` + webhookOptionalURI + `",
