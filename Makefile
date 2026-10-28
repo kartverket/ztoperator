@@ -34,7 +34,6 @@ SHELL = /usr/bin/env bash -o pipefail
 
 ##@ Variables
 
-ALLOWED_LOCAL_EGRESS_HOSTS = test.idporten.no,test.ansattporten.no,test.maskinporten.no,login.microsoftonline.com
 # Pinned by digest so local runs and the api-docs workflow render identically.
 CRDOC_IMAGE                ?= ghcr.io/fybrik/crdoc@sha256:355ef777a45021ee864e613b2234b4f2c6193762e3e0de94a26b66d06cec81c3
 CRDOC_RESOURCES_DIR        := crdoc-resources
@@ -196,24 +195,12 @@ ifndef ignore-not-found
   ignore-not-found = false
 endif
 
-.PHONY: ztoperator-service-entry
-ztoperator-service-entry: kubectl ztoperator-namespace ## Create a ServiceEntry for ztoperator with the allowed egress hosts.
-	@hosts_list="$(ALLOWED_LOCAL_EGRESS_HOSTS)"; \
-	hosts_yaml=""; \
-	for host in $$(echo "$$hosts_list" | tr ',' '\n'); do \
-		hosts_yaml="$$hosts_yaml    - $$host\n"; \
-	done; \
-	printf "apiVersion: networking.istio.io/v1\nkind: ServiceEntry\nmetadata:\n  name: ztoperator-egress\n  namespace: ztoperator-system\nspec:\n  exportTo:\n    - .\n  hosts:\n$$hosts_yaml  ports:\n    - name: https\n      number: 443\n      protocol: HTTPS\n  resolution: DNS\n" | \
-	$(KUBECTL) apply --context $(KUBECONTEXT) -f -
-
-
 .PHONY: deploy
-deploy: ensurelocal isnotrunning ztoperator-namespace generate install kustomize docker-build ztoperator-service-entry ## Deploy ztoperator and all the required resources for ztoperator to run properly to the kind cluster
+deploy: ensurelocal isnotrunning ztoperator-namespace generate install kustomize docker-build ## Deploy ztoperator and all the required resources for ztoperator to run properly to the kind cluster
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KIND)" load docker-image ${IMG} --name $(KIND_CLUSTER_NAME)
 	"$(KUSTOMIZE)" build config/webhook | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
 	"$(KUSTOMIZE)" build config/manager | "$(KUBECTL)" apply --context $(KUBECONTEXT) -f -
-	"$(KUBECTL)" patch networkpolicy ztoperator-netpol --namespace ztoperator-system --context $(KUBECONTEXT) --type=json --patch '[{"op":"add","path":"/spec/egress/-","value":{"ports":[{"port":8080,"protocol":"TCP"}],"to":[{"namespaceSelector":{"matchLabels":{"kubernetes.io/metadata.name":"auth"}},"podSelector":{"matchLabels":{"app":"mock-oauth2"}}}]}}]'
 	"$(KUBECTL)" wait pod --for=condition=ready --timeout=60s -n ztoperator-system -l app=ztoperator --context $(KUBECONTEXT) || (echo -e "❌  Error deploying ztoperator." && exit 1)
 	@echo -e "✅  ztoperator installed in namespace 'ztoperator-system'!"
 

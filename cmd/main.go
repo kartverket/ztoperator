@@ -27,7 +27,6 @@ import (
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/metrics"
-	"github.com/kartverket/ztoperator/pkg/rest"
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -107,7 +106,6 @@ func main() {
 		setupLog.Error(configLoadErr, "unable to load config")
 		os.Exit(1)
 	}
-	discoveryResolver := rest.NewDefaultDiscoveryDocumentResolver()
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -198,10 +196,9 @@ func main() {
 	}
 
 	if err = (&controller.AuthPolicyReconciler{
-		Client:                    mgr.GetClient(),
-		Scheme:                    mgr.GetScheme(),
-		Recorder:                  mgr.GetEventRecorder("authpolicy-controller"),
-		DiscoveryDocumentResolver: discoveryResolver,
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorder("authpolicy-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthPolicy")
 		os.Exit(1)

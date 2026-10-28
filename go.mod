@@ -18,7 +18,6 @@ require (
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
 	k8s.io/client-go v0.37.1
-	resty.dev/v3 v3.0.0-rc.4
 	sigs.k8s.io/controller-runtime v0.25.1
 	sigs.k8s.io/kustomize/kyaml v0.21.1
 )

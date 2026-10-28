@@ -18,7 +18,6 @@ import (
 	"github.com/kartverket/ztoperator/pkg/metrics"
 	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
-	"github.com/kartverket/ztoperator/pkg/rest"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
 	v1 "k8s.io/api/core/v1"
@@ -36,9 +35,8 @@ import (
 // AuthPolicyReconciler reconciles a AuthPolicy object.
 type AuthPolicyReconciler struct {
 	client.Client
-	Scheme                    *runtime.Scheme
-	Recorder                  events.EventRecorder
-	DiscoveryDocumentResolver rest.DiscoveryDocumentResolver
+	Scheme   *runtime.Scheme
+	Recorder events.EventRecorder
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -116,7 +114,7 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	scope, err := resolveAuthPolicy(ctx, r.Client, *authPolicy, r.DiscoveryDocumentResolver)
+	scope, err := resolveAuthPolicy(ctx, r.Client, *authPolicy)
 	if err != nil {
 		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))
 		authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
@@ -198,7 +196,6 @@ func resolveAuthPolicy(
 	ctx context.Context,
 	k8sClient client.Client,
 	authPolicy ztoperatorv1alpha1.AuthPolicy,
-	discoveryDocumentResolver rest.DiscoveryDocumentResolver,
 ) (*model.Scope, error) {
 	rLog := log.GetLogger(ctx)
 	rLog.Info(fmt.Sprintf("Trying to resolve auth policy %s/%s", authPolicy.Namespace, authPolicy.Name))
@@ -216,11 +213,7 @@ func resolveAuthPolicy(
 			authPolicy.Name,
 		),
 	)
-	var identityProviderUris, errIdentityProviderUris = resolver.ResolveDiscoveryDocument(
-		ctx,
-		authPolicy,
-		discoveryDocumentResolver,
-	)
+	identityProviderUris, errIdentityProviderUris := resolver.ResolveDiscoveryDocument(authPolicy)
 	if errIdentityProviderUris != nil {
 		return nil, errIdentityProviderUris
 	}

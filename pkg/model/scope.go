@@ -21,14 +21,6 @@ type Scope struct {
 	ValidationErrorMessage *string
 }
 
-type IdentityProviderUris struct {
-	IssuerURI        string
-	JwksURI          string
-	TokenURI         string
-	AuthorizationURI string
-	EndSessionURI    *string
-}
-
 type OAuthCredentials struct {
 	ClientID     *string
 	ClientSecret *string
