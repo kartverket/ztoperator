@@ -34,6 +34,14 @@ type OAuthCredentials struct {
 	ClientSecret *string
 }
 
+type IdentityProviderUris struct {
+	IssuerURI        string
+	JwksURI          string
+	TokenURI         string
+	AuthorizationURI string
+	EndSessionURI    *string
+}
+
 type Descendant[T client.Object] struct {
 	ID             string
 	Object         T
