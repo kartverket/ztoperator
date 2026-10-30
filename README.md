@@ -104,7 +104,7 @@ Ztoperator is configured through environment variables:
 
 | Variable | Description |
 |---|---|
-| `ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS` | Required JSON object containing the allowed OAuth providers. Each provider specifies its `wellKnownURI` and whether audience validation is required (`requireAudience`). |
+| `ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS` | Required JSON object containing allowed OAuth providers and the endpoint values from their discovery documents. |
 | `ZTOPERATOR_GIT_REF` | Git reference used in links to documentation. Defaults to `main`. |
 
 Ztoperator always runs with webhooks enabled.
@@ -116,16 +116,27 @@ ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS: |
   {
     "login.microsoftonline.com": {
       "wellKnownURI": "https://login.microsoftonline.com/example/v2.0/.well-known/openid-configuration",
-      "requireAudience": true
+      "requireAudience": true,
+      "issuer": "https://login.microsoftonline.com/example/v2.0",
+      "authorizationEndpoint": "https://login.microsoftonline.com/example/oauth2/v2.0/authorize",
+      "tokenEndpoint": "https://login.microsoftonline.com/example/oauth2/v2.0/token",
+      "jwksURI": "https://login.microsoftonline.com/example/discovery/v2.0/keys",
+      "endSessionEndpoint": "https://login.microsoftonline.com/example/oauth2/v2.0/logout"
     },
     "test.maskinporten.no": {
       "wellKnownURI": "https://test.maskinporten.no/.well-known/oauth-authorization-server",
-      "requireAudience": false
+      "requireAudience": false,
+      "issuer": "https://test.maskinporten.no/",
+      "tokenEndpoint": "https://test.maskinporten.no/token",
+      "jwksURI": "https://test.maskinporten.no/jwk"
     }
   }
 ```
 
 When `requireAudience` is enabled, the webhook requires `allowedAudiences` in the `AuthPolicy`.
+`issuer`, `tokenEndpoint`, and `jwksURI` are required for every provider. `authorizationEndpoint` and
+`endSessionEndpoint` are optional, but both are required when an `AuthPolicy` enables auto-login.
+Ztoperator reads these values from configuration and does not fetch the `wellKnownURI` at runtime.
 
 ## 🧪 Local Development
 

@@ -71,10 +71,23 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Load environment variables
-	Expect(os.Setenv("ZTOPERATOR_CLUSTER_NAME", "test-cluster")).To(Succeed())
 	providers := `{
-		"required": {"wellKnownURI": "` + testWellKnownURI + `", "requireAudience": true},
-		"optional": {"wellKnownURI": "` + testOptionalWellKnownURI + `", "requireAudience": false}
+		"required": {
+			"wellKnownURI": "` + testWellKnownURI + `",
+			"requireAudience": true,
+			"issuer": "https://required.example.com",
+			"authorizationEndpoint": "https://required.example.com/authorize",
+			"tokenEndpoint": "https://required.example.com/token",
+			"jwksURI": "https://required.example.com/jwks",
+			"endSessionEndpoint": "https://required.example.com/endsession"
+		},
+		"optional": {
+			"wellKnownURI": "` + testOptionalWellKnownURI + `",
+			"requireAudience": false,
+			"issuer": "https://optional.example.com",
+			"tokenEndpoint": "https://optional.example.com/token",
+			"jwksURI": "https://optional.example.com/jwks"
+		}
 	}`
 	Expect(os.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", providers)).To(Succeed())
 	err = config.Load()

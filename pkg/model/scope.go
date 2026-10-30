@@ -21,17 +21,17 @@ type Scope struct {
 	ValidationErrorMessage *string
 }
 
+type OAuthCredentials struct {
+	ClientID     *string
+	ClientSecret *string
+}
+
 type IdentityProviderUris struct {
 	IssuerURI        string
 	JwksURI          string
 	TokenURI         string
 	AuthorizationURI string
 	EndSessionURI    *string
-}
-
-type OAuthCredentials struct {
-	ClientID     *string
-	ClientSecret *string
 }
 
 type Descendant[T client.Object] struct {

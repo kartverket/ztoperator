@@ -5,14 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/kelseyhightower/envconfig"
 )
 
-// OAuthProvider configures an allowed provider and its audience requirement.
+// OAuthProvider configures an allowed provider and its discovery document values.
 type OAuthProvider struct {
-	WellKnownURI    string `json:"wellKnownURI"`
-	RequireAudience bool   `json:"requireAudience"`
+	WellKnownURI          string `json:"wellKnownURI"`
+	RequireAudience       bool   `json:"requireAudience"`
+	Issuer                string `json:"issuer"`
+	AuthorizationEndpoint string `json:"authorizationEndpoint"`
+	TokenEndpoint         string `json:"tokenEndpoint"`
+	JwksURI               string `json:"jwksURI"`
+	EndSessionEndpoint    string `json:"endSessionEndpoint"`
 }
 
 // AllowedOAuthProviders maps provider names to their configuration.
@@ -43,15 +49,21 @@ func Load() error {
 		if name == "" {
 			return errors.New("OAuth provider name must not be empty")
 		}
-		parsedURI, err := url.Parse(provider.WellKnownURI)
-		validURI := err == nil && parsedURI.Host != "" &&
-			(parsedURI.Scheme == "http" || parsedURI.Scheme == "https")
-		if !validURI {
-			return fmt.Errorf(
-				"well-known URI %q for OAuth provider %q must be a valid http or https URL",
-				provider.WellKnownURI,
-				name,
-			)
+		for _, endpoint := range []struct {
+			field    string
+			uri      string
+			required bool
+		}{
+			{field: "wellKnownURI", uri: provider.WellKnownURI, required: true},
+			{field: "issuer", uri: provider.Issuer, required: true},
+			{field: "tokenEndpoint", uri: provider.TokenEndpoint, required: true},
+			{field: "jwksURI", uri: provider.JwksURI, required: true},
+			{field: "authorizationEndpoint", uri: provider.AuthorizationEndpoint},
+			{field: "endSessionEndpoint", uri: provider.EndSessionEndpoint},
+		} {
+			if err := validateProviderURI(name, endpoint.field, endpoint.uri, endpoint.required); err != nil {
+				return err
+			}
 		}
 		if configuredProvider, found := configuredURIs[provider.WellKnownURI]; found {
 			return fmt.Errorf(
@@ -70,4 +82,23 @@ func Load() error {
 
 func Get() Config {
 	return cfg
+}
+
+func validateProviderURI(providerName, field, uri string, required bool) error {
+	if uri == "" && !required {
+		return nil
+	}
+	parsedURI, err := url.Parse(uri)
+	validURI := err == nil && parsedURI.Host != "" &&
+		(parsedURI.Scheme == "http" || parsedURI.Scheme == "https") &&
+		!strings.ContainsAny(uri, "\"\\\n\r\x00")
+	if !validURI {
+		return fmt.Errorf(
+			"%s %q for OAuth provider %q must be a valid http or https URL without unsafe characters",
+			field,
+			uri,
+			providerName,
+		)
+	}
+	return nil
 }

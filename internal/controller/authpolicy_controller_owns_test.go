@@ -10,7 +10,6 @@ import (
 	"github.com/kartverket/ztoperator/internal/controller"
 	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
-	"github.com/kartverket/ztoperator/pkg/rest"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
@@ -60,8 +59,7 @@ var _ = Describe("AuthPolicy Controller Owns", Ordered, func() {
 			Client: mgr.GetClient(),
 			Scheme: mgr.GetScheme(),
 			// Large buffer so Eventf never blocks the reconcile
-			Recorder:                  k8sevents.NewFakeRecorder(10000),
-			DiscoveryDocumentResolver: rest.NewDefaultDiscoveryDocumentResolver(),
+			Recorder: k8sevents.NewFakeRecorder(10000),
 		}
 		Expect(reconciler.SetupWithManager(mgr)).To(Succeed())
 
