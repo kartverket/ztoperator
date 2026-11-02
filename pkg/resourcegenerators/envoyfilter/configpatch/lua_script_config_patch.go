@@ -1,13 +1,22 @@
 package configpatch
 
-func GetLuaScriptFilterConfig(luaScript string) map[string]any {
-	return map[string]any{
-		"name": "envoy.filters.http.lua",
-		"typed_config": map[string]any{
-			"@type": "type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua",
-			"default_source_code": map[string]any{
-				"inline_string": luaScript,
-			},
-		},
+import (
+	"fmt"
+
+	"github.com/kartverket/ztoperator/pkg/envoy/httpfilter"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/structpb"
+)
+
+func GetLuaScriptConfigPatchValue(luaScript string) (*structpb.Struct, error) {
+	lua, err := httpfilter.LuaHttpFilter(luaScript)
+	luaAny, err := anypb.New(lua)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize lua HTTP filter to protobuf Any: %w", err)
 	}
+	patchValue, err := ToPbStruct(luaAny)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize lua HTTP filter config patch value to protobuf struct: %w", err)
+	}
+	return patchValue, nil
 }

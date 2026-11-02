@@ -1,16 +1,12 @@
 package envoyfilter
 
 import (
+	"github.com/kartverket/ztoperator/pkg/envoy"
 	"github.com/kartverket/ztoperator/pkg/model"
-	"google.golang.org/protobuf/types/known/structpb"
 	"istio.io/api/networking/v1alpha3"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 )
-
-const oAuthClusterName = "oauth"
 
 // GetDesired returns the desired EnvoyFilter resource for the given AuthPolicy scope
 //
@@ -34,46 +30,18 @@ func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 		return nil
 	}
 
-	oAuthClusterConfigPatchValue, err := configpatch.GetOAuth2ClusterConfig(
-		oAuthClusterName, scope.IdentityProviderUris.TokenURI,
+	autoLoginFiltersAndClusters, err := envoy.GetAutoLoginFiltersAndClusters(
+		scope.AuthPolicy,
+		scope.AutoLoginConfig,
+		scope.IdentityProviderUris,
+		scope.OAuthCredentials.ClientID,
 	)
 	if err != nil {
-		panic("failed to get oauth envoy cluster config patch: " + err.Error())
-	}
-	oAuthClusterConfigPatchValueAsPbStruct, err := structpb.NewStruct(
-		*oAuthClusterConfigPatchValue,
-	)
-	if err != nil {
-		panic(
-			"failed to serialize OAuth Cluster Config Patch to protobuf struct due to the following error: " + err.Error(),
-		)
-	}
-
-	luaScriptConfigPatchValue, err := structpb.NewStruct(configpatch.GetLuaScriptFilterConfig(
-		scope.AutoLoginConfig.LuaScriptConfig.LuaScript,
-	))
-	if err != nil {
-		panic(
-			"failed to serialize Lua script config patch value due to the following error: " + err.Error(),
-		)
-	}
-
-	oAuthSidecarConfigPatchValueAsPbStruct, err := structpb.NewStruct(
-		configpatch.GetOAuth2FilterConfig(
-			oAuthClusterName,
-			scope.AutoLoginConfig,
-			scope.IdentityProviderUris,
-			*scope.OAuthCredentials.ClientID,
-		),
-	)
-	if err != nil {
-		panic(
-			"failed to serialize OAuth Sidecar Config Patch to protobuf struct due to the following error: " + err.Error(),
-		)
+		panic("failed to get envoy http filter config: " + err.Error())
 	}
 
 	// Pre-allocating the slice with a length of 3 since we know there will be exactly 3 patches.
-	configPatches := make([]*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch, 0, 3)
+	configPatches := autoLoginFiltersAndClusters.ToEnvoyFilterConfigPatches()
 
 	configPatches = append(configPatches, &v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: v1alpha3.EnvoyFilter_HTTP_FILTER,
@@ -106,7 +74,7 @@ func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 		},
 		Patch: &v1alpha3.EnvoyFilter_Patch{
 			Operation: v1alpha3.EnvoyFilter_Patch_ADD,
-			Value:     oAuthClusterConfigPatchValueAsPbStruct,
+			Value:     tokenClusterConfigPatchValue,
 		},
 	})
 

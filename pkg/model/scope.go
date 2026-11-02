@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 
+	bootstrapv3 "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v3"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -16,14 +17,15 @@ type Scope struct {
 	AutoLoginConfig        AutoLoginConfig
 	OAuthCredentials       OAuthCredentials
 	IdentityProviderUris   IdentityProviderUris
+	IstioAmbientConfig     IstioAmbientConfig
 	Descendants            []Descendant[client.Object]
 	InvalidConfig          bool
 	ValidationErrorMessage *string
 }
 
-type OAuthCredentials struct {
-	ClientID     *string
-	ClientSecret *string
+type IstioAmbientConfig struct {
+	Enabled        bool
+	EnvoyBootstrap *bootstrapv3.Bootstrap
 }
 
 type IdentityProviderUris struct {
@@ -32,6 +34,11 @@ type IdentityProviderUris struct {
 	TokenURI         string
 	AuthorizationURI string
 	EndSessionURI    *string
+}
+
+type OAuthCredentials struct {
+	ClientID     *string
+	ClientSecret *string
 }
 
 type Descendant[T client.Object] struct {

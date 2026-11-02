@@ -121,18 +121,27 @@ isnotrunning: ## Check if ztoperator is NOT running on your host machine (i.e. f
 .PHONY: local
 local: cluster ztoperator-namespace cert-manager istio-gateways skiperator mock-oauth2 generate install ## Set up entire local development environment with external dependencies
 
-EXAMPLE_MANIFEST ?= examples/example.yaml
-EXAMPLE_HOST     ?= demo.localdev
-
 .PHONY: example
-example: kubectl ensurelocal ensurerunningordeployed ## Deploy examples/example.yaml and expose it on https://demo.localdev (gateway forward runs in the background)
-	@echo -e "🤞  Applying $(EXAMPLE_MANIFEST)..."
-	@"$(KUBECTL)" apply -f "$(EXAMPLE_MANIFEST)" --context $(KUBECONTEXT)
-	@echo -e "✅  Applied $(EXAMPLE_MANIFEST)"
+example: kubectl ensurelocal ensurerunningordeployed ## Deploy an example manifest and add host entries for its Skiperator ingresses. Usage: make example file=examples/example.yaml
+	$(if $(strip $(file)),,$(error file is not set. Usage: make example file=<PATH>))
+	$(if $(wildcard $(file)),,$(error File '$(file)' does not exist. Usage: make example file=<PATH>))
+	@echo -e "🤞  Applying $(file)..."
+	@"$(KUBECTL)" apply -f "$(file)" --context $(KUBECONTEXT)
+	@echo -e "✅  Applied $(file)"
 	@$(MAKE) --no-print-directory mock-oauth2-ingress
-	@$(MAKE) --no-print-directory host-entry host=$(EXAMPLE_HOST)
-	@$(MAKE) --no-print-directory gateway-forward GATEWAY_PORTS="443:443 80:80"
-	@echo -e "🌐  Open https://$(EXAMPLE_HOST)  (stop the forward with 'make gateway-forward-stop')"
+	@hosts=$$("$(KUBECTL)" get -f "$(file)" --context $(KUBECONTEXT) \
+	   -o jsonpath='{range .items[?(@.kind=="Application")]}{range .spec.ingresses[*]}{@}{"\n"}{end}{end}' 2>/dev/null \
+	   | sed -E 's#^[a-zA-Z]+://##; s#[/:].*$$##' | sort -u); \
+	if [ -z "$$hosts" ]; then \
+	   echo "ℹ️   No Skiperator Application ingresses found in $(file), skipping host entries and gateway forward"; \
+	   exit 0; \
+	fi; \
+	for h in $$hosts; do \
+	   $(MAKE) --no-print-directory host-entry host=$$h || exit 1; \
+	done; \
+	$(MAKE) --no-print-directory gateway-forward GATEWAY_PORTS="443:443 80:80" || exit 1; \
+	for h in $$hosts; do echo "🌐  Open https://$$h"; done; \
+	echo "    (stop the forward with 'make gateway-forward-stop')"
 
 .PHONY: clean
 clean: kind ## Clean up local environment by deleting kind cluster
@@ -415,7 +424,8 @@ host-entry: ## Point a hostname at 127.0.0.1 in /etc/hosts. Usage: make host-ent
 	   exit 0; \
 	fi; \
 	echo "🤞  Adding '$(host)' to $(HOSTS_FILE) (requires sudo)"; \
-	printf '127.0.0.1\t%s\t%s\n' "$(host)" "$$marker" | sudo tee -a "$(HOSTS_FILE)" > /dev/null; \
+	sudo -l /usr/bin/tee -a "$(HOSTS_FILE)" > /dev/null 2>&1 || { echo "❌  You are not allowed to run 'sudo tee -a $(HOSTS_FILE)'"; exit 1; }; \
+	printf '127.0.0.1\t%s\t%s\n' "$(host)" "$$marker" | sudo tee -a "$(HOSTS_FILE)" > /dev/null || { echo "❌  Failed to write to $(HOSTS_FILE)"; exit 1; }; \
 	echo "✅  Added: 127.0.0.1 $(host)  $$marker"; \
 	case "$(host)" in \
 	   *.skip.statkart.no|*.kartverket-intern.cloud) \
@@ -463,6 +473,7 @@ gateway-forward: kubectl ## Forward the istio gateway to localhost in the backgr
 	   exit 0; \
 	fi; \
 	rm -f "$(GATEWAY_FORWARD_PID)"; \
+	sudo -l "$(KUBECTL)" port-forward -n $(GATEWAY_NS) "svc/$(GATEWAY)-istio" $(GATEWAY_PORTS) --context $(KUBECONTEXT) > /dev/null 2>&1 || { echo "❌  You are not allowed to run 'sudo kubectl port-forward'"; exit 1; }; \
 	echo "🔍  Checking gateway '$(GATEWAY)' in namespace '$(GATEWAY_NS)'..."; \
 	"$(KUBECTL)" wait gateway $(GATEWAY) -n $(GATEWAY_NS) --for=condition=Programmed \
 	   --timeout=30s --context $(KUBECONTEXT) > /dev/null 2>&1 || { \
@@ -494,7 +505,6 @@ gateway-forward: kubectl ## Forward the istio gateway to localhost in the backgr
 	   done; \
 	fi; \
 	echo "🔌  Forwarding $(GATEWAY_PORTS) from $$svc in the background (sudo needed for ports below 1024)"; \
-	sudo -v || { echo "❌  sudo authentication failed"; exit 1; }; \
 	nohup sudo KUBECONFIG="$$HOME/.kube/config" "$(KUBECTL)" port-forward \
 	   -n $(GATEWAY_NS) "svc/$$svc" $(GATEWAY_PORTS) --context $(KUBECONTEXT) \
 	   > "$(GATEWAY_FORWARD_LOG)" 2>&1 & \

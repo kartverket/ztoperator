@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/kartverket/ztoperator/internal/names"
+	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
 	"github.com/kartverket/ztoperator/pkg/model"
@@ -12,18 +13,26 @@ import (
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/deny"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/require"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/configmap"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ControllerResources creates all reconcile actions for the given AuthPolicy scope.
 func ControllerResources(scope *model.Scope) []reconciliation.ControllerResource {
+	if scope.IstioAmbientConfig.Enabled {
+		return []reconciliation.ControllerResource{
+			secretResource(scope),
+			envoyBootstrapConfigMap(scope),
+		}
+	}
+
 	return []reconciliation.ControllerResource{
 		secretResource(scope),
 		envoyFilterResource(scope),
@@ -59,8 +68,8 @@ func secretResource(scope *model.Scope) ControllerResourceAdapter[*v1.Secret] {
 }
 
 func SecretShouldUpdate(current, desired *v1.Secret) bool {
-	desiredTokenSecret, hasDesired := desired.Data[configpatch.TokenSecretFileName]
-	currentTokenSecret, hasCurrent := current.Data[configpatch.TokenSecretFileName]
+	desiredTokenSecret, hasDesired := desired.Data[constants.EnvoyOAuth2TokenSecretFileName]
+	currentTokenSecret, hasCurrent := current.Data[constants.EnvoyOAuth2TokenSecretFileName]
 	return !hasDesired || !hasCurrent || !bytes.Equal(currentTokenSecret, desiredTokenSecret) ||
 		labelsNeedUpdate(current, desired)
 }
@@ -247,6 +256,43 @@ func AuthorizationPolicyUpdateFields(current, desired *istioclientsecurityv1.Aut
 	current.Labels = desired.Labels
 }
 
+func envoyBootstrapConfigMap(scope *model.Scope) ControllerResourceAdapter[*v1.ConfigMap] {
+	envoyBootstrapConfigMapName := names.EnvoyBootstrapConfigMap(scope.AuthPolicy.Name)
+	desiredResource := configmap.GetDesired(
+		scope.IstioAmbientConfig.EnvoyBootstrap,
+		buildObjectMeta(envoyBootstrapConfigMapName, scope.AuthPolicy.Namespace),
+	)
+
+	return ControllerResourceAdapter[*v1.ConfigMap]{
+		reconciliation.ReconcilerAdapter[*v1.ConfigMap]{
+			Func: reconciliation.ResourceReconciler[*v1.ConfigMap]{
+				ResourceKind:    "ConfigMap",
+				ResourceName:    envoyBootstrapConfigMapName,
+				DesiredResource: helperfunctions.Ptr(desiredResource),
+				Scope:           scope,
+				ShouldUpdate:    ConfigMapShouldUpdateFunc,
+				UpdateFields:    configMapUpdateFieldsFunc,
+			},
+		},
+	}
+}
+
+func ConfigMapShouldUpdateFunc(current, desired *v1.ConfigMap) bool {
+	return !equality.Semantic.DeepEqual(current.BinaryData, desired.BinaryData) ||
+		!equality.Semantic.DeepEqual(current.Data, desired.Data) ||
+		!equality.Semantic.DeepEqual(current.Immutable, desired.Immutable) ||
+		labelsNeedUpdate(current, desired) ||
+		annotationsNeedUpdate(current, desired)
+}
+
+func configMapUpdateFieldsFunc(current, desired *v1.ConfigMap) {
+	current.BinaryData = desired.BinaryData
+	current.Data = desired.Data
+	current.Immutable = desired.Immutable
+	current.Labels = desired.Labels
+	current.Annotations = desired.Annotations
+}
+
 type LabeledObject interface {
 	GetLabels() map[string]string
 }
@@ -258,6 +304,23 @@ func labelsNeedUpdate(current, desired LabeledObject) bool {
 	currentLabels := current.GetLabels()
 	for key, value := range desiredLabels {
 		if currentValue, ok := currentLabels[key]; !ok || currentValue != value {
+			return true
+		}
+	}
+	return false
+}
+
+type AnnotatedObject interface {
+	GetAnnotations() map[string]string
+}
+
+// annotationsNeedUpdate reports whether any of the desired annotations are missing from current or have a
+// different value. Annotations on current that are not part of the desired set are ignored.
+func annotationsNeedUpdate(current, desired AnnotatedObject) bool {
+	desiredAnnotations := desired.GetAnnotations()
+	currentAnnotations := current.GetAnnotations()
+	for key, value := range desiredAnnotations {
+		if currentValue, ok := currentAnnotations[key]; !ok || currentValue != value {
 			return true
 		}
 	}

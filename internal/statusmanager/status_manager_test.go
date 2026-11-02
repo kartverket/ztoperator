@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/internal/statusmanager"
+	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
@@ -303,6 +305,166 @@ func TestUpdateAuthPolicyStatus_WithFailedStatusUpdate_RecordsWarningEvent(t *te
 	assert.Len(t, recordedEvents, 2)
 	assert.Contains(t, recordedEvents[0], "Normal StatusUpdateStarted")
 	assert.Contains(t, recordedEvents[1], "Warning StatusUpdateFailed")
+}
+
+func TestUpdateAuthPolicyStatus_WithIstioAmbientEnabled_SetsEnvoyBootstrapReference(t *testing.T) {
+	// 1. Arrange
+	ctx := context.Background()
+	authPolicy := createTestAuthPolicyForStatusManager()
+	originalAuthPolicy := authPolicy.DeepCopy()
+	k8sClient := newStatusManagerFakeClient(authPolicy)
+	fakeRecorder := events.NewFakeRecorder(10)
+
+	scope := &model.Scope{
+		AuthPolicy:         *authPolicy,
+		IstioAmbientConfig: model.IstioAmbientConfig{Enabled: true},
+		Descendants:        []model.Descendant[client.Object]{},
+	}
+
+	// 2. Act
+	statusmanager.UpdateAuthPolicyStatus(ctx, k8sClient, fakeRecorder, scope, originalAuthPolicy, nil)
+
+	// 3. Assert
+	expected := ztoperatorv1alpha1.IstioAmbientConfig{
+		Enabled: true,
+		EnvoyBootstrap: ztoperatorv1alpha1.EnvoyBootstrap{
+			ConfigMapName: names.EnvoyBootstrapConfigMap(authPolicy.Name),
+			ConfigMapKey:  constants.EnvoyBootstrapConfigMapKey,
+		},
+	}
+	assert.Equal(t, expected, scope.AuthPolicy.Status.IstioAmbientConfig)
+
+	persisted := getAuthPolicy(ctx, t, k8sClient, authPolicy)
+	assert.Equal(t, expected, persisted.Status.IstioAmbientConfig)
+	assert.Equal(t, "test-policy-envoy-bootstrap", persisted.Status.IstioAmbientConfig.EnvoyBootstrap.ConfigMapName)
+	assert.Equal(t, "envoy.json", persisted.Status.IstioAmbientConfig.EnvoyBootstrap.ConfigMapKey)
+}
+
+func TestUpdateAuthPolicyStatus_WithIstioAmbientDisabled_LeavesEnvoyBootstrapEmpty(t *testing.T) {
+	// 1. Arrange
+	ctx := context.Background()
+	authPolicy := createTestAuthPolicyForStatusManager()
+	authPolicy.Status.Phase = ztoperatorv1alpha1.PhasePending // force a status update
+	originalAuthPolicy := authPolicy.DeepCopy()
+	k8sClient := newStatusManagerFakeClient(authPolicy)
+	fakeRecorder := events.NewFakeRecorder(10)
+
+	scope := &model.Scope{
+		AuthPolicy:         *authPolicy,
+		IstioAmbientConfig: model.IstioAmbientConfig{Enabled: false},
+		Descendants:        []model.Descendant[client.Object]{},
+	}
+
+	// 2. Act
+	statusmanager.UpdateAuthPolicyStatus(ctx, k8sClient, fakeRecorder, scope, originalAuthPolicy, nil)
+
+	// 3. Assert
+	persisted := getAuthPolicy(ctx, t, k8sClient, authPolicy)
+	assert.False(t, persisted.Status.IstioAmbientConfig.Enabled)
+	assert.Empty(t, persisted.Status.IstioAmbientConfig.EnvoyBootstrap.ConfigMapName)
+	assert.Empty(t, persisted.Status.IstioAmbientConfig.EnvoyBootstrap.ConfigMapKey)
+}
+
+func TestUpdateAuthPolicyStatus_WhenIstioAmbientIsDisabledAfterBeingEnabled_ClearsEnvoyBootstrapReference(t *testing.T) {
+	// 1. Arrange
+	ctx := context.Background()
+	authPolicy := createTestAuthPolicyForStatusManager()
+	authPolicy.Status.IstioAmbientConfig = ztoperatorv1alpha1.IstioAmbientConfig{
+		Enabled: true,
+		EnvoyBootstrap: ztoperatorv1alpha1.EnvoyBootstrap{
+			ConfigMapName: names.EnvoyBootstrapConfigMap(authPolicy.Name),
+			ConfigMapKey:  constants.EnvoyBootstrapConfigMapKey,
+		},
+	}
+	originalAuthPolicy := authPolicy.DeepCopy()
+	k8sClient := newStatusManagerFakeClient(authPolicy)
+	fakeRecorder := events.NewFakeRecorder(10)
+
+	scope := &model.Scope{
+		AuthPolicy:         *authPolicy,
+		IstioAmbientConfig: model.IstioAmbientConfig{Enabled: false},
+		Descendants:        []model.Descendant[client.Object]{},
+	}
+
+	// 2. Act
+	statusmanager.UpdateAuthPolicyStatus(ctx, k8sClient, fakeRecorder, scope, originalAuthPolicy, nil)
+
+	// 3. Assert
+	persisted := getAuthPolicy(ctx, t, k8sClient, authPolicy)
+	assert.Equal(t, ztoperatorv1alpha1.IstioAmbientConfig{}, persisted.Status.IstioAmbientConfig)
+
+	recordedEvents := drainEvents(fakeRecorder)
+	assert.Contains(t, recordedEvents, "Normal StatusUpdateSuccess Status update of AuthPolicy updated successfully.")
+}
+
+func TestUpdateAuthPolicyStatus_WithUnchangedIstioAmbientConfig_DoesNotUpdate(t *testing.T) {
+	// 1. Arrange
+	ctx := context.Background()
+	authPolicy := createTestAuthPolicyForStatusManager()
+	authPolicy.Status.Conditions = []metav1.Condition{
+		{
+			Type:               "AuthPolicy-test-policy",
+			Status:             metav1.ConditionTrue,
+			Reason:             "ReconciliationSuccess",
+			Message:            "Descendants of AuthPolicy reconciled successfully.",
+			LastTransitionTime: metav1.Now(),
+		},
+	}
+	authPolicy.Status.IstioAmbientConfig = ztoperatorv1alpha1.IstioAmbientConfig{
+		Enabled: true,
+		EnvoyBootstrap: ztoperatorv1alpha1.EnvoyBootstrap{
+			ConfigMapName: names.EnvoyBootstrapConfigMap(authPolicy.Name),
+			ConfigMapKey:  constants.EnvoyBootstrapConfigMapKey,
+		},
+	}
+	originalAuthPolicy := authPolicy.DeepCopy()
+	k8sClient := newStatusManagerFakeClient(authPolicy)
+	fakeRecorder := events.NewFakeRecorder(10)
+
+	scope := &model.Scope{
+		AuthPolicy:         *authPolicy,
+		IstioAmbientConfig: model.IstioAmbientConfig{Enabled: true},
+		Descendants:        []model.Descendant[client.Object]{},
+	}
+
+	// 2. Act
+	statusmanager.UpdateAuthPolicyStatus(ctx, k8sClient, fakeRecorder, scope, originalAuthPolicy, nil)
+
+	// 3. Assert
+	recordedEvents := drainEvents(fakeRecorder)
+	assert.Len(t, recordedEvents, 1)
+	assert.Contains(t, recordedEvents[0], "StatusUpdateStarted")
+}
+
+func newStatusManagerFakeClient(authPolicy *ztoperatorv1alpha1.AuthPolicy) client.Client {
+	scheme := runtime.NewScheme()
+	_ = ztoperatorv1alpha1.AddToScheme(scheme)
+	return fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(authPolicy).
+		WithStatusSubresource(authPolicy).
+		Build()
+}
+
+func getAuthPolicy(
+	ctx context.Context,
+	t *testing.T,
+	k8sClient client.Client,
+	authPolicy *ztoperatorv1alpha1.AuthPolicy,
+) *ztoperatorv1alpha1.AuthPolicy {
+	t.Helper()
+	persisted := &ztoperatorv1alpha1.AuthPolicy{}
+	require.NoError(t, k8sClient.Get(ctx, client.ObjectKeyFromObject(authPolicy), persisted))
+	return persisted
+}
+
+func drainEvents(recorder *events.FakeRecorder) []string {
+	close(recorder.Events)
+	recordedEvents := make([]string, 0, len(recorder.Events))
+	for e := range recorder.Events {
+		recordedEvents = append(recordedEvents, e)
+	}
+	return recordedEvents
 }
 
 func createTestAuthPolicyForStatusManager() *ztoperatorv1alpha1.AuthPolicy {

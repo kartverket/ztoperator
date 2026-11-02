@@ -8,15 +8,6 @@ rules:
   - ""
   resources:
   - configmaps
-  - namespaces
-  - pods
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - secrets
   verbs:
   - create
@@ -25,6 +16,16 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - deployments
+  - namespaces
+  - pods
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - events.k8s.io

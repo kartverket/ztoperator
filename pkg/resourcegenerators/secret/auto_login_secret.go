@@ -3,9 +3,9 @@ package secret
 import (
 	"fmt"
 
+	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/model"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -35,13 +35,13 @@ func getEnvoySecret(objectMeta metav1.ObjectMeta, clientSecret string) (*v1.Secr
 	if err != nil {
 		return nil, err
 	}
-	secretData[configpatch.HmacSecretFileName] = *hmacSecretDataValue
+	secretData[constants.EnvoyOAuth2HmacSecretFileName] = *hmacSecretDataValue
 
 	tokenSecretDataValue, err := getEnvoySecretDataValue("token", clientSecret, "inline_string")
 	if err != nil {
 		return nil, err
 	}
-	secretData[configpatch.TokenSecretFileName] = *tokenSecretDataValue
+	secretData[constants.EnvoyOAuth2TokenSecretFileName] = *tokenSecretDataValue
 
 	return &v1.Secret{
 		ObjectMeta: objectMeta,

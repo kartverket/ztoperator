@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"maps"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -61,6 +62,26 @@ func ConfigMapContentOrLabelsChanged() predicate.Predicate {
 				return true
 			}
 			return !maps.EqualFunc(oldConfigMap.BinaryData, newConfigMap.BinaryData, bytes.Equal)
+		},
+	}
+}
+
+// DeploymentPodTemplateMetadataOrLabelsChanged passes update events only when a Deployment's
+// pod template's labels or annotations changed. Scaling, rollout status and other spec changes
+// are dropped. Create, delete and generic events always pass.
+func DeploymentPodTemplateMetadataOrLabelsChanged() predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldDeployment, oldOk := e.ObjectOld.(*appsv1.Deployment)
+			newDeployment, newOk := e.ObjectNew.(*appsv1.Deployment)
+			if !oldOk || !newOk {
+				return true
+			}
+			oldTemplate, newTemplate := oldDeployment.Spec.Template, newDeployment.Spec.Template
+			if !maps.Equal(oldTemplate.Labels, newTemplate.Labels) {
+				return true
+			}
+			return !maps.Equal(oldTemplate.Annotations, newTemplate.Annotations)
 		},
 	}
 }

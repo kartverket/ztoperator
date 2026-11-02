@@ -573,6 +573,20 @@ spec:
                   - type
                   type: object
                 type: array
+              istioAmbientConfig:
+                description: IstioAmbientConfig holds the relevant configuration if
+                  the AuthPolicy selects workloads
+                properties:
+                  enabled:
+                    type: boolean
+                  envoyBootstrap:
+                    properties:
+                      configMapKey:
+                        type: string
+                      configMapName:
+                        type: string
+                    type: object
+                type: object
               message:
                 type: string
               observedGeneration:

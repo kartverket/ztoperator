@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/names"
+	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/log"
 	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
@@ -57,6 +59,14 @@ func UpdateAuthPolicyStatus(
 		controllerResources,
 		originalAuthPolicy.Status.Conditions,
 	)
+	istioAmbientConfigStatus := ztoperatorv1alpha1.IstioAmbientConfig{Enabled: scope.IstioAmbientConfig.Enabled}
+	if istioAmbientConfigStatus.Enabled {
+		istioAmbientConfigStatus.EnvoyBootstrap = ztoperatorv1alpha1.EnvoyBootstrap{
+			ConfigMapName: names.EnvoyBootstrapConfigMap(ap.Name),
+			ConfigMapKey:  constants.EnvoyBootstrapConfigMapKey,
+		}
+	}
+	ap.Status.IstioAmbientConfig = istioAmbientConfigStatus
 
 	if !equality.Semantic.DeepEqual(originalAuthPolicy.Status, ap.Status) {
 		rLog.Debug(fmt.Sprintf("Updating AuthPolicy status with name %s/%s", ap.Namespace, ap.Name))

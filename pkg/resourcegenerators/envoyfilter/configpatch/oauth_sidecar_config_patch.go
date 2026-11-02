@@ -1,128 +1,36 @@
 package configpatch
 
 import (
-	"github.com/kartverket/ztoperator/pkg/luascript"
+	"fmt"
+
+	"github.com/kartverket/ztoperator/pkg/envoy/httpfilter"
 	"github.com/kartverket/ztoperator/pkg/model"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
-const (
-	TokenSecretFileName       = "token-secret.yaml"
-	HmacSecretFileName        = "hmac-secret.yaml"
-	IstioTokenSecretSource    = "/etc/istio/config/" + TokenSecretFileName
-	IstioHmacSecretSource     = "/etc/istio/config/" + HmacSecretFileName
-	IstioCredentialsDirectory = "/etc/istio/config"
-)
-
-func GetOAuth2FilterConfig(
+func GetOAuth2ConfigPatchValue(
 	tokenEndpointClusterName string,
 	autoLoginConfig model.AutoLoginConfig,
 	identityProviderUris model.IdentityProviderUris,
 	clientID string,
-) map[string]interface{} {
-	resourcesInterface := make([]any, 0, len(autoLoginConfig.ResourceIndicators))
-
-	for _, resourceIndicator := range autoLoginConfig.ResourceIndicators {
-		resourcesInterface = append(resourcesInterface, resourceIndicator)
+) (*structpb.Struct, error) {
+	oAuth2, err := httpfilter.OAuth2HttpFilter(
+		autoLoginConfig,
+		identityProviderUris,
+		clientID,
+		tokenEndpointClusterName,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get OAuth2 HTTP filter config patch value: %w", err)
 	}
-
-	authScopesInterface := make([]interface{}, len(autoLoginConfig.Scopes))
-	for i, authScope := range autoLoginConfig.Scopes {
-		authScopesInterface[i] = authScope
+	oAuth2Any, err := anypb.New(oAuth2)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize OAuth2 HTTP filter to protobuf Any: %w", err)
 	}
-
-	oauthSidecarConfigPatchValue := map[string]interface{}{
-		"token_endpoint": map[string]interface{}{
-			"cluster": tokenEndpointClusterName,
-			"uri":     identityProviderUris.TokenURI,
-			"timeout": "5s",
-		},
-		"retry_policy":           map[string]interface{}{},
-		"authorization_endpoint": identityProviderUris.AuthorizationURI,
-		"redirect_uri":           "https://%REQ(:authority)%" + autoLoginConfig.RedirectPath,
-		"redirect_path_matcher": map[string]interface{}{
-			"path": map[string]interface{}{
-				"exact": autoLoginConfig.RedirectPath,
-			},
-		},
-		"signout_path": map[string]interface{}{
-			"path": map[string]interface{}{
-				"exact": autoLoginConfig.LogoutPath,
-			},
-		},
-		"forward_bearer_token": true,
-		"use_refresh_token":    true,
-		"pass_through_matcher": []interface{}{
-			map[string]interface{}{
-				"name": "authorization",
-				"string_match": map[string]interface{}{
-					"prefix": "Bearer ",
-				},
-			},
-			map[string]interface{}{
-				"name": luascript.BypassOauthLoginHeaderName,
-				"string_match": map[string]interface{}{
-					"exact": "true",
-				},
-			},
-		},
-		"deny_redirect_matcher": []interface{}{
-			map[string]interface{}{
-				"name": luascript.DenyRedirectHeaderName,
-				"string_match": map[string]interface{}{
-					"exact": "true",
-				},
-			},
-		},
-		"credentials": map[string]interface{}{
-			"client_id": clientID,
-			"token_secret": map[string]interface{}{
-				"name": "token",
-				"sds_config": map[string]interface{}{
-					"path_config_source": map[string]interface{}{
-						"path": IstioTokenSecretSource,
-						"watched_directory": map[string]interface{}{
-							"path": IstioCredentialsDirectory,
-						},
-					},
-				},
-			},
-			"hmac_secret": map[string]interface{}{
-				"name": "hmac",
-				"sds_config": map[string]interface{}{
-					"path_config_source": map[string]interface{}{
-						"path": IstioHmacSecretSource,
-						"watched_directory": map[string]interface{}{
-							"path": IstioCredentialsDirectory,
-						},
-					},
-				},
-			},
-		},
-		"auth_scopes": authScopesInterface,
-		"cookie_configs": map[string]interface{}{
-			"bearer_token_cookie_config":  map[string]interface{}{"same_site": "LAX"},
-			"oauth_hmac_cookie_config":    map[string]interface{}{"same_site": "LAX"},
-			"oauth_expires_cookie_config": map[string]interface{}{"same_site": "LAX"},
-			"id_token_cookie_config":      map[string]interface{}{"same_site": "LAX"},
-			"refresh_token_cookie_config": map[string]interface{}{"same_site": "LAX"},
-			"oauth_nonce_cookie_config":   map[string]interface{}{"same_site": "LAX"},
-			"code_verifier_cookie_config": map[string]interface{}{"same_site": "LAX"},
-		},
+	patchValue, err := ToPbStruct(oAuth2Any)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize OAuth2 HTTP filter to protobuf Struct: %w", err)
 	}
-
-	if len(resourcesInterface) > 0 {
-		oauthSidecarConfigPatchValue["resources"] = resourcesInterface
-	}
-
-	if identityProviderUris.EndSessionURI != nil {
-		oauthSidecarConfigPatchValue["end_session_endpoint"] = *identityProviderUris.EndSessionURI
-	}
-
-	return map[string]interface{}{
-		"name": "envoy.filters.http.oauth2",
-		"typed_config": map[string]interface{}{
-			"@type":  "type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2",
-			"config": oauthSidecarConfigPatchValue,
-		},
-	}
+	return patchValue, nil
 }

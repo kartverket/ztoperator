@@ -6,6 +6,7 @@ import (
 
 	ztoperatorv1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
+	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -59,7 +60,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Name:      skiperatorAppName,
 					Namespace: "ns",
 					Labels: map[string]string{
-						v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+						constants.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
 				},
 			}
@@ -75,7 +76,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Name:      skiperatorAppName,
 					Namespace: "ns",
 					Labels: map[string]string{
-						v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+						constants.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
 				},
 			}
@@ -96,7 +97,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Name:      skiperatorAppName,
 					Namespace: "ns",
 					Labels: map[string]string{
-						v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+						constants.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
 					Annotations: map[string]string{
 						v1.ZtoperatorVerifyAnnotationKey: v1.ZtoperatorVerifyAnnotationValue,
@@ -119,7 +120,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Name:      skiperatorAppName,
 					Namespace: "ns",
 					Labels: map[string]string{
-						v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+						constants.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
 					Annotations: map[string]string{
 						v1.ZtoperatorVerifyAnnotationKey: v1.ZtoperatorVerifyAnnotationValue,
@@ -166,7 +167,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Name:      skiperatorAppName,
 					Namespace: "ns",
 					Labels: map[string]string{
-						v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+						constants.SkiperatorApplicationRefLabel: skiperatorAppName,
 					},
 					Annotations: map[string]string{
 						v1.ZtoperatorVerifyAnnotationKey: v1.ZtoperatorVerifyAnnotationValue,
@@ -216,7 +217,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 					Name:      "p",
 					Namespace: "ns",
 					Labels: map[string]string{
-						v1.SkiperatorApplicationRefLabel: "app",
+						constants.SkiperatorApplicationRefLabel: "app",
 					},
 					Annotations: map[string]string{
 						v1.ZtoperatorVerifyAnnotationKey: v1.ZtoperatorVerifyAnnotationValue,
@@ -246,7 +247,7 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 
 		It("returns false when pod is not created from a Skiperator Application", func() {
 			pod := newPod()
-			delete(pod.Labels, v1.SkiperatorApplicationRefLabel)
+			delete(pod.Labels, constants.SkiperatorApplicationRefLabel)
 
 			eligible, msg := v1.IsWebhookEligible(ctx, helperfunctions.GetMockKubernetesClient(scheme), pod)
 

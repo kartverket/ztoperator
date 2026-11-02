@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/pkg/constants"
+	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -19,8 +21,6 @@ import (
 const (
 	CreatedBySkipNamespaceLabel      = "skip.kartverket.no/skip-managed"
 	CreatedBySkipNamespaceLabelValue = "true"
-
-	SkiperatorApplicationRefLabel = "application.skiperator.no/app-name"
 
 	ZtoperatorWebhookAnnotationPrefix = "ztoperator.kartverket.no/"
 	ZtoperatorVerifyAnnotationKey     = ZtoperatorWebhookAnnotationPrefix + "verify-authpolicy"
@@ -92,6 +92,22 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 		return nil, nil
 	}
 
+	namespace, err := helperfunctions.GetNamespace(ctx, k8sClient, pod.Namespace)
+	if err != nil {
+		podlog.Error(err, "failed to get pod namespace", "pod", types.NamespacedName{
+			Namespace: pod.GetNamespace(),
+			Name:      pod.GetName(),
+		})
+		return nil, fmt.Errorf("failed to get pod namespace %s", pod.Namespace)
+	}
+	if helperfunctions.NamespaceIsIstioAmbientEligible(namespace) && helperfunctions.PodIsIstioAmbientEligible(*pod) {
+		podlog.Info("Pod is Istio Ambient enabled, skipping validation for now", "pod", types.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      pod.Name,
+		})
+		return nil, nil
+	}
+
 	// Validate that the pod is correctly configured given the AuthPolicy.
 	validationErr := validation.ValidatePodAnnotations(pod, podAuthPolicyConfiguration.AuthPolicy)
 	return nil, validationErr
@@ -116,7 +132,7 @@ func GetPodAuthPolicyConfiguration(
 		return &PodAuthPolicyConfiguration{CreatedFromSkiperatorApplication: false}, nil
 	}
 
-	appName, isSkiperatorPod := pod.Labels[SkiperatorApplicationRefLabel]
+	appName, isSkiperatorPod := pod.Labels[constants.SkiperatorApplicationRefLabel]
 	if !isSkiperatorPod {
 		return &PodAuthPolicyConfiguration{CreatedFromSkiperatorApplication: false}, nil
 	}
@@ -155,7 +171,7 @@ func IsWebhookEligible(ctx context.Context, k8sClient client.Client, pod corev1.
 	if pod.Labels == nil {
 		return false, fmt.Sprintf("pod %s/%s has no labels", pod.Namespace, pod.Name)
 	}
-	_, isSkiperatorPod := pod.Labels[SkiperatorApplicationRefLabel]
+	_, isSkiperatorPod := pod.Labels[constants.SkiperatorApplicationRefLabel]
 	if !isSkiperatorPod {
 		return false, fmt.Sprintf("pod %s/%s is not created from a Skiperator Application", pod.Namespace, pod.Name)
 	}

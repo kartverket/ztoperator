@@ -5,8 +5,8 @@ import (
 
 	"github.com/kartverket/ztoperator/internal/predicates"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 )
@@ -41,8 +41,8 @@ func TestSpecOrLabelsChanged_WithCreateOrDelete_PassesEvent(t *testing.T) {
 
 func TestSecretContentOrLabelsChanged_WithAnnotationOnlyUpdate_DropsEvent(t *testing.T) {
 	old := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-secret", Namespace: "default"},
-		Data:       map[string][]byte{"client-secret": []byte("hunter2")},
+		Name: "my-secret", Namespace: "default",
+		Data: map[string][]byte{"client-secret": []byte("hunter2")},
 	}
 	updated := old.DeepCopy()
 	updated.Annotations = map[string]string{"some.controller/last-seen": "now"}
@@ -52,8 +52,8 @@ func TestSecretContentOrLabelsChanged_WithAnnotationOnlyUpdate_DropsEvent(t *tes
 
 func TestSecretContentOrLabelsChanged_WithChangedData_PassesEvent(t *testing.T) {
 	old := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-secret", Namespace: "default"},
-		Data:       map[string][]byte{"client-secret": []byte("hunter2")},
+		Name: "my-secret", Namespace: "default",
+		Data: map[string][]byte{"client-secret": []byte("hunter2")},
 	}
 	updated := old.DeepCopy()
 	updated.Data["client-secret"] = []byte("rotated")
@@ -63,8 +63,8 @@ func TestSecretContentOrLabelsChanged_WithChangedData_PassesEvent(t *testing.T) 
 
 func TestSecretContentOrLabelsChanged_WithChangedLabels_PassesEvent(t *testing.T) {
 	old := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-secret", Namespace: "default", Labels: map[string]string{"app": "some-app"}},
-		Data:       map[string][]byte{"client-secret": []byte("hunter2")},
+		Name: "my-secret", Namespace: "default", Labels: map[string]string{"app": "some-app"},
+		Data: map[string][]byte{"client-secret": []byte("hunter2")},
 	}
 	updated := old.DeepCopy()
 	updated.Labels["app"] = "some-other-app"
@@ -74,8 +74,8 @@ func TestSecretContentOrLabelsChanged_WithChangedLabels_PassesEvent(t *testing.T
 
 func TestConfigMapContentOrLabelsChanged_WithAnnotationOnlyUpdate_DropsEvent(t *testing.T) {
 	old := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-configmap", Namespace: "default"},
-		Data:       map[string]string{"AUDIENCE": "some-audience"},
+		Name: "my-configmap", Namespace: "default",
+		Data: map[string]string{"AUDIENCE": "some-audience"},
 	}
 	updated := old.DeepCopy()
 	updated.Annotations = map[string]string{"some.controller/last-seen": "now"}
@@ -85,8 +85,8 @@ func TestConfigMapContentOrLabelsChanged_WithAnnotationOnlyUpdate_DropsEvent(t *
 
 func TestConfigMapContentOrLabelsChanged_WithChangedData_PassesEvent(t *testing.T) {
 	old := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-configmap", Namespace: "default"},
-		Data:       map[string]string{"AUDIENCE": "some-audience"},
+		Name: "my-configmap", Namespace: "default",
+		Data: map[string]string{"AUDIENCE": "some-audience"},
 	}
 	updated := old.DeepCopy()
 	updated.Data["AUDIENCE"] = "some-other-audience"
@@ -96,8 +96,8 @@ func TestConfigMapContentOrLabelsChanged_WithChangedData_PassesEvent(t *testing.
 
 func TestConfigMapContentOrLabelsChanged_WithChangedLabels_PassesEvent(t *testing.T) {
 	old := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-configmap", Namespace: "default", Labels: map[string]string{"app": "some-app"}},
-		Data:       map[string]string{"AUDIENCE": "some-audience"},
+		Name: "my-configmap", Namespace: "default", Labels: map[string]string{"app": "some-app"},
+		Data: map[string]string{"AUDIENCE": "some-audience"},
 	}
 	updated := old.DeepCopy()
 	updated.Labels["app"] = "some-other-app"
@@ -105,15 +105,91 @@ func TestConfigMapContentOrLabelsChanged_WithChangedLabels_PassesEvent(t *testin
 	assert.True(t, predicates.ConfigMapContentOrLabelsChanged().Update(updateEvent(old, updated)))
 }
 
+func TestDeploymentPodTemplateMetadataOrLabelsChanged_WithReplicaOnlyUpdate_DropsEvent(t *testing.T) {
+	old := deployment(1, nil, nil)
+	updated := old.DeepCopy()
+	updated.Spec.Replicas = new(int32(3))
+	updated.Generation = 2
+
+	assert.False(t, predicates.DeploymentPodTemplateMetadataOrLabelsChanged().Update(updateEvent(old, updated)))
+}
+
+func TestDeploymentPodTemplateMetadataOrLabelsChanged_WithStatusOnlyUpdate_DropsEvent(t *testing.T) {
+	old := deployment(1, nil, nil)
+	updated := old.DeepCopy()
+	updated.Status.ReadyReplicas = 1
+	updated.ResourceVersion = "1001"
+
+	assert.False(t, predicates.DeploymentPodTemplateMetadataOrLabelsChanged().Update(updateEvent(old, updated)))
+}
+
+func TestDeploymentPodTemplateMetadataOrLabelsChanged_WithChangedTemplateLabels_PassesEvent(t *testing.T) {
+	old := deployment(1, map[string]string{"app": "some-app"}, nil)
+	updated := old.DeepCopy()
+	updated.Spec.Template.Labels["istio.io/dataplane-mode"] = "none"
+
+	assert.True(t, predicates.DeploymentPodTemplateMetadataOrLabelsChanged().Update(updateEvent(old, updated)))
+}
+
+func TestDeploymentPodTemplateMetadataOrLabelsChanged_WithAddedTemplateAnnotation_PassesEvent(t *testing.T) {
+	old := deployment(1, map[string]string{"app": "some-app"}, nil)
+	updated := old.DeepCopy()
+	updated.Spec.Template.Annotations = map[string]string{"ztoperator.kartverket.no/inject": "true"}
+
+	assert.True(t, predicates.DeploymentPodTemplateMetadataOrLabelsChanged().Update(updateEvent(old, updated)))
+}
+
+func TestDeploymentPodTemplateMetadataOrLabelsChanged_WithRemovedTemplateAnnotation_PassesEvent(t *testing.T) {
+	old := deployment(1, nil, map[string]string{"ztoperator.kartverket.no/inject": "true"})
+	updated := old.DeepCopy()
+	delete(updated.Spec.Template.Annotations, "ztoperator.kartverket.no/inject")
+
+	assert.True(t, predicates.DeploymentPodTemplateMetadataOrLabelsChanged().Update(updateEvent(old, updated)))
+}
+
+func TestDeploymentPodTemplateMetadataOrLabelsChanged_WithNilVsEmptyTemplateLabels_DropsEvent(t *testing.T) {
+	old := deployment(1, nil, nil)
+	updated := old.DeepCopy()
+	updated.Spec.Template.Labels = map[string]string{}
+
+	assert.False(t, predicates.DeploymentPodTemplateMetadataOrLabelsChanged().Update(updateEvent(old, updated)))
+}
+
+func TestDeploymentPodTemplateMetadataOrLabelsChanged_WithNonDeploymentObjects_PassesEvent(t *testing.T) {
+	old := istioLikeObject(1, nil, "1000")
+	updated := istioLikeObject(1, nil, "1001")
+
+	assert.True(t, predicates.DeploymentPodTemplateMetadataOrLabelsChanged().Update(updateEvent(old, updated)))
+}
+
+func TestDeploymentPodTemplateMetadataOrLabelsChanged_WithCreateOrDelete_PassesEvent(t *testing.T) {
+	obj := deployment(1, nil, nil)
+
+	assert.True(t, predicates.DeploymentPodTemplateMetadataOrLabelsChanged().Create(event.CreateEvent{Object: obj}))
+	assert.True(t, predicates.DeploymentPodTemplateMetadataOrLabelsChanged().Delete(event.DeleteEvent{Object: obj}))
+}
+
+func deployment(generation int64, templateLabels, templateAnnotations map[string]string) *appsv1.Deployment {
+	return &appsv1.Deployment{
+		Name: "some-deployment", Namespace: "default", Generation: generation, ResourceVersion: "1000",
+		Labels: map[string]string{"app": "some-app"},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: new(int32(1)),
+			Template: corev1.PodTemplateSpec{
+				Labels:      templateLabels,
+				Annotations: templateAnnotations,
+			},
+		},
+	}
+}
+
 func istioLikeObject(generation int64, labels map[string]string, resourceVersion string) client.Object {
 	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "some-resource",
-			Namespace:       "default",
-			Generation:      generation,
-			Labels:          labels,
-			ResourceVersion: resourceVersion,
-		},
+		Name:            "some-resource",
+		Namespace:       "default",
+		Generation:      generation,
+		Labels:          labels,
+		ResourceVersion: resourceVersion,
 	}
 }
 

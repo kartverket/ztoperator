@@ -7,7 +7,7 @@ import (
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/pkg/config"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
+	"github.com/kartverket/ztoperator/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -42,7 +42,7 @@ func ValidatePodAnnotations(pod *corev1.Pod, authPolicy v1alpha1.AuthPolicy) err
 	}
 	envoySecretVolumeMounts := make([]istioUserVolumeMount, 0, len(volumeMounts))
 	for _, volumeMount := range volumeMounts {
-		if volumeMount.MountPath == configpatch.IstioCredentialsDirectory {
+		if volumeMount.MountPath == constants.EnvoyOAuth2CredentialsDirectory {
 			envoySecretVolumeMounts = append(envoySecretVolumeMounts, volumeMount)
 		}
 	}

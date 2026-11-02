@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"time"
 
+	bootstrapv3 "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v3"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/internal/reconciler"
 	"github.com/kartverket/ztoperator/internal/resolver"
+	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
 	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -82,6 +83,34 @@ var _ = Describe("ControllerResources", func() {
 				fmt.Sprintf("%s/%s", "AuthorizationPolicy", names.RequirePolicy(authPolicyName)),
 			),
 		)
+	})
+
+	It("returns the envoy bootstrap ConfigMap and the auto login Secret when Istio ambient is enabled", func() {
+		scope := scopeFor("some-namespace")
+		scope.IstioAmbientConfig = model.IstioAmbientConfig{
+			Enabled:        true,
+			EnvoyBootstrap: &bootstrapv3.Bootstrap{},
+		}
+
+		resources := reconciler.ControllerResources(scope)
+
+		Expect(resources).To(HaveLen(2))
+		Expect(resources[0].GetResourceKind()).To(Equal("Secret"))
+		Expect(resources[0].GetResourceName()).To(Equal(names.EnvoySecret(authPolicyName)))
+		Expect(resources[1].GetResourceKind()).To(Equal("ConfigMap"))
+		Expect(resources[1].GetResourceName()).To(Equal(names.EnvoyBootstrapConfigMap(authPolicyName)))
+	})
+
+	It("does not return the envoy bootstrap ConfigMap when Istio ambient is disabled", func() {
+		scope := scopeFor("some-namespace")
+		scope.IstioAmbientConfig = model.IstioAmbientConfig{Enabled: false}
+
+		resources := reconciler.ControllerResources(scope)
+
+		Expect(resources).To(HaveLen(6))
+		for _, r := range resources {
+			Expect(r.GetResourceKind()).NotTo(Equal("ConfigMap"))
+		}
 	})
 
 	DescribeTable(
@@ -203,7 +232,7 @@ var _ = Describe("auto-login Secret reconciliation", func() {
 			Name:      adapter.GetResourceName(),
 			Namespace: testNamespace,
 		}, createdSecret)).To(Succeed())
-		Expect(createdSecret.Data).To(HaveKey(configpatch.TokenSecretFileName))
+		Expect(createdSecret.Data).To(HaveKey(constants.EnvoyOAuth2TokenSecretFileName))
 		Expect(createdSecret.Labels).To(SatisfyAll(
 			HaveKeyWithValue(labels.ManagedByLabelKey, labels.ManagedByLabelValue),
 			HaveKeyWithValue(labels.ControllerLabelKey, labels.AuthPolicyControllerLabelValue),
@@ -234,7 +263,7 @@ var _ = Describe("auto-login Secret reconciliation", func() {
 			Name:      scope.AutoLoginConfig.EnvoySecretName,
 			Namespace: testNamespace,
 		}, updated)).To(Succeed())
-		Expect(updated.Data).ToNot(HaveKey(configpatch.TokenSecretFileName))
+		Expect(updated.Data).ToNot(HaveKey(constants.EnvoyOAuth2TokenSecretFileName))
 	})
 
 	It("updates a Secret when it needs updating and is owned by AuthPolicy", func() {
@@ -259,7 +288,7 @@ var _ = Describe("auto-login Secret reconciliation", func() {
 			Name:      scope.AutoLoginConfig.EnvoySecretName,
 			Namespace: testNamespace,
 		}, updated)).To(Succeed())
-		Expect(updated.Data).To(HaveKey(configpatch.TokenSecretFileName))
+		Expect(updated.Data).To(HaveKey(constants.EnvoyOAuth2TokenSecretFileName))
 	})
 
 	It("does not update a Secret when the OAuth client secret is unchanged", func() {
@@ -289,7 +318,7 @@ var _ = Describe("SecretShouldUpdate", func() {
 	secretWithToken := func(token string, lbls map[string]string) *corev1.Secret {
 		return &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{Labels: lbls},
-			Data:       map[string][]byte{configpatch.TokenSecretFileName: []byte(token)},
+			Data:       map[string][]byte{constants.EnvoyOAuth2TokenSecretFileName: []byte(token)},
 		}
 	}
 
