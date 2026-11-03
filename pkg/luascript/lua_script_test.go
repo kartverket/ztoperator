@@ -515,8 +515,16 @@ func TestGeneratedLuaScript_OnRequest_LogoutPath_CrossSiteIsRejected(t *testing.
 			map[string]string{"origin": "https://app.example.com:443"}, false,
 		},
 		{
-			"origin with explicit default http port and authority without port", "/logout",
-			map[string]string{"origin": "http://app.example.com:80"}, false,
+			"http origin with explicit port 80 on https request", "/logout",
+			map[string]string{"origin": "http://app.example.com:80"}, true,
+		},
+		{
+			"http origin without port on https request", "/logout",
+			map[string]string{"origin": "http://app.example.com"}, true,
+		},
+		{
+			"http referer on https request", "/logout",
+			map[string]string{"referer": "http://app.example.com/page"}, true,
 		},
 		{
 			"referer without port and authority with explicit default https port", "/logout",

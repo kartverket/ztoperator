@@ -61,15 +61,15 @@ local function split_host_port(host_port, default_port)
     return host, port
 end
 
--- compares the origin (scheme, host, effective port) of an Origin/Referer value with the request authority
+-- Compares the origin (scheme, host, effective port) of an Origin/Referer value with the request authority.
+-- The external scheme is always https, since the OAuth2 filter builds its redirect_uri as https://<authority>.
 local function is_same_origin(source, authority)
     local scheme, source_host_port = string.match(string.lower(source), "^(%%a[%%w+.-]*)://([^/?#]*)")
-    if scheme ~= "http" and scheme ~= "https" then
+    if scheme ~= "https" then
         return false
     end
-    local default_port = scheme == "https" and "443" or "80"
-    local source_host, source_port = split_host_port(source_host_port, default_port)
-    local authority_host, authority_port = split_host_port(authority, default_port)
+    local source_host, source_port = split_host_port(source_host_port, "443")
+    local authority_host, authority_port = split_host_port(authority, "443")
     return source_host == authority_host and source_port == authority_port
 end
 
