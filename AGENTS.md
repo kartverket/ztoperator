@@ -198,6 +198,7 @@ The operator generates **one** `EnvoyFilter` resource (`<authpolicy-name>-login`
 The Lua script (`pkg/luascript/ztoperator.lua`) is embedded at compile time via `//go:embed` and handles:
 - OAuth2 redirect detection and bypass
 - Logout (RP-initiated logout with `end_session_endpoint`)
+- Rejecting cross-site requests (403) to the logout path, to prevent logout CSRF (see `docs/adrs`)
 - Deny-redirect behavior for API endpoints
 - Cookie-based session management
 

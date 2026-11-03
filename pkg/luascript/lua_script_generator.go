@@ -36,6 +36,10 @@ var luaScriptTemplate string
 //     redirecting to the IdP (used for API paths where a browser redirect
 //     would be inappropriate).
 //
+//   - On request to the logout path: cross-site requests (Sec-Fetch-Site, falling
+//     back to Origin/Referer vs :authority) are rejected with 403 before the OAuth2
+//     filter can sign the user out, which protects against logout CSRF.
+//
 //   - On response: the script intercepts 302 redirects produced by the OAuth2
 //     filter and rewrites the Location header:
 //
@@ -84,6 +88,7 @@ func GenerateLuaScript(
 		loginParamsAsLua,
 		EscapeLuaString(endSessionURI),
 		EscapeLuaString(queryEscapedPostLogoutRedirectURI),
+		EscapeLuaString(autoLoginConfig.LogoutPath),
 		BypassOauthLoginHeaderName,
 		DenyRedirectHeaderName,
 	)

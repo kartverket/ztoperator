@@ -5,6 +5,7 @@ local authorize_endpoint = "%s"
 local login_params = %s
 local end_session_endpoint = "%s"
 local post_logout_redirect_uri = "%s"
+local logout_path = "%s"
 
 -- returns true when {p,m} matches any rule in the supplied table
 local function match(rules, p, m)
@@ -47,10 +48,33 @@ local function is_empty_table(t)
     return type(t) ~= "table" or next(t) == nil
 end
 
+local function host_of(url)
+    return string.lower(string.match(url, "^%%a[%%w+.-]*://([^/?#]*)") or "")
+end
+
+-- The Envoy OAuth2 filter signs the user out on any request to the logout path, regardless of method and cookies.
+-- Reject cross-site requests so that a third-party site cannot log the user out (logout CSRF).
+local function is_cross_site(headers)
+    local site = headers:get("sec-fetch-site")
+    if site ~= nil and site ~= "" then
+        return site == "cross-site"
+    end
+    local source = headers:get("origin") or headers:get("referer")
+    if source == nil or source == "" then
+        return false
+    end
+    return host_of(source) ~= string.lower(headers:get(":authority") or "")
+end
+
 function envoy_on_request(request_handle)
     local raw_p = request_handle:headers():get(":path") or ""
     local m = request_handle:headers():get(":method") or ""
     local p = string.match(raw_p, "^[^?]*")
+
+    if logout_path ~= "" and p == logout_path and is_cross_site(request_handle:headers()) then
+        request_handle:respond({[":status"] = "403"}, "")
+        return
+    end
 
     local bypass = should_bypass(p, m)
     request_handle:headers():add("%s", tostring(bypass))

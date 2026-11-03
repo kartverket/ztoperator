@@ -20,6 +20,7 @@ import (
 //	handle:headers():add(key, val)
 //	handle:headers():replace(key, val)
 //	handle:logCritical(msg)
+//	handle:respond(headers, body)  (records the status as hdrs["responded-status"])
 //
 // After calling envoy_on_request / envoy_on_response the test reads results
 // directly from the handle.hdrs table.
@@ -37,6 +38,7 @@ function make_handle(initial_headers)
         hdrs        = hdrs,
         headers     = function(_) return headers_obj end,
         logCritical = function(_, msg) end,
+        respond     = function(_, h, _) hdrs["responded-status"] = h[":status"] end,
     }
 end
 `
@@ -477,4 +479,52 @@ func TestGeneratedLuaScript_NilEndSessionURI_LogoutRedirectSkipped(t *testing.T)
 	})
 
 	assert.Equal(t, "https://other.example.com/somewhere", headers["location"])
+}
+
+func TestGeneratedLuaScript_OnRequest_LogoutPath_CrossSiteIsRejected(t *testing.T) {
+	script := luascript.GenerateLuaScript(defaultAuthPolicy(), defaultAutoLoginConfig(), defaultIdpUris())
+
+	tests := []struct {
+		name         string
+		path         string
+		headers      map[string]string
+		wantRejected bool
+	}{
+		{"cross-site fetch metadata", "/logout", map[string]string{"sec-fetch-site": "cross-site"}, true},
+		{"cross-site with query string", "/logout?x=1", map[string]string{"sec-fetch-site": "cross-site"}, true},
+		{"same-origin fetch metadata", "/logout", map[string]string{"sec-fetch-site": "same-origin"}, false},
+		{"user initiated fetch metadata", "/logout", map[string]string{"sec-fetch-site": "none"}, false},
+		{
+			"fetch metadata wins over matching origin", "/logout",
+			map[string]string{"sec-fetch-site": "cross-site", "origin": "https://app.example.com"}, true,
+		},
+		{"foreign origin without fetch metadata", "/logout", map[string]string{"origin": "https://evil.com"}, true},
+		{"null origin without fetch metadata", "/logout", map[string]string{"origin": "null"}, true},
+		{"foreign referer without fetch metadata", "/logout", map[string]string{"referer": "https://evil.com/a?b"}, true},
+		{"same origin without fetch metadata", "/logout", map[string]string{"origin": "https://APP.example.com"}, false},
+		{
+			"same referer with port without fetch metadata", "/logout",
+			map[string]string{":authority": "app.example.com:8443", "referer": "https://app.example.com:8443/page"}, false,
+		},
+		{"no origin information", "/logout", map[string]string{}, false},
+		{"other path is never rejected", "/secure", map[string]string{"sec-fetch-site": "cross-site"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			headers := map[string]string{":path": tt.path, ":method": "GET", ":authority": "app.example.com"}
+			for k, v := range tt.headers {
+				headers[k] = v
+			}
+
+			result := runOnRequest(t, script, headers)
+
+			if tt.wantRejected {
+				assert.Equal(t, "403", result["responded-status"])
+				assert.NotContains(t, result, luascript.BypassOauthLoginHeaderName)
+			} else {
+				assert.NotContains(t, result, "responded-status")
+			}
+		})
+	}
 }
