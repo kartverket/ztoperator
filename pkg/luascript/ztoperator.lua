@@ -48,8 +48,29 @@ local function is_empty_table(t)
     return type(t) ~= "table" or next(t) == nil
 end
 
-local function host_of(url)
-    return string.lower(string.match(url, "^%%a[%%w+.-]*://([^/?#]*)") or "")
+-- splits "host[:port]" (including bracketed IPv6) into a lowercase host and a port, defaulting the port when omitted
+local function split_host_port(host_port, default_port)
+    local hp = string.lower((string.gsub(host_port, "^[^@]*@", "")))
+    local host, port = string.match(hp, "^(%%[[^%%]]*%%]):(%%d+)$")
+    if host == nil then
+        host, port = string.match(hp, "^([^:]+):(%%d+)$")
+    end
+    if host == nil then
+        return hp, default_port
+    end
+    return host, port
+end
+
+-- compares the origin (scheme, host, effective port) of an Origin/Referer value with the request authority
+local function is_same_origin(source, authority)
+    local scheme, source_host_port = string.match(string.lower(source), "^(%%a[%%w+.-]*)://([^/?#]*)")
+    if scheme ~= "http" and scheme ~= "https" then
+        return false
+    end
+    local default_port = scheme == "https" and "443" or "80"
+    local source_host, source_port = split_host_port(source_host_port, default_port)
+    local authority_host, authority_port = split_host_port(authority, default_port)
+    return source_host == authority_host and source_port == authority_port
 end
 
 -- The Envoy OAuth2 filter signs the user out on any request to the logout path, regardless of method and cookies.
@@ -63,7 +84,7 @@ local function is_cross_site(headers)
     if source == nil or source == "" then
         return false
     end
-    return host_of(source) ~= string.lower(headers:get(":authority") or "")
+    return not is_same_origin(source, headers:get(":authority") or "")
 end
 
 function envoy_on_request(request_handle)

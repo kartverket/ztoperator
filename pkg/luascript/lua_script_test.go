@@ -506,6 +506,34 @@ func TestGeneratedLuaScript_OnRequest_LogoutPath_CrossSiteIsRejected(t *testing.
 			"same referer with port without fetch metadata", "/logout",
 			map[string]string{":authority": "app.example.com:8443", "referer": "https://app.example.com:8443/page"}, false,
 		},
+		{
+			"origin without port and authority with explicit default https port", "/logout",
+			map[string]string{":authority": "app.example.com:443", "origin": "https://app.example.com"}, false,
+		},
+		{
+			"origin with explicit default https port and authority without port", "/logout",
+			map[string]string{"origin": "https://app.example.com:443"}, false,
+		},
+		{
+			"origin with explicit default http port and authority without port", "/logout",
+			map[string]string{"origin": "http://app.example.com:80"}, false,
+		},
+		{
+			"referer without port and authority with explicit default https port", "/logout",
+			map[string]string{":authority": "app.example.com:443", "referer": "https://app.example.com/page"}, false,
+		},
+		{
+			"origin with different port", "/logout",
+			map[string]string{"origin": "https://app.example.com:8443"}, true,
+		},
+		{
+			"https origin and authority with explicit http default port", "/logout",
+			map[string]string{":authority": "app.example.com:80", "origin": "https://app.example.com"}, true,
+		},
+		{
+			"ipv6 origin matching authority", "/logout",
+			map[string]string{":authority": "[::1]:8443", "origin": "https://[::1]:8443"}, false,
+		},
 		{"no origin information", "/logout", map[string]string{}, false},
 		{"other path is never rejected", "/secure", map[string]string{"sec-fetch-site": "cross-site"}, false},
 	}
