@@ -290,3 +290,21 @@ See [CONTRIBUTING.md#managing-dependencies-and-patching-vulnerabilities](CONTRIB
 - Update this document when making significant changes to architecture, code structure, conventions etc.
 - Ensure that specific references to packages, patterns, versions etc. are updated as the code evolves.
 
+## Decisions (ADRs)
+
+Important decisions are recorded as Architecture Decision Records in `docs/adr`. Examples are choosing a library or
+framework, changing the API contract, and security-relevant choices. Read the relevant ADRs before changing what they
+cover. When a change makes a decision like this, suggest an ADR, but don't write one unless asked.
+
+There are two templates. Pick the one that fits how much is at stake, or ask for guidance if unsure:
+
+- **Brief** (`template-brief.md`): the decision is easy to reverse, or the best option is fairly obvious. A few
+  sentences each for the context, the decision and the consequences are enough.
+- **Detailed** (`template-detailed.md`): the decision is costly to reverse, affects callers or other teams, or real
+  alternatives were weighed. It needs the full problem statement, the options considered with their pros and cons,
+  and why the chosen option won. Ask for guidance with regards to list of deciders (individuals or teams who contributed
+  to the decision).
+
+Name files `YYYY-MM-DD-title.md`, using the date of the decision and a lowercase, hyphenated title. Never change or
+rewrite an accepted ADR, other than updating status if it is superseded. Write a new one that supersedes it, and update
+the old one's status.
