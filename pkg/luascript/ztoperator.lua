@@ -77,9 +77,13 @@ end
 -- Reject cross-site requests so that a third-party site cannot log the user out (logout CSRF).
 local function is_cross_site(headers)
     local site = headers:get("sec-fetch-site")
-    if site ~= nil and site ~= "" then
-        return site == "cross-site"
+    if site == "same-origin" or site == "same-site" or site == "none" then
+        return false
     end
+    if site == "cross-site" then
+        return true
+    end
+    -- missing or unknown Sec-Fetch-Site values fall through to the Origin/Referer check
     local source = headers:get("origin") or headers:get("referer")
     if source == nil or source == "" then
         return false

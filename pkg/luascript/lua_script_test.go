@@ -493,6 +493,19 @@ func TestGeneratedLuaScript_OnRequest_LogoutPath_CrossSiteIsRejected(t *testing.
 		{"cross-site fetch metadata", "/logout", map[string]string{"sec-fetch-site": "cross-site"}, true},
 		{"cross-site with query string", "/logout?x=1", map[string]string{"sec-fetch-site": "cross-site"}, true},
 		{"same-origin fetch metadata", "/logout", map[string]string{"sec-fetch-site": "same-origin"}, false},
+		{
+			"unknown fetch metadata with foreign origin", "/logout",
+			map[string]string{"sec-fetch-site": "evil-not-cross-site", "origin": "https://evil.com"}, true,
+		},
+		{
+			"unknown fetch metadata with same origin", "/logout",
+			map[string]string{"sec-fetch-site": "evil-not-cross-site", "origin": "https://app.example.com"}, false,
+		},
+		{
+			"unknown fetch metadata without origin information", "/logout",
+			map[string]string{"sec-fetch-site": "evil-not-cross-site"}, false,
+		},
+		{"same-site fetch metadata", "/logout", map[string]string{"sec-fetch-site": "same-site"}, false},
 		{"user initiated fetch metadata", "/logout", map[string]string{"sec-fetch-site": "none"}, false},
 		{
 			"fetch metadata wins over matching origin", "/logout",
