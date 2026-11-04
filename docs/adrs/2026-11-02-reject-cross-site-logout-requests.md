@@ -19,9 +19,10 @@ See `2026-11-02-keep-samesite-lax-for-oauth-cookies.md` and `2026-11-02-do-not-a
 The generated Lua filter, which runs before the OAuth2 filter, rejects cross-site requests to the logout path with 403.
 It uses `Sec-Fetch-Site` (`cross-site` is rejected, `same-origin`, `same-site` and `none` are allowed). If the header is
 absent or has any other value, it falls back to comparing `Origin`, then `Referer`, with `:authority` using the scheme,
-lowercase host and effective port. The external scheme is always https (the OAuth2 filter's `redirect_uri` is built as
-`https://<authority>`), so an omitted port means 443 (`app.example.com:443` matches `https://app.example.com`) and an
-`http://` origin never matches. A request with none of them is allowed.
+lowercase host and effective port. The request scheme is taken from `x-forwarded-proto` (set by the ingress gateway, which overwrites
+client-supplied values), falling back to `:scheme`, and https when neither says http. The Origin/Referer scheme must
+equal it, so an `http://` origin never matches an https request, and an omitted port means the scheme's default port
+(443 or 80). A request with none of them is allowed.
 `Origin`/`Referer` alone is not used as the primary signal, since `Referrer-Policy: no-referrer` suppresses `Referer`.
 The check is always on and not configurable, since a legitimate logout is always same-origin.
 

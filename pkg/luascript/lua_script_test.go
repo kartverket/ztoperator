@@ -555,6 +555,39 @@ func TestGeneratedLuaScript_OnRequest_LogoutPath_CrossSiteIsRejected(t *testing.
 			"ipv6 origin matching authority", "/logout",
 			map[string]string{":authority": "[::1]:8443", "origin": "https://[::1]:8443"}, false,
 		},
+		{
+			"http origin on http request via x-forwarded-proto", "/logout",
+			map[string]string{"x-forwarded-proto": "http", "origin": "http://app.example.com"}, false,
+		},
+		{
+			"http origin with explicit port 80 on http request", "/logout",
+			map[string]string{"x-forwarded-proto": "http", "origin": "http://app.example.com:80"}, false,
+		},
+		{
+			"http origin with port on http request", "/logout",
+			map[string]string{":authority": "localhost:8080", "x-forwarded-proto": "http", "origin": "http://localhost:8080"},
+			false,
+		},
+		{
+			"https origin on http request", "/logout",
+			map[string]string{"x-forwarded-proto": "http", "origin": "https://app.example.com"}, true,
+		},
+		{
+			"http origin on https request via x-forwarded-proto", "/logout",
+			map[string]string{"x-forwarded-proto": "https", "origin": "http://app.example.com"}, true,
+		},
+		{
+			"http origin on http request via :scheme", "/logout",
+			map[string]string{":scheme": "http", "origin": "http://app.example.com"}, false,
+		},
+		{
+			"x-forwarded-proto takes precedence over :scheme", "/logout",
+			map[string]string{":scheme": "http", "x-forwarded-proto": "https", "origin": "http://app.example.com"}, true,
+		},
+		{
+			"first x-forwarded-proto value is used", "/logout",
+			map[string]string{"x-forwarded-proto": "http,https", "origin": "http://app.example.com"}, false,
+		},
 		{"no origin information", "/logout", map[string]string{}, false},
 		{"other path is never rejected", "/secure", map[string]string{"sec-fetch-site": "cross-site"}, false},
 	}

@@ -61,15 +61,26 @@ local function split_host_port(host_port, default_port)
     return host, port
 end
 
--- Compares the origin (scheme, host, effective port) of an Origin/Referer value with the request authority.
--- The external scheme is always https, since the OAuth2 filter builds its redirect_uri as https://<authority>.
-local function is_same_origin(source, authority)
-    local scheme, source_host_port = string.match(string.lower(source), "^(%%a[%%w+.-]*)://([^/?#]*)")
-    if scheme ~= "https" then
+-- The external request scheme: x-forwarded-proto (set by the ingress gateway, which overwrites client-supplied values),
+-- falling back to :scheme, and https when neither is http. A browser cannot set these headers on a victim's request.
+local function request_scheme(headers)
+    local value = headers:get("x-forwarded-proto") or headers:get(":scheme") or ""
+    local first = string.match(string.lower(value), "^%%s*([^,%%s]+)")
+    if first == "http" then
+        return "http"
+    end
+    return "https"
+end
+
+-- Compares the origin (scheme, host, effective port) of an Origin/Referer value with the request scheme and authority.
+local function is_same_origin(source, scheme, authority)
+    local source_scheme, source_host_port = string.match(string.lower(source), "^(%%a[%%w+.-]*)://([^/?#]*)")
+    if source_scheme ~= scheme then
         return false
     end
-    local source_host, source_port = split_host_port(source_host_port, "443")
-    local authority_host, authority_port = split_host_port(authority, "443")
+    local default_port = scheme == "https" and "443" or "80"
+    local source_host, source_port = split_host_port(source_host_port, default_port)
+    local authority_host, authority_port = split_host_port(authority, default_port)
     return source_host == authority_host and source_port == authority_port
 end
 
@@ -88,7 +99,7 @@ local function is_cross_site(headers)
     if source == nil or source == "" then
         return false
     end
-    return not is_same_origin(source, headers:get(":authority") or "")
+    return not is_same_origin(source, request_scheme(headers), headers:get(":authority") or "")
 end
 
 function envoy_on_request(request_handle)
