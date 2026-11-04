@@ -16,7 +16,6 @@ import (
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
-	"github.com/kartverket/ztoperator/pkg/validation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -493,11 +492,7 @@ var _ = Describe("Pod validating webhook", func() {
 		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring(
-			fmt.Sprintf(
-				"the required annotation '%s' is either missing or its content is not properly formatted, %s",
-				validation.IstioUserVolumeAnnotation,
-				validation.PodAnnotationErrorMessageSuffix(),
-			),
+			"is not mounted at '/etc/istio/config' in the istio-proxy container",
 		)))
 	})
 })

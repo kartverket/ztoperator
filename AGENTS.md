@@ -45,7 +45,7 @@ Controller.Reconcile()
   │   └─ ResolveAudiences          (static values or from ConfigMap/Secret references)
   ├─ validateAuthPolicy()        ← Validators (pkg/validation/)
   │   ├─ Path validation           (RFC 3986 pchar, template syntax {*}, {**})
-  │   └─ Pod annotation validation (sidecar.istio.io/userVolume + userVolumeMount must reference the envoy secret)
+  │   └─ Pod validation (final pod spec must have the envoy secret mounted in istio-proxy; sidecar injection must not be disabled)
   ├─ ControllerResources()        ← Builds list of 6 controller resources (internal/reconciler/resources.go)
   │   ├─ Secret
   │   ├─ EnvoyFilter
@@ -80,7 +80,7 @@ Controller.Reconcile()
 | `pkg/resourcegenerators/requestauthentication/` | RequestAuthentication generation |
 | `pkg/resourcegenerators/secret/` | Envoy Secret generation (HMAC + token secret) |
 | `pkg/luascript/` | Lua script templating (`ztoperator.lua` embedded via `//go:embed`); handles login/logout/redirect/deny-redirect logic |
-| `pkg/validation/` | Path validation (RFC 3986, template patterns `{*}` / `{**}`), pod annotation validation; `path_classifier.go` distinguishes exact/prefix/template paths, `path_transformation.go` normalises them before matching |
+| `pkg/validation/` | Path validation (RFC 3986, template patterns `{*}` / `{**}`), pod validation (`pod_validation.go`); `path_classifier.go` distinguishes exact/prefix/template paths, `path_transformation.go` normalises them before matching |
 | `pkg/reconciliation/` | `ControllerResource` interface and generic `ReconcilerAdapter[T]` / `ResourceReconciler[T]` types |
 | `pkg/metrics/` | Prometheus gauge `ztoperator_authpolicy_info` with labels: name, namespace, state, owner, issuer, enabled, auto_login_enabled, protected_pod |
 | `pkg/config/` | Env-based config via `envconfig`, including the allowed OAuth providers and their discovery endpoint values |
@@ -217,13 +217,13 @@ Ztoperator works alongside Skiperator (`skiperator.kartverket.no/v1alpha1`):
 - The `examples/example.yaml` shows both an `Application` and an `AuthPolicy` working together.
 - Skiperator is installed in the local dev environment via `make skiperator` / `scripts/install-skiperator.sh`.
 
-### Pod Annotation Requirements
+### Pod Requirements
 
-When `autoLogin` is enabled, pods must mount the generated envoy secret into the istio-proxy sidecar via annotations:
+When `autoLogin` is enabled, the generated envoy secret (`<authpolicy-name>-envoy-secret`) must be mounted at `/etc/istio/config` in the `istio-proxy` container. Users currently do this with Istio annotations:
 - `sidecar.istio.io/userVolume`: JSON array with secret volume referencing `<authpolicy-name>-envoy-secret`
 - `sidecar.istio.io/userVolumeMount`: JSON array mounting at `/etc/istio/config`
 
-The operator validates these annotations and sets the AuthPolicy to `Invalid` phase if they are missing or malformed.
+The validating pod webhook runs after all mutations and only checks the resulting pod spec (an `istio-proxy` container mounting the secret at `/etc/istio/config`), regardless of how the mount got there. It also rejects pods with `sidecar.istio.io/inject: "false"` (label or annotation) when the AuthPolicy is enabled, since the policy would not be enforced.
 
 ## Local Development
 
