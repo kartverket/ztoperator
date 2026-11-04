@@ -1,0 +1,42 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: auto-login-istio-annotations-wrong-secret
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+        skip.kartverket.no/skip-managed: "true"
+  steps:
+    - try:
+        - create:
+            file: ../../../resources/secret/oauth-secret.yaml
+        - create:
+            file: authpolicy.yaml
+        - assert:
+            resource:
+              apiVersion: ztoperator.kartverket.no/v1alpha1
+              kind: AuthPolicy
+              metadata:
+                name: auth-policy
+              status:
+                ready: true
+        - create:
+            file: application.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: ServiceAccount
+              metadata:
+                name: application
+        # Restart to clear stale FailedCreate conditions from before the ServiceAccount existed
+        - script:
+            content: kubectl delete replicaset -n $NAMESPACE -l app=application --ignore-not-found
+        - assert:
+            file: replicaset-assert.yaml
+        - error:
+            file: pod.yaml
