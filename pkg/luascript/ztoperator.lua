@@ -5,6 +5,7 @@ local authorize_endpoint = "%s"
 local login_params = %s
 local end_session_endpoint = "%s"
 local post_logout_redirect_uri = "%s"
+local logout_path = "%s"
 
 -- returns true when {p,m} matches any rule in the supplied table
 local function match(rules, p, m)
@@ -47,10 +48,69 @@ local function is_empty_table(t)
     return type(t) ~= "table" or next(t) == nil
 end
 
+-- splits "host[:port]" (including bracketed IPv6) into a lowercase host and a port, defaulting the port when omitted
+local function split_host_port(host_port, default_port)
+    local hp = string.lower((string.gsub(host_port, "^[^@]*@", "")))
+    local host, port = string.match(hp, "^(%%[[^%%]]*%%]):(%%d+)$")
+    if host == nil then
+        host, port = string.match(hp, "^([^:]+):(%%d+)$")
+    end
+    if host == nil then
+        return hp, default_port
+    end
+    return host, port
+end
+
+-- The external request scheme: x-forwarded-proto (set by the ingress gateway, which overwrites client-supplied values),
+-- falling back to :scheme, and https when neither is http. A browser cannot set these headers on a victim's request.
+local function request_scheme(headers)
+    local value = headers:get("x-forwarded-proto") or headers:get(":scheme") or ""
+    local first = string.match(string.lower(value), "^%%s*([^,%%s]+)")
+    if first == "http" then
+        return "http"
+    end
+    return "https"
+end
+
+-- Compares the origin (scheme, host, effective port) of an Origin/Referer value with the request scheme and authority.
+local function is_same_origin(source, scheme, authority)
+    local source_scheme, source_host_port = string.match(string.lower(source), "^(%%a[%%w+.-]*)://([^/?#]*)")
+    if source_scheme ~= scheme then
+        return false
+    end
+    local default_port = scheme == "https" and "443" or "80"
+    local source_host, source_port = split_host_port(source_host_port, default_port)
+    local authority_host, authority_port = split_host_port(authority, default_port)
+    return source_host == authority_host and source_port == authority_port
+end
+
+-- The Envoy OAuth2 filter signs the user out on any request to the logout path, regardless of method and cookies.
+-- Reject cross-site requests so that a third-party site cannot log the user out (logout CSRF).
+local function is_cross_site(headers)
+    local site = headers:get("sec-fetch-site")
+    if site == "same-origin" or site == "same-site" or site == "none" then
+        return false
+    end
+    if site == "cross-site" then
+        return true
+    end
+    -- missing or unknown Sec-Fetch-Site values fall through to the Origin/Referer check
+    local source = headers:get("origin") or headers:get("referer")
+    if source == nil or source == "" then
+        return false
+    end
+    return not is_same_origin(source, request_scheme(headers), headers:get(":authority") or "")
+end
+
 function envoy_on_request(request_handle)
     local raw_p = request_handle:headers():get(":path") or ""
     local m = request_handle:headers():get(":method") or ""
     local p = string.match(raw_p, "^[^?]*")
+
+    if logout_path ~= "" and p == logout_path and is_cross_site(request_handle:headers()) then
+        request_handle:respond({[":status"] = "403"}, "")
+        return
+    end
 
     local bypass = should_bypass(p, m)
     request_handle:headers():add("%s", tostring(bypass))

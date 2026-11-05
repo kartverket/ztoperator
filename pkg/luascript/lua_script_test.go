@@ -20,6 +20,7 @@ import (
 //	handle:headers():add(key, val)
 //	handle:headers():replace(key, val)
 //	handle:logCritical(msg)
+//	handle:respond(headers, body)  (records the status as hdrs["responded-status"])
 //
 // After calling envoy_on_request / envoy_on_response the test reads results
 // directly from the handle.hdrs table.
@@ -37,6 +38,7 @@ function make_handle(initial_headers)
         hdrs        = hdrs,
         headers     = function(_) return headers_obj end,
         logCritical = function(_, msg) end,
+        respond     = function(_, h, _) hdrs["responded-status"] = h[":status"] end,
     }
 end
 `
@@ -477,4 +479,134 @@ func TestGeneratedLuaScript_NilEndSessionURI_LogoutRedirectSkipped(t *testing.T)
 	})
 
 	assert.Equal(t, "https://other.example.com/somewhere", headers["location"])
+}
+
+func TestGeneratedLuaScript_OnRequest_LogoutPath_CrossSiteIsRejected(t *testing.T) {
+	script := luascript.GenerateLuaScript(defaultAuthPolicy(), defaultAutoLoginConfig(), defaultIdpUris())
+
+	tests := []struct {
+		name         string
+		path         string
+		headers      map[string]string
+		wantRejected bool
+	}{
+		{"cross-site fetch metadata", "/logout", map[string]string{"sec-fetch-site": "cross-site"}, true},
+		{"cross-site with query string", "/logout?x=1", map[string]string{"sec-fetch-site": "cross-site"}, true},
+		{"same-origin fetch metadata", "/logout", map[string]string{"sec-fetch-site": "same-origin"}, false},
+		{
+			"unknown fetch metadata with foreign origin", "/logout",
+			map[string]string{"sec-fetch-site": "evil-not-cross-site", "origin": "https://evil.com"}, true,
+		},
+		{
+			"unknown fetch metadata with same origin", "/logout",
+			map[string]string{"sec-fetch-site": "evil-not-cross-site", "origin": "https://app.example.com"}, false,
+		},
+		{
+			"unknown fetch metadata without origin information", "/logout",
+			map[string]string{"sec-fetch-site": "evil-not-cross-site"}, false,
+		},
+		{"same-site fetch metadata", "/logout", map[string]string{"sec-fetch-site": "same-site"}, false},
+		{"user initiated fetch metadata", "/logout", map[string]string{"sec-fetch-site": "none"}, false},
+		{
+			"fetch metadata wins over matching origin", "/logout",
+			map[string]string{"sec-fetch-site": "cross-site", "origin": "https://app.example.com"}, true,
+		},
+		{"foreign origin without fetch metadata", "/logout", map[string]string{"origin": "https://evil.com"}, true},
+		{"null origin without fetch metadata", "/logout", map[string]string{"origin": "null"}, true},
+		{"foreign referer without fetch metadata", "/logout", map[string]string{"referer": "https://evil.com/a?b"}, true},
+		{"same origin without fetch metadata", "/logout", map[string]string{"origin": "https://APP.example.com"}, false},
+		{
+			"same referer with port without fetch metadata", "/logout",
+			map[string]string{":authority": "app.example.com:8443", "referer": "https://app.example.com:8443/page"}, false,
+		},
+		{
+			"origin without port and authority with explicit default https port", "/logout",
+			map[string]string{":authority": "app.example.com:443", "origin": "https://app.example.com"}, false,
+		},
+		{
+			"origin with explicit default https port and authority without port", "/logout",
+			map[string]string{"origin": "https://app.example.com:443"}, false,
+		},
+		{
+			"http origin with explicit port 80 on https request", "/logout",
+			map[string]string{"origin": "http://app.example.com:80"}, true,
+		},
+		{
+			"http origin without port on https request", "/logout",
+			map[string]string{"origin": "http://app.example.com"}, true,
+		},
+		{
+			"http referer on https request", "/logout",
+			map[string]string{"referer": "http://app.example.com/page"}, true,
+		},
+		{
+			"referer without port and authority with explicit default https port", "/logout",
+			map[string]string{":authority": "app.example.com:443", "referer": "https://app.example.com/page"}, false,
+		},
+		{
+			"origin with different port", "/logout",
+			map[string]string{"origin": "https://app.example.com:8443"}, true,
+		},
+		{
+			"https origin and authority with explicit http default port", "/logout",
+			map[string]string{":authority": "app.example.com:80", "origin": "https://app.example.com"}, true,
+		},
+		{
+			"ipv6 origin matching authority", "/logout",
+			map[string]string{":authority": "[::1]:8443", "origin": "https://[::1]:8443"}, false,
+		},
+		{
+			"http origin on http request via x-forwarded-proto", "/logout",
+			map[string]string{"x-forwarded-proto": "http", "origin": "http://app.example.com"}, false,
+		},
+		{
+			"http origin with explicit port 80 on http request", "/logout",
+			map[string]string{"x-forwarded-proto": "http", "origin": "http://app.example.com:80"}, false,
+		},
+		{
+			"http origin with port on http request", "/logout",
+			map[string]string{":authority": "localhost:8080", "x-forwarded-proto": "http", "origin": "http://localhost:8080"},
+			false,
+		},
+		{
+			"https origin on http request", "/logout",
+			map[string]string{"x-forwarded-proto": "http", "origin": "https://app.example.com"}, true,
+		},
+		{
+			"http origin on https request via x-forwarded-proto", "/logout",
+			map[string]string{"x-forwarded-proto": "https", "origin": "http://app.example.com"}, true,
+		},
+		{
+			"http origin on http request via :scheme", "/logout",
+			map[string]string{":scheme": "http", "origin": "http://app.example.com"}, false,
+		},
+		{
+			"x-forwarded-proto takes precedence over :scheme", "/logout",
+			map[string]string{":scheme": "http", "x-forwarded-proto": "https", "origin": "http://app.example.com"}, true,
+		},
+		{
+			"first x-forwarded-proto value is used", "/logout",
+			map[string]string{"x-forwarded-proto": "http,https", "origin": "http://app.example.com"}, false,
+		},
+		{"no origin information", "/logout", map[string]string{}, false},
+		{"other path is never rejected", "/secure", map[string]string{"sec-fetch-site": "cross-site"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			headers := map[string]string{":path": tt.path, ":method": "GET", ":authority": "app.example.com"}
+			for k, v := range tt.headers {
+				headers[k] = v
+			}
+
+			result := runOnRequest(t, script, headers)
+
+			if tt.wantRejected {
+				assert.Equal(t, "403", result["responded-status"])
+				assert.NotContains(t, result, luascript.BypassOauthLoginHeaderName)
+			} else {
+				assert.NotContains(t, result, "responded-status")
+			}
+		})
+	}
 }
