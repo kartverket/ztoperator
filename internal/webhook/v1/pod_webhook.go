@@ -92,9 +92,8 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 		return nil, nil
 	}
 
-	// Validate that the pod is correctly configured given the AuthPolicy.
-	validationErr := validation.ValidatePodAnnotations(pod, podAuthPolicyConfiguration.AuthPolicy)
-	return nil, validationErr
+	// Validate the final pod spec (after all mutating webhooks) against the AuthPolicy.
+	return nil, validation.ValidatePod(pod, podAuthPolicyConfiguration.AuthPolicy)
 }
 
 // PodAuthPolicyConfiguration holds all resolved security context for a Pod,

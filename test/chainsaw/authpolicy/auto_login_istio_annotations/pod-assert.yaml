@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    application.skiperator.no/app-name: application
+spec:
+  (volumes[?name == 'secret'] | [0].secret.secretName): auth-policy-envoy-secret
+  (initContainers[?name == 'istio-proxy'] | [0].volumeMounts[?mountPath == '/etc/istio/config' && name == 'secret'] | length(@)): 1
