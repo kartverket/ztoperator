@@ -6,6 +6,7 @@ import (
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/names"
+	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,6 +55,29 @@ func TestValidatePod_MountErrors(t *testing.T) {
 			secretVolume(secret),
 			nil,
 		),
+		"ordinary init container": func() *corev1.Pod {
+			pod := podWith(nil, secretVolume(secret), nil)
+			pod.Spec.InitContainers = []corev1.Container{proxyWithMount(istioCredentialsDirectory)}
+			return pod
+		}(),
+		"subPath mount": func() *corev1.Pod {
+			proxy := proxyWithMount(istioCredentialsDirectory)
+			proxy.VolumeMounts[0].SubPath = "token-secret.yaml"
+			return podWith([]corev1.Container{proxy}, secretVolume(secret), nil)
+		}(),
+		"items omit hmac secret": func() *corev1.Pod {
+			volume := secretVolume(secret)
+			volume.Secret.Items = []corev1.KeyToPath{{Key: "token-secret.yaml", Path: "token-secret.yaml"}}
+			return podWith([]corev1.Container{proxyWithMount(istioCredentialsDirectory)}, volume, nil)
+		}(),
+		"items rename credential file": func() *corev1.Pod {
+			volume := secretVolume(secret)
+			volume.Secret.Items = []corev1.KeyToPath{
+				{Key: "token-secret.yaml", Path: "token-secret.yaml"},
+				{Key: "hmac-secret.yaml", Path: "other.yaml"},
+			}
+			return podWith([]corev1.Container{proxyWithMount(istioCredentialsDirectory)}, volume, nil)
+		}(),
 		"annotations without a mounted spec": podWith(nil, nil, map[string]string{
 			validation.IstioUserVolumeAnnotation:      `[{"name":"v","secret":{"secretName":"` + secret + `"}}]`,
 			validation.IstioUserVolumeMountAnnotation: `[{"name":"v","mountPath":"/etc/istio/config"}]`,
@@ -84,11 +108,20 @@ func TestValidatePod_SecretMountedInIstioProxy_ReturnsNil(t *testing.T) {
 	)
 	native := podWith(nil, secretVolume(secret), nil)
 	native.Spec.InitContainers = []corev1.Container{proxyWithMount(istioCredentialsDirectory)}
+	native.Spec.InitContainers[0].RestartPolicy = helperfunctions.Ptr(corev1.ContainerRestartPolicyAlways)
 
 	for name, pod := range map[string]*corev1.Pod{"container": regular, "init container": native} {
 		if err := validation.ValidatePod(pod, authPolicy); err != nil {
 			t.Errorf("expected nil error for istio-proxy in %s, got: %v", name, err)
 		}
+	}
+}
+
+func TestValidatePod_InjectLabelTakesPrecedenceOverAnnotation(t *testing.T) {
+	pod := podWith(nil, nil, map[string]string{validation.IstioInjectKey: "false"})
+	pod.Labels = map[string]string{validation.IstioInjectKey: "true"}
+	if err := validation.ValidatePod(pod, buildAuthPolicy(false, true)); err != nil {
+		t.Errorf("expected nil when label inject=true overrides annotation, got: %v", err)
 	}
 }
 
