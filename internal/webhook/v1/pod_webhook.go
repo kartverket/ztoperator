@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/names"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -24,7 +26,12 @@ const (
 
 	ZtoperatorWebhookAnnotationPrefix = "ztoperator.kartverket.no/"
 	ZtoperatorVerifyAnnotationKey     = ZtoperatorWebhookAnnotationPrefix + "verify-authpolicy"
-	ZtoperatorVerifyAnnotationValue   = "true"
+	ZtoperatorAnnotationEnabledValue  = "true"
+	ZtoperatorVerifyAnnotationValue   = ZtoperatorAnnotationEnabledValue
+	ZtoperatorInjectAnnotationKey     = ZtoperatorWebhookAnnotationPrefix + "inject"
+	ZtoperatorInjectAnnotationValue   = ZtoperatorAnnotationEnabledValue
+
+	EnvoySecretVolumeName = "ztoperator-envoy-secret"
 )
 
 // nolint:unused
@@ -33,8 +40,91 @@ var podlog = logf.Log.WithName("pod-webhook")
 // SetupPodWebhookWithManager registers the webhook for Pod in the manager.
 func SetupPodWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr, &corev1.Pod{}).
+		WithDefaulter(&PodCustomDefaulter{Client: mgr.GetClient()}).
 		WithValidator(&PodCustomValidator{Client: mgr.GetClient()}).
 		Complete()
+}
+
+// +kubebuilder:webhook:path=/mutate--v1-pod,mutating=true,failurePolicy=fail,sideEffects=None,groups="",resources=pods,verbs=create,versions=v1,name=mpod-v1.kb.io,admissionReviewVersions=v1
+
+// PodCustomDefaulter mounts the Envoy secret into the istio-proxy sidecar of pods protected by an AuthPolicy with autoLogin.
+type PodCustomDefaulter struct {
+	Client client.Client
+}
+
+var _ admission.Defaulter[*corev1.Pod] = &PodCustomDefaulter{}
+
+func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error {
+	podlog.Info("Defaulting for Pod", "name", pod.GetName(), "generateName", pod.GetGenerateName())
+
+	isPodWebhookEligible, errMsg := IsWebhookEligible(ctx, d.Client, *pod)
+	if !isPodWebhookEligible {
+		podlog.Info("Pod is not eligible for Ztoperator mutation", "reason", errMsg)
+		return nil
+	}
+
+	podAuthPolicyConfiguration, err := GetPodAuthPolicyConfiguration(ctx, d.Client, pod)
+	if err != nil {
+		return err
+	}
+	if !podAuthPolicyConfiguration.CreatedFromSkiperatorApplication {
+		return nil
+	}
+
+	if isAnnotationEnabled(pod, ZtoperatorInjectAnnotationKey) {
+		MountEnvoySecret(pod, podAuthPolicyConfiguration.AuthPolicy)
+	}
+	return nil
+}
+
+// MountEnvoySecret mounts the AuthPolicy's Envoy secret in the istio-proxy sidecar. It is a no-op when:
+// - auto-login is not in effect
+// - the pod opts out of sidecar injection
+// - the user has set the annotations
+// - the secret is already mounted
+// - Istio has not injected istio-proxy yet, in which case we rely on reinvocation
+func MountEnvoySecret(pod *corev1.Pod, authPolicy v1alpha1.AuthPolicy) {
+	if !validation.IsAutoLoginEnabled(authPolicy) || validation.IsSidecarInjectionDisabled(pod) {
+		return
+	}
+	_, hasUserVolume := pod.Annotations[validation.IstioUserVolumeAnnotation]
+	_, hasUserVolumeMount := pod.Annotations[validation.IstioUserVolumeMountAnnotation]
+	if hasUserVolume || hasUserVolumeMount {
+		return
+	}
+
+	secretName := names.EnvoySecret(authPolicy.Name)
+	if validation.IsEnvoySecretMountedInIstioProxy(pod, secretName) {
+		return
+	}
+
+	proxy := findIstioProxyContainer(pod)
+	if proxy == nil {
+		return
+	}
+
+	pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+		Name: EnvoySecretVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{SecretName: secretName},
+		},
+	})
+	proxy.VolumeMounts = append(proxy.VolumeMounts, corev1.VolumeMount{
+		Name:      EnvoySecretVolumeName,
+		MountPath: configpatch.IstioCredentialsDirectory,
+		ReadOnly:  true,
+	})
+}
+
+func findIstioProxyContainer(pod *corev1.Pod) *corev1.Container {
+	for _, containers := range [][]corev1.Container{pod.Spec.Containers, pod.Spec.InitContainers} {
+		for i := range containers {
+			if containers[i].Name == validation.IstioProxyContainerName {
+				return &containers[i]
+			}
+		}
+	}
+	return nil
 }
 
 // +kubebuilder:webhook:path=/validate--v1-pod,mutating=false,failurePolicy=fail,sideEffects=None,groups="",resources=pods,verbs=create,versions=v1,name=vpod-v1.kb.io,admissionReviewVersions=v1
@@ -92,6 +182,10 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 		return nil, nil
 	}
 
+	if !isAnnotationEnabled(pod, ZtoperatorVerifyAnnotationKey) {
+		return nil, nil
+	}
+
 	// Validate the final pod spec (after all mutating webhooks) against the AuthPolicy.
 	return nil, validation.ValidatePod(pod, podAuthPolicyConfiguration.AuthPolicy)
 }
@@ -124,9 +218,8 @@ func GetPodAuthPolicyConfiguration(
 		return nil, fmt.Errorf("webhook client is not configured")
 	}
 
-	verifyAnnotation, hasVerify := pod.Annotations[ZtoperatorVerifyAnnotationKey]
-
-	shouldFetchAuthPolicy := hasVerify && verifyAnnotation == ZtoperatorVerifyAnnotationValue
+	shouldFetchAuthPolicy := isAnnotationEnabled(pod, ZtoperatorVerifyAnnotationKey) ||
+		isAnnotationEnabled(pod, ZtoperatorInjectAnnotationKey)
 	if !shouldFetchAuthPolicy {
 		return &PodAuthPolicyConfiguration{
 			AppName:                          appName,
@@ -147,6 +240,10 @@ func GetPodAuthPolicyConfiguration(
 		AppName:                          appName,
 		CreatedFromSkiperatorApplication: true,
 	}, nil
+}
+
+func isAnnotationEnabled(pod *corev1.Pod, key string) bool {
+	return pod.Annotations[key] == ZtoperatorAnnotationEnabledValue
 }
 
 func IsWebhookEligible(ctx context.Context, k8sClient client.Client, pod corev1.Pod) (bool, string) {

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	ztoperatorv1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/internal/webhook/authpolicy"
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
@@ -433,7 +434,7 @@ var _ = Describe("Pod validating webhook", func() {
 		Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring("no AuthPolicy resource was found for the corresponding Application")))
 	})
 
-	It("does not create when pod is missing annotations (authPolicy has enabled autoLogin)", func() {
+	It("mounts the envoy secret in istio-proxy when pod is missing annotations (authPolicy has enabled autoLogin)", func() {
 		ns := getWebhookNamespace("pod-webhook-invalid-annotations", true)
 		skiperatorAppName := skiperatorAppName
 		authPolicyName := authPolicyName
@@ -446,6 +447,7 @@ var _ = Describe("Pod validating webhook", func() {
 				Namespace: ns.GetName(),
 			},
 			Spec: ztoperatorv1.AuthPolicySpec{
+				Enabled:      true,
 				WellKnownURI: testWellKnownURI,
 				AllowedAudiences: []ztoperatorv1.AllowedAudience{{
 					Value: helperfunctions.Ptr("entraid_server"),
@@ -477,13 +479,15 @@ var _ = Describe("Pod validating webhook", func() {
 				},
 				Annotations: map[string]string{
 					v1.ZtoperatorVerifyAnnotationKey: v1.ZtoperatorVerifyAnnotationValue,
+					v1.ZtoperatorInjectAnnotationKey: v1.ZtoperatorInjectAnnotationValue,
 				},
 			},
 			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{
-					Name:  skiperatorAppName,
-					Image: "nginx:stable",
-				}},
+				// Stand-in for the sidecar Istio's injector has already added when our webhook runs.
+				Containers: []corev1.Container{
+					{Name: skiperatorAppName, Image: "nginx:stable"},
+					{Name: "istio-proxy", Image: "nginx:stable"},
+				},
 			},
 		}
 		if pod.Labels == nil {
@@ -491,9 +495,36 @@ var _ = Describe("Pod validating webhook", func() {
 		}
 		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
 
-		Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring(
-			"is not mounted at '/etc/istio/config' in the istio-proxy container",
+		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
+		Expect(pod.Spec.Volumes).To(HaveLen(1))
+		Expect(pod.Spec.Volumes[0].Secret.SecretName).To(Equal(names.EnvoySecret(authPolicyName)))
+		Expect(pod.Spec.Containers).To(ContainElement(SatisfyAll(
+			HaveField("Name", "istio-proxy"),
+			HaveField("VolumeMounts", ContainElement(HaveField("MountPath", "/etc/istio/config"))),
 		)))
+
+		// Without the inject annotation nothing is mounted, so the verify annotation rejects the pod.
+		verifyOnlyPod := pod.DeepCopy()
+		verifyOnlyPod.ResourceVersion = ""
+		verifyOnlyPod.Name = "pod-webhook-verify-only"
+		delete(verifyOnlyPod.Annotations, v1.ZtoperatorInjectAnnotationKey)
+		verifyOnlyPod.Spec = corev1.PodSpec{Containers: []corev1.Container{{Name: skiperatorAppName, Image: "nginx:stable"}}}
+		Expect(k8sClient.Create(ctx, verifyOnlyPod)).To(MatchError(ContainSubstring("is not mounted at '/etc/istio/config'")))
+
+		blockedPod := pod.DeepCopy()
+		blockedPod.ResourceVersion = ""
+		blockedPod.Name = "pod-webhook-no-sidecar"
+		blockedPod.Labels["sidecar.istio.io/inject"] = "false"
+		blockedPod.Spec = corev1.PodSpec{Containers: []corev1.Container{{Name: skiperatorAppName, Image: "nginx:stable"}}}
+		Expect(k8sClient.Create(ctx, blockedPod)).To(MatchError(ContainSubstring("opts out of Istio sidecar injection")))
+
+		// Istio annotations alone are not enough: without an injected istio-proxy mounting the secret, the pod is rejected.
+		annotatedPod := pod.DeepCopy()
+		annotatedPod.ResourceVersion = ""
+		annotatedPod.Name = "pod-webhook-annotations-only"
+		annotatedPod.Annotations["sidecar.istio.io/userVolume"] = "[]"
+		annotatedPod.Spec = corev1.PodSpec{Containers: []corev1.Container{{Name: skiperatorAppName, Image: "nginx:stable"}}}
+		Expect(k8sClient.Create(ctx, annotatedPod)).To(MatchError(ContainSubstring("is not mounted at '/etc/istio/config' in the istio-proxy container")))
 	})
 })
 

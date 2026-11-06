@@ -29,7 +29,7 @@ func ValidatePod(pod *corev1.Pod, authPolicy v1alpha1.AuthPolicy) error {
 		)
 	}
 
-	if authPolicy.Spec.AutoLogin == nil || !authPolicy.Spec.AutoLogin.Enabled {
+	if !IsAutoLoginEnabled(authPolicy) {
 		return nil
 	}
 
@@ -47,8 +47,15 @@ func ValidatePod(pod *corev1.Pod, authPolicy v1alpha1.AuthPolicy) error {
 	return nil
 }
 
-// IsSidecarInjectionDisabled says whether the pod opts out of Istio sidecar injection.
-// Like Istio, the sidecar.istio.io/inject label takes precedence over the annotation.
+// IsAutoLoginEnabled reports whether auto-login is in effect, which is when the Envoy secret is generated:
+// the AuthPolicy is enabled and has autoLogin defined and enabled.
+func IsAutoLoginEnabled(authPolicy v1alpha1.AuthPolicy) bool {
+	return authPolicy.Spec.Enabled && authPolicy.Spec.AutoLogin != nil && authPolicy.Spec.AutoLogin.Enabled
+}
+
+// IsSidecarInjectionDisabled reports whether the pod opts out of Istio sidecar injection.
+// Like Istio, the sidecar.istio.io/inject label takes precedence over the annotation, and only
+// the exact value "false" disables injection (other values fall back to the default policy).
 func IsSidecarInjectionDisabled(pod *corev1.Pod) bool {
 	if value, ok := pod.Labels[IstioInjectKey]; ok {
 		return value == "false"

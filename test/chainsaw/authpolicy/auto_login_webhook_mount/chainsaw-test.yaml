@@ -1,0 +1,41 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: auto-login-webhook-mount
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+        skip.kartverket.no/skip-managed: "true"
+  steps:
+    - try:
+        # No sidecar.istio.io/userVolume annotations: the mutating webhook must mount the envoy secret
+        - apply:
+            file: ../../../resources/ingress/wildcard-ingress.yaml
+        - create:
+            file: ../../../resources/secret/oauth-secret.yaml
+        - create:
+            file: authpolicy.yaml
+        - create:
+            file: ../../../resources/skiperator/application-with-webhook-mount.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: ServiceAccount
+              metadata:
+                name: application
+        # Restart to clear stale FailedCreate conditions from before the AuthPolicy was ready
+        - script:
+            content: kubectl delete replicaset -n $NAMESPACE -l app=application --ignore-not-found
+        - assert:
+            file: pod-assert.yaml
+        - script:
+            content: sleep 14
+        - script:
+            content: |
+              hurl --error-format long \
+              --insecure --test tests.hurl
