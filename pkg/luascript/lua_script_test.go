@@ -146,16 +146,16 @@ func TestGeneratedLuaScript_OnRequest_IgnoreAuthRules_BypassAsExpected(t *testin
 		":method": "GET",     // ignored path in defaultAuthPolicy
 	})
 
-	assert.Equal(t, "true", ignoredMethodHandle[luascript.BypassOauthLoginHeaderName])
-	assert.Equal(t, "false", ignoredMethodHandle[luascript.DenyRedirectHeaderName])
+	assert.Equal(t, "true", ignoredMethodHandle[luascript.OAuth2FilterPassThroughHeaderName])
+	assert.Equal(t, "false", ignoredMethodHandle[luascript.OAuth2FilterDenyRedirectHeaderName])
 
 	nonIgnoredMethodHandle := runOnRequest(t, script, map[string]string{
 		":path":   "/public", // ignored path in defaultAuthPolicy
 		":method": "POST",    // not ignored method in defaultAuthPolicy
 	})
 
-	assert.Equal(t, "false", nonIgnoredMethodHandle[luascript.BypassOauthLoginHeaderName])
-	assert.Equal(t, "false", nonIgnoredMethodHandle[luascript.DenyRedirectHeaderName])
+	assert.Equal(t, "false", nonIgnoredMethodHandle[luascript.OAuth2FilterPassThroughHeaderName])
+	assert.Equal(t, "false", nonIgnoredMethodHandle[luascript.OAuth2FilterDenyRedirectHeaderName])
 }
 
 func TestGeneratedLuaScript_OnRequest_AuthRules_DoNotBypass(t *testing.T) {
@@ -166,16 +166,16 @@ func TestGeneratedLuaScript_OnRequest_AuthRules_DoNotBypass(t *testing.T) {
 		":method": "GET",
 	})
 
-	assert.Equal(t, "false", authRuleHandle[luascript.BypassOauthLoginHeaderName])
-	assert.Equal(t, "false", authRuleHandle[luascript.DenyRedirectHeaderName])
+	assert.Equal(t, "false", authRuleHandle[luascript.OAuth2FilterPassThroughHeaderName])
+	assert.Equal(t, "false", authRuleHandle[luascript.OAuth2FilterDenyRedirectHeaderName])
 
 	noRuleHandle := runOnRequest(t, script, map[string]string{
 		":path":   "/noRulesHere",
 		":method": "GET",
 	})
 
-	assert.Equal(t, "false", noRuleHandle[luascript.BypassOauthLoginHeaderName])
-	assert.Equal(t, "false", noRuleHandle[luascript.DenyRedirectHeaderName])
+	assert.Equal(t, "false", noRuleHandle[luascript.OAuth2FilterPassThroughHeaderName])
+	assert.Equal(t, "false", noRuleHandle[luascript.OAuth2FilterDenyRedirectHeaderName])
 }
 
 func TestGeneratedLuaScript_OnRequest_AutoLoginPaths_DoNotBypass(t *testing.T) {
@@ -190,8 +190,8 @@ func TestGeneratedLuaScript_OnRequest_AutoLoginPaths_DoNotBypass(t *testing.T) {
 				":method": "GET",
 			})
 
-			assert.Equal(t, "false", handle[luascript.BypassOauthLoginHeaderName])
-			assert.Equal(t, "false", handle[luascript.DenyRedirectHeaderName])
+			assert.Equal(t, "false", handle[luascript.OAuth2FilterPassThroughHeaderName])
+			assert.Equal(t, "false", handle[luascript.OAuth2FilterDenyRedirectHeaderName])
 		})
 	}
 }
@@ -204,7 +204,7 @@ func TestGeneratedLuaScript_OnRequest_QueryStringStrippedBeforeMatching(t *testi
 		":method": "GET",             // ignored path in defaultAuthPolicy
 	})
 
-	assert.Equal(t, "true", handle[luascript.BypassOauthLoginHeaderName])
+	assert.Equal(t, "true", handle[luascript.OAuth2FilterPassThroughHeaderName])
 }
 
 func TestGeneratedLuaScript_OnRequest_DenyRedirectDoesNotRedirect(t *testing.T) {
@@ -222,8 +222,8 @@ func TestGeneratedLuaScript_OnRequest_DenyRedirectDoesNotRedirect(t *testing.T) 
 		":method": "GET",
 	})
 
-	assert.Equal(t, "false", handle[luascript.BypassOauthLoginHeaderName])
-	assert.Equal(t, "true", handle[luascript.DenyRedirectHeaderName])
+	assert.Equal(t, "false", handle[luascript.OAuth2FilterPassThroughHeaderName])
+	assert.Equal(t, "true", handle[luascript.OAuth2FilterDenyRedirectHeaderName])
 }
 
 func TestGeneratedLuaScript_OnResponse_DoesNotRedirectNon302Responses(t *testing.T) {
@@ -298,7 +298,7 @@ func TestGeneratedLuaScript_OnRequest_SingleSegmentWildcard_MatchesOneSegment(t 
 	script := luascript.GenerateLuaScript(policy, defaultAutoLoginConfig(), defaultIdpUris())
 
 	handle := runOnRequest(t, script, map[string]string{":path": "/api/v1/items", ":method": "GET"})
-	assert.Equal(t, "true", handle[luascript.BypassOauthLoginHeaderName], "/api/v1/items should be public")
+	assert.Equal(t, "true", handle[luascript.OAuth2FilterPassThroughHeaderName], "/api/v1/items should be public")
 
 	invalidPaths := []string{
 		"/api/v1/extra/items",
@@ -307,7 +307,7 @@ func TestGeneratedLuaScript_OnRequest_SingleSegmentWildcard_MatchesOneSegment(t 
 	for _, path := range invalidPaths {
 		t.Run(path, func(t *testing.T) {
 			handle = runOnRequest(t, script, map[string]string{":path": path, ":method": "GET"})
-			assert.Equal(t, "false", handle[luascript.BypassOauthLoginHeaderName], "%s should not match {*}", path)
+			assert.Equal(t, "false", handle[luascript.OAuth2FilterPassThroughHeaderName], "%s should not match {*}", path)
 		})
 	}
 }
@@ -329,7 +329,7 @@ func TestGeneratedLuaScript_OnRequest_DoubleStarWildcard_MatchesMultipleSegments
 	for _, path := range validPaths {
 		t.Run(path, func(t *testing.T) {
 			handle := runOnRequest(t, script, map[string]string{":path": path, ":method": "GET"})
-			assert.Equal(t, "true", handle[luascript.BypassOauthLoginHeaderName], "%s should match /api/{**}", path)
+			assert.Equal(t, "true", handle[luascript.OAuth2FilterPassThroughHeaderName], "%s should match /api/{**}", path)
 		})
 	}
 }
@@ -352,7 +352,7 @@ func TestGeneratedLuaScript_OnRequest_LegacyStarWildcard_MatchesMultipleSegments
 	for _, path := range validPaths {
 		t.Run(path, func(t *testing.T) {
 			handle := runOnRequest(t, script, map[string]string{":path": path, ":method": "GET"})
-			assert.Equal(t, "true", handle[luascript.BypassOauthLoginHeaderName], "%s should match /api/{**}", path)
+			assert.Equal(t, "true", handle[luascript.OAuth2FilterPassThroughHeaderName], "%s should match /api/{**}", path)
 		})
 	}
 }
@@ -603,7 +603,7 @@ func TestGeneratedLuaScript_OnRequest_LogoutPath_CrossSiteIsRejected(t *testing.
 
 			if tt.wantRejected {
 				assert.Equal(t, "403", result["responded-status"])
-				assert.NotContains(t, result, luascript.BypassOauthLoginHeaderName)
+				assert.NotContains(t, result, luascript.OAuth2FilterPassThroughHeaderName)
 			} else {
 				assert.NotContains(t, result, "responded-status")
 			}
