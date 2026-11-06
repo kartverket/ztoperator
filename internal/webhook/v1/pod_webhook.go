@@ -7,7 +7,7 @@ import (
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/names"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
+	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -111,7 +111,7 @@ func MountEnvoySecret(pod *corev1.Pod, authPolicy v1alpha1.AuthPolicy) {
 	})
 	proxy.VolumeMounts = append(proxy.VolumeMounts, corev1.VolumeMount{
 		Name:      EnvoySecretVolumeName,
-		MountPath: configpatch.IstioCredentialsDirectory,
+		MountPath: constants.EnvoyOAuth2CredentialsDirectory,
 		ReadOnly:  true,
 	})
 }
