@@ -1,0 +1,40 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: webhook-sidecar-injection-disabled
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+        skip.kartverket.no/skip-managed: "true"
+  steps:
+    - try:
+        - create:
+            file: authpolicy.yaml
+        - assert:
+            resource:
+              apiVersion: ztoperator.kartverket.no/v1alpha1
+              kind: AuthPolicy
+              metadata:
+                name: auth-policy
+              status:
+                ready: true
+        - create:
+            file: application.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: ServiceAccount
+              metadata:
+                name: app-no-sidecar
+        # Restart to clear stale conditions from before the AuthPolicy was ready
+        - script:
+            content: kubectl delete replicaset -n $NAMESPACE -l app=app-no-sidecar --ignore-not-found
+        - assert:
+            file: replicaset-assert.yaml
+        - error:
+            file: pod.yaml

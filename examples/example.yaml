@@ -15,22 +15,8 @@ spec:
   podSettings:
     annotations:
       ztoperator.kartverket.no/verify-authpolicy: "true"
+      ztoperator.kartverket.no/inject: "true"
       sidecar.istio.io/logLevel: 'debug'
-      sidecar.istio.io/userVolume: '[
-        {
-          "name": "secret",
-          "secret": {
-            "secretName": "auth-policy-envoy-secret"
-          }
-        }        
-      ]'
-      sidecar.istio.io/userVolumeMount: '[
-        {
-          "name": "secret",
-          "mountPath": "/etc/istio/config",
-          "readonly": true
-        }        
-      ]'
   image: hashicorp/http-echo:latest
   port: 5678
   replicas: 1

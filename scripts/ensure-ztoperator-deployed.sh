@@ -9,10 +9,12 @@ NAMESPACE="ztoperator-system"
 DEPLOYMENT="ztoperator"
 
 VALIDATING_CFG="ztoperator-validating-webhook-configuration"
+MUTATING_CFG="ztoperator-mutating-webhook-configuration"
 
 EXPECTED_SVC="webhook-service"
 EXPECTED_AUTHPOLICY_WEBHOOK_NAME="vauthpolicy-v1alpha1.kb.io"
 EXPECTED_WEBHOOK_NAME="vpod-v1.kb.io"
+EXPECTED_MUTATING_WEBHOOK_NAME="mpod-v1.kb.io"
 EXPECTED_SELECTOR_KEY="skip.kartverket.no/skip-managed"
 EXPECTED_SELECTOR_VALUE="true"
 
@@ -121,6 +123,13 @@ check_webhook \
   "$VALIDATING_CFG" \
   "Validating" \
   "$EXPECTED_WEBHOOK_NAME" \
+  "true"
+
+check_webhook \
+  "mutatingwebhookconfiguration" \
+  "$MUTATING_CFG" \
+  "Mutating" \
+  "$EXPECTED_MUTATING_WEBHOOK_NAME" \
   "true"
 
 echo "🎉 Ztoperator is deployed and ready to reconcile."

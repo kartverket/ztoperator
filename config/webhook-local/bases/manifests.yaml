@@ -1,4 +1,48 @@
 apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: ztoperator-mutating-webhook-configuration
+  annotations:
+    cert-manager.io/inject-ca-from: "ztoperator-system/webhook-cert"
+webhooks:
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      url: https://host.docker.internal:9443/mutate--v1-pod
+    name: mpod-v1.kb.io
+    failurePolicy: Fail
+    reinvocationPolicy: IfNeeded
+    rules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+        resources:
+          - pods
+    sideEffects: None
+    namespaceSelector:
+      matchExpressions:
+        - key: skip.kartverket.no/skip-managed
+          operator: In
+          values:
+            - "true"
+    matchConditions:
+      - name: has-ztoperator-annotation-prefix
+        expression: >
+          object != null &&
+          object.metadata != null &&
+          ('annotations' in object.metadata) &&
+          object.metadata.annotations.exists(k, k.startsWith("ztoperator.kartverket.no/"))
+      - name: has-skiperator-app-label
+        expression: >
+          object != null &&
+          object.metadata != null &&
+          ('labels' in object.metadata) &&
+          ('application.skiperator.no/app-name' in object.metadata.labels)
+---
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: ztoperator-validating-webhook-configuration

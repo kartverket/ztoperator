@@ -339,4 +339,71 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			Expect(msg).To(BeEmpty())
 		})
 	})
+
+	Describe("MountEnvoySecret", func() {
+		const secretName = "auth-policy-envoy-secret"
+
+		newAuthPolicy := func(enabled, autoLoginEnabled bool) ztoperatorv1.AuthPolicy {
+			return ztoperatorv1.AuthPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "auth-policy", Namespace: "default"},
+				Spec: ztoperatorv1.AuthPolicySpec{
+					Enabled:   enabled,
+					AutoLogin: &ztoperatorv1.AutoLogin{Enabled: autoLoginEnabled},
+				},
+			}
+		}
+		newPod := func(containers, initContainers []corev1.Container) *corev1.Pod {
+			return &corev1.Pod{Spec: corev1.PodSpec{Containers: containers, InitContainers: initContainers}}
+		}
+		app := corev1.Container{Name: "app"}
+		proxy := corev1.Container{Name: "istio-proxy"}
+
+		DescribeTable("does not mutate the pod",
+			func(pod *corev1.Pod, enabled, autoLoginEnabled bool) {
+				before := pod.DeepCopy()
+				v1.MountEnvoySecret(pod, newAuthPolicy(enabled, autoLoginEnabled))
+				Expect(pod).To(Equal(before))
+			},
+			Entry("when the AuthPolicy is disabled", newPod([]corev1.Container{app, proxy}, nil), false, true),
+			Entry("when auto-login is disabled", newPod([]corev1.Container{app, proxy}, nil), true, false),
+			Entry("when istio has not injected istio-proxy yet", newPod([]corev1.Container{app}, nil), true, true),
+			Entry("when the pod opts out of injection", func() *corev1.Pod {
+				pod := newPod([]corev1.Container{app, proxy}, nil)
+				pod.Labels = map[string]string{"sidecar.istio.io/inject": "false"}
+				return pod
+			}(), true, true),
+			Entry("when the Istio mount annotations are set", func() *corev1.Pod {
+				pod := newPod([]corev1.Container{app, proxy}, nil)
+				pod.Annotations = map[string]string{"sidecar.istio.io/userVolumeMount": "[]"}
+				return pod
+			}(), true, true),
+		)
+
+		DescribeTable("mounts the secret read-only in istio-proxy",
+			func(pod *corev1.Pod, proxyContainers func(*corev1.Pod) []corev1.Container) {
+				v1.MountEnvoySecret(pod, newAuthPolicy(true, true))
+				Expect(pod.Spec.Volumes).To(HaveLen(1))
+				Expect(pod.Spec.Volumes[0].Secret.SecretName).To(Equal(secretName))
+				Expect(proxyContainers(pod)).To(ContainElement(SatisfyAll(
+					HaveField("Name", "istio-proxy"),
+					HaveField("VolumeMounts", ConsistOf(SatisfyAll(
+						HaveField("MountPath", "/etc/istio/config"),
+						HaveField("ReadOnly", true),
+					))),
+				)))
+			},
+			Entry("regular container", newPod([]corev1.Container{app, proxy}, nil),
+				func(pod *corev1.Pod) []corev1.Container { return pod.Spec.Containers }),
+			Entry("native sidecar init container", newPod([]corev1.Container{app}, []corev1.Container{proxy}),
+				func(pod *corev1.Pod) []corev1.Container { return pod.Spec.InitContainers }),
+		)
+
+		It("is idempotent when reinvoked", func() {
+			pod := newPod([]corev1.Container{app, proxy}, nil)
+			v1.MountEnvoySecret(pod, newAuthPolicy(true, true))
+			v1.MountEnvoySecret(pod, newAuthPolicy(true, true))
+			Expect(pod.Spec.Volumes).To(HaveLen(1))
+			Expect(pod.Spec.Containers[1].VolumeMounts).To(HaveLen(1))
+		})
+	})
 })
