@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/kartverket/ztoperator/internal/names"
+	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
 	"github.com/kartverket/ztoperator/pkg/model"
@@ -13,7 +14,6 @@ import (
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/require"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
@@ -59,8 +59,8 @@ func secretResource(scope *model.Scope) ControllerResourceAdapter[*v1.Secret] {
 }
 
 func SecretShouldUpdate(current, desired *v1.Secret) bool {
-	desiredTokenSecret, hasDesired := desired.Data[configpatch.TokenSecretFileName]
-	currentTokenSecret, hasCurrent := current.Data[configpatch.TokenSecretFileName]
+	desiredTokenSecret, hasDesired := desired.Data[constants.EnvoyOAuth2TokenSecretFileName]
+	currentTokenSecret, hasCurrent := current.Data[constants.EnvoyOAuth2TokenSecretFileName]
 	return !hasDesired || !hasCurrent || !bytes.Equal(currentTokenSecret, desiredTokenSecret) ||
 		labelsNeedUpdate(current, desired)
 }

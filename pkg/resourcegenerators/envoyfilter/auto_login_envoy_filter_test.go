@@ -3,6 +3,8 @@ package envoyfilter_test
 import (
 	"testing"
 
+	"github.com/kartverket/ztoperator/pkg/envoy"
+	"github.com/kartverket/ztoperator/pkg/envoy/httpfilter"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/model"
 	"istio.io/api/networking/v1alpha3"
@@ -71,37 +73,34 @@ func TestGetDesired_ProducesExactlyThreeConfigPatches(t *testing.T) {
 	assert.Len(t, ef.Spec.ConfigPatches, 3)
 }
 
-// patch[0]: Lua filter — inserted before jwt_authn in the inbound sidecar HTTP chain.
 func TestGetDesired_LuaPatch_ApplyToAndOperation(t *testing.T) {
 	ef := envoyfilter.GetDesired(helperfunctions.Ptr(defaultScope()), defaultObjectMeta())
 
 	require.NotNil(t, ef)
-	p := ef.Spec.ConfigPatches[0]
-	assert.Equal(t, v1alpha3.EnvoyFilter_HTTP_FILTER, p.ApplyTo)
+	p := findHttpFilterPatch(t, ef.Spec.ConfigPatches, httpfilter.EnvoyExtensionHttpFilterLua)
 	assert.Equal(t, v1alpha3.EnvoyFilter_Patch_INSERT_BEFORE, p.Patch.Operation)
 	assert.Equal(t, v1alpha3.EnvoyFilter_SIDECAR_INBOUND, p.Match.Context)
 
 	filterName := p.Match.GetListener().GetFilterChain().GetFilter().GetName()
 	assert.Equal(t, "envoy.filters.network.http_connection_manager", filterName)
+	assert.Nil(t, p.Match.GetListener().GetFilterChain().GetFilter().GetSubFilter())
 }
 
-// patch[1]: OAuth cluster — added to the cluster list.
+// OAuth token endpoint cluster — added to the cluster list.
 func TestGetDesired_ClusterPatch_ApplyToAndOperation(t *testing.T) {
 	ef := envoyfilter.GetDesired(helperfunctions.Ptr(defaultScope()), defaultObjectMeta())
 
 	require.NotNil(t, ef)
-	p := ef.Spec.ConfigPatches[1]
-	assert.Equal(t, v1alpha3.EnvoyFilter_CLUSTER, p.ApplyTo)
+	p := findClusterPatch(t, ef.Spec.ConfigPatches, envoy.TokenEndpointClusterName)
 	assert.Equal(t, v1alpha3.EnvoyFilter_Patch_ADD, p.Patch.Operation)
 }
 
-// patch[2]: OAuth2 sidecar filter — inserted before jwt_authn in the inbound sidecar HTTP chain.
+// OAuth2 sidecar filter — inserted before jwt_authn in the inbound sidecar HTTP chain.
 func TestGetDesired_OAuthSidecarPatch_ApplyToAndOperation(t *testing.T) {
 	ef := envoyfilter.GetDesired(helperfunctions.Ptr(defaultScope()), defaultObjectMeta())
 
 	require.NotNil(t, ef)
-	p := ef.Spec.ConfigPatches[2]
-	assert.Equal(t, v1alpha3.EnvoyFilter_HTTP_FILTER, p.ApplyTo)
+	p := findHttpFilterPatch(t, ef.Spec.ConfigPatches, httpfilter.EnvoyExtensionHttpFilterOAuth2)
 	assert.Equal(t, v1alpha3.EnvoyFilter_Patch_INSERT_BEFORE, p.Patch.Operation)
 	assert.Equal(t, v1alpha3.EnvoyFilter_SIDECAR_INBOUND, p.Match.Context)
 
@@ -118,7 +117,7 @@ func TestGetDesired_InternalIdP_ClusterPatchHasNoTLS(t *testing.T) {
 	ef := envoyfilter.GetDesired(&scope, defaultObjectMeta())
 
 	require.NotNil(t, ef)
-	clusterValue := ef.Spec.ConfigPatches[1].Patch.Value.AsMap()
+	clusterValue := findClusterPatch(t, ef.Spec.ConfigPatches, envoy.TokenEndpointClusterName).Patch.Value.AsMap()
 	_, hasTransportSocket := clusterValue["transport_socket"]
 	assert.False(t, hasTransportSocket, "internal IdP cluster should not have TLS transport_socket")
 }
@@ -130,10 +129,45 @@ func TestGetDesired_ExternalIdP_ClusterPatchHasTLS(t *testing.T) {
 	ef := envoyfilter.GetDesired(&scope, defaultObjectMeta())
 
 	require.NotNil(t, ef)
-	clusterValue := ef.Spec.ConfigPatches[1].Patch.Value.AsMap()
+	clusterValue := findClusterPatch(t, ef.Spec.ConfigPatches, envoy.TokenEndpointClusterName).Patch.Value.AsMap()
 	ts, ok := clusterValue["transport_socket"].(map[string]interface{})
 	require.True(t, ok, "external IdP cluster must have transport_socket")
 	assert.Equal(t, "envoy.transport_sockets.tls", ts["name"])
+}
+
+func findConfigPatch(
+	t *testing.T,
+	patches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch,
+	applyTo v1alpha3.EnvoyFilter_ApplyTo,
+	name string,
+) *v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
+	t.Helper()
+	var found []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch
+	for _, p := range patches {
+		if p.GetApplyTo() == applyTo && p.GetPatch().GetValue().GetFields()["name"].GetStringValue() == name {
+			found = append(found, p)
+		}
+	}
+	require.Len(t, found, 1, "expected exactly one %s config patch named %q", applyTo, name)
+	return found[0]
+}
+
+func findHttpFilterPatch(
+	t *testing.T,
+	patches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch,
+	name string,
+) *v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
+	t.Helper()
+	return findConfigPatch(t, patches, v1alpha3.EnvoyFilter_HTTP_FILTER, name)
+}
+
+func findClusterPatch(
+	t *testing.T,
+	patches []*v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch,
+	name string,
+) *v1alpha3.EnvoyFilter_EnvoyConfigObjectPatch {
+	t.Helper()
+	return findConfigPatch(t, patches, v1alpha3.EnvoyFilter_CLUSTER, name)
 }
 
 func defaultScope() model.Scope {
