@@ -6,3 +6,5 @@ prefix: ztoperator-
 fieldSpecs:
   - path: metadata/name
     kind: ValidatingWebhookConfiguration
+  - path: metadata/name
+    kind: MutatingWebhookConfiguration

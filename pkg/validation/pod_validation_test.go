@@ -117,11 +117,27 @@ func TestValidatePod_SecretMountedInIstioProxy_ReturnsNil(t *testing.T) {
 	}
 }
 
+func TestValidatePod_AuthPolicyDisabled_DoesNotRequireMount(t *testing.T) {
+	authPolicy := buildAuthPolicy(true, false)
+	if err := validation.ValidatePod(podWith(nil, nil, nil), authPolicy); err != nil {
+		t.Errorf("expected nil when the AuthPolicy is disabled and no Envoy secret exists, got: %v", err)
+	}
+}
+
 func TestValidatePod_InjectLabelTakesPrecedenceOverAnnotation(t *testing.T) {
 	pod := podWith(nil, nil, map[string]string{validation.IstioInjectKey: "false"})
 	pod.Labels = map[string]string{validation.IstioInjectKey: "true"}
 	if err := validation.ValidatePod(pod, buildAuthPolicy(false, true)); err != nil {
 		t.Errorf("expected nil when label inject=true overrides annotation, got: %v", err)
+	}
+}
+
+func TestIsSidecarInjectionDisabled_OnlyExactFalseDisables(t *testing.T) {
+	for value, want := range map[string]bool{"false": true, "FALSE": false, "no": false, "true": false, "": false} {
+		pod := podWith(nil, nil, map[string]string{validation.IstioInjectKey: value})
+		if got := validation.IsSidecarInjectionDisabled(pod); got != want {
+			t.Errorf("inject=%q: got disabled=%v, want %v", value, got, want)
+		}
 	}
 }
 

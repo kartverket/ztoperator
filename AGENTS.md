@@ -73,7 +73,7 @@ Controller.Reconcile()
 | `internal/eventhandler/pod/` | Watches Pods → enqueues all AuthPolicies in the same namespace for re-reconciliation |
 | `internal/eventhandler/secret/` | Watches Secrets → same re-reconciliation trigger |
 | `internal/eventhandler/configmap/` | Watches ConfigMaps → same re-reconciliation trigger |
-| `internal/webhook/` | Admission webhooks: `pod_webhook.go` (mutating) and `authpolicy_config.go` (validating/defaulting) |
+| `internal/webhook/` | Admission webhooks: `pod_webhook.go` (mutating + validating) and `authpolicy_config.go` (validating/defaulting) |
 | `pkg/resourcegenerators/` | Desired-state generators for each child resource type |
 | `pkg/resourcegenerators/envoyfilter/` | EnvoyFilter generation (OAuth2 filter + Lua filter config patches) |
 | `pkg/resourcegenerators/authorizationpolicy/` | Split into `deny/`, `ignore/`, `require/` sub-packages |
@@ -218,13 +218,13 @@ Ztoperator works alongside Skiperator (`skiperator.kartverket.no/v1alpha1`):
 - The `examples/example.yaml` shows both an `Application` and an `AuthPolicy` working together.
 - Skiperator is installed in the local dev environment via `make skiperator` / `scripts/install-skiperator.sh`.
 
-### Pod Requirements
+### Mounting the Envoy Secret in the Istio Sidecar
 
-When `autoLogin` is enabled, the generated envoy secret (`<authpolicy-name>-envoy-secret`) must be mounted at `/etc/istio/config` in the `istio-proxy` container. Users currently do this with Istio annotations:
-- `sidecar.istio.io/userVolume`: JSON array with secret volume referencing `<authpolicy-name>-envoy-secret`
-- `sidecar.istio.io/userVolumeMount`: JSON array mounting at `/etc/istio/config`
-
-The validating pod webhook runs after all mutations and only checks the resulting pod spec (an `istio-proxy` container mounting the secret at `/etc/istio/config`), regardless of how the mount got there. It also rejects pods with `sidecar.istio.io/inject: "false"` (label or annotation) when the AuthPolicy is enabled, since the policy would not be enforced.
+When `autoLogin` is enabled, the generated envoy secret (`<authpolicy-name>-envoy-secret`) must be mounted at `/etc/istio/config` in the `istio-proxy` container.
+The mutating pod webhook (`PodCustomDefaulter` in `internal/webhook/v1/pod_webhook.go`) does this: it adds a secret volume and a read-only mount to the `istio-proxy` container (in `containers` or, for native sidecars, `initContainers`). If Istio has not injected the sidecar yet it does nothing; `reinvocationPolicy: IfNeeded` makes the API server call the webhook again once Istio has mutated the pod.
+It does nothing if the user has set `sidecar.istio.io/userVolume`/`userVolumeMount` annotations (legacy approach) or if the secret is already mounted in `istio-proxy`.
+The validating webhook runs after all mutations and only checks the resulting pod spec (an `istio-proxy` container mounting the secret at `/etc/istio/config`), regardless of whether it came from Istio's annotations, our webhook or a hand-written spec. It also rejects pods with `sidecar.istio.io/inject: "false"` (label or annotation) when the AuthPolicy is enabled, since the policy would not be enforced.
+Both webhooks only apply to Skiperator-managed pods with a `ztoperator.kartverket.no/` annotation in `skip.kartverket.no/skip-managed` namespaces. The mutating webhook acts on `ztoperator.kartverket.no/inject: "true"`, the validating webhook on `ztoperator.kartverket.no/verify-authpolicy: "true"`; either one makes the webhook look up the pod's AuthPolicy (rejecting the pod if there is none), see `docs/adr`.
 
 ## Local Development
 
