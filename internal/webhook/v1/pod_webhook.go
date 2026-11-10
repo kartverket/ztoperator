@@ -2,15 +2,18 @@ package v1
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/names"
+	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/constants"
+	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/validation"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -69,9 +72,29 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error
 		return nil
 	}
 
-	if isAnnotationEnabled(pod, ZtoperatorInjectAnnotationKey) {
-		MountEnvoySecret(pod, podAuthPolicyConfiguration.AuthPolicy)
+	if !isAnnotationEnabled(pod, ZtoperatorInjectAnnotationKey) {
+		return nil
 	}
+
+	if config.Get().FeatureIstioAmbient {
+		podKey := types.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      pod.Name,
+		}
+		isAmbient, isIstioAmbientErr := isIstioAmbientPod(ctx, d.Client, pod)
+		if isIstioAmbientErr != nil {
+			msg := "failed to determine whether pod is Istio Ambient enabled"
+			podlog.Error(isIstioAmbientErr, msg, "pod", podKey)
+			return errors.New(msg)
+		}
+		if isAmbient {
+			podlog.Info("Pod is Istio Ambient enabled, skipping mutation", "pod", podKey)
+			return nil
+		}
+	}
+
+	MountEnvoySecret(pod, podAuthPolicyConfiguration.AuthPolicy)
+
 	return nil
 }
 
@@ -149,6 +172,10 @@ func (v *PodCustomValidator) ValidateDelete(_ context.Context, pod *corev1.Pod) 
 
 func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) (admission.Warnings, error) {
 	podlog.Info("Validating for Pod", "name", pod.GetName())
+	podKey := types.NamespacedName{
+		Namespace: pod.Namespace,
+		Name:      pod.Name,
+	}
 
 	isPodWebhookEligible, errMsg := IsWebhookEligible(ctx, k8sClient, *pod)
 	if !isPodWebhookEligible {
@@ -159,10 +186,7 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 			),
 			"received validating webhook request for pod that is not eligible for Ztoperator webhook processing",
 			"pod",
-			types.NamespacedName{
-				Namespace: pod.GetNamespace(),
-				Name:      pod.GetName(),
-			},
+			podKey,
 		)
 		return nil, nil
 	}
@@ -173,10 +197,7 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 	}
 	if !podAuthPolicyConfiguration.CreatedFromSkiperatorApplication {
 		// Only validate Pods that are created from Skiperator Applications.
-		podlog.Info("Pod is not created from Skiperator Application, skipping validation", "pod", types.NamespacedName{
-			Namespace: pod.Namespace,
-			Name:      pod.Name,
-		})
+		podlog.Info("Pod is not created from Skiperator Application, skipping validation", "pod", podKey)
 		return nil, nil
 	}
 
@@ -184,8 +205,30 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 		return nil, nil
 	}
 
+	if config.Get().FeatureIstioAmbient {
+		isAmbient, isIstioAmbientErr := isIstioAmbientPod(ctx, k8sClient, pod)
+		if isIstioAmbientErr != nil {
+			msg := "failed to determine whether pod is Istio Ambient enabled"
+			podlog.Error(isIstioAmbientErr, msg, "pod", podKey)
+			return nil, errors.New(msg)
+		}
+		if isAmbient {
+			podlog.Info("Pod is Istio Ambient enabled, skipping validation", "pod", podKey)
+			return nil, nil
+		}
+	}
+
 	// Validate the final pod spec (after all mutating webhooks) against the AuthPolicy.
 	return nil, validation.ValidatePod(pod, podAuthPolicyConfiguration.AuthPolicy)
+}
+
+func isIstioAmbientPod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) (bool, error) {
+	namespace, err := helperfunctions.GetNamespace(ctx, k8sClient, pod.Namespace)
+	if err != nil {
+		return false, fmt.Errorf("failed to get pod namespace %s: %w", pod.Namespace, err)
+	}
+	return helperfunctions.NamespaceIsIstioAmbientEligible(namespace) &&
+		helperfunctions.PodIsIstioAmbientEligible(*pod), nil
 }
 
 // PodAuthPolicyConfiguration holds all resolved security context for a Pod,
@@ -271,7 +314,7 @@ func IsWebhookEligible(ctx context.Context, k8sClient client.Client, pod corev1.
 	// Verify that the pod lies in a SKIP managed namespace
 	ns := &corev1.Namespace{}
 	if err := k8sClient.Get(ctx, client.ObjectKey{Name: pod.Namespace}, ns); err != nil {
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			return false, fmt.Sprintf("namespace %s not found", pod.Namespace)
 		}
 		return false, fmt.Sprintf("failed to get namespace %s: %s", pod.Namespace, err.Error())
