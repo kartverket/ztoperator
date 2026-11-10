@@ -7,6 +7,7 @@ import (
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/eventhandler/configmap"
+	"github.com/kartverket/ztoperator/internal/eventhandler/deployments"
 	"github.com/kartverket/ztoperator/internal/eventhandler/secret"
 	"github.com/kartverket/ztoperator/internal/predicates"
 	"github.com/kartverket/ztoperator/internal/reconciler"
@@ -20,7 +21,8 @@ import (
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
-	v1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sErrors "k8s.io/apimachinery/pkg/util/errors"
@@ -49,9 +51,11 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&istioclientsecurityv1.RequestAuthentication{}, builder.WithPredicates(predicates.SpecOrLabelsChanged())).
 		Owns(&istioclientsecurityv1.AuthorizationPolicy{}, builder.WithPredicates(predicates.SpecOrLabelsChanged())).
 		Owns(&v1alpha4.EnvoyFilter{}, builder.WithPredicates(predicates.SpecOrLabelsChanged())).
-		Owns(&v1.Secret{}, builder.WithPredicates(predicates.SecretContentOrLabelsChanged())).
-		Watches(&v1.Secret{}, secret.EventHandler(r.Client), builder.WithPredicates(predicates.SecretContentOrLabelsChanged())).
-		Watches(&v1.ConfigMap{}, configmap.EventHandler(r.Client), builder.WithPredicates(predicates.ConfigMapContentOrLabelsChanged())).
+		Owns(&corev1.Secret{}, builder.WithPredicates(predicates.SecretContentOrLabelsChanged())).
+		Owns(&corev1.ConfigMap{}, builder.WithPredicates(predicates.ConfigMapContentOrLabelsChanged())).
+		Watches(&corev1.Secret{}, secret.EventHandler(r.Client), builder.WithPredicates(predicates.SecretContentOrLabelsChanged())).
+		Watches(&corev1.ConfigMap{}, configmap.EventHandler(r.Client), builder.WithPredicates(predicates.ConfigMapContentOrLabelsChanged())).
+		Watches(&appsv1.Deployment{}, deployments.EventHandler(r.Client), builder.WithPredicates(predicates.DeploymentPodTemplateMetadataOrLabelsChanged())).
 		Complete(r)
 }
 
@@ -60,10 +64,10 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=ztoperator.kartverket.no,resources=authpolicies/finalizers,verbs=update
 // +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=core,resources=namespaces;pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch
 // +kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies;requestauthentications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
 
 func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	rLog := log.GetLogger(ctx)
