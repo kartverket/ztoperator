@@ -1,6 +1,7 @@
 package constants
 
 const (
+	EnvoyBootstrapUpstreamClusterName = "upstream"
 	EnvoyOAuth2TokenSecretFileName  = "token-secret.yaml"
 	EnvoyOAuth2HmacSecretFileName   = "hmac-secret.yaml"
 	EnvoyOAuth2CredentialsDirectory = "/etc/istio/config"
