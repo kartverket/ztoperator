@@ -13,6 +13,7 @@ import (
 	"github.com/kartverket/ztoperator/internal/reconciler"
 	"github.com/kartverket/ztoperator/internal/resolver"
 	"github.com/kartverket/ztoperator/internal/statusmanager"
+	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
 	"github.com/kartverket/ztoperator/pkg/log"
@@ -195,47 +196,106 @@ func resolveAuthPolicy(
 	authPolicy ztoperatorv1alpha1.AuthPolicy,
 ) (*model.Scope, error) {
 	rLog := log.GetLogger(ctx)
-	rLog.Info(fmt.Sprintf("Trying to resolve auth policy %s/%s", authPolicy.Namespace, authPolicy.Name))
+	rLog.Info(fmt.Sprintf("Trying to resolve AuthPolicy %s/%s", authPolicy.Namespace, authPolicy.Name))
 
-	oAuthCredentials, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
-	if err != nil {
-		return nil, err
+	scope := model.Scope{AuthPolicy: authPolicy}
+	if err := resolveCommon(ctx, k8sClient, &scope); err != nil {
+		return nil, fmt.Errorf("failed to resolve common AuthPolicy fields: %w", err)
 	}
-
-	rLog.Info(
-		fmt.Sprintf(
-			"Trying to resolve discovery document from well-known uri: %s for AuthPolicy with name %s/%s",
-			authPolicy.Spec.WellKnownURI,
-			authPolicy.Namespace,
-			authPolicy.Name,
-		),
-	)
-	identityProviderUris, errIdentityProviderUris := resolver.ResolveDiscoveryDocument(authPolicy)
-	if errIdentityProviderUris != nil {
-		return nil, errIdentityProviderUris
-	}
-
-	autoLoginConfig := resolver.ResolveAutoLoginConfig(authPolicy, *identityProviderUris)
-
-	resolvedAudiences, errAudiences := resolver.ResolveAudiences(
-		ctx,
-		k8sClient,
-		authPolicy.Namespace,
-		authPolicy.Spec.AllowedAudiences,
-	)
-	if errAudiences != nil {
-		return nil, fmt.Errorf("failed to resolve audiences: %w", errAudiences)
+	if config.Get().FeatureIstioAmbient {
+		istioAmbientConfig, err := resolveIstioAmbientConfig(ctx, k8sClient, &scope)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"failed to resolve Istio Ambient config for AuthPolicy %s/%s: %w",
+				authPolicy.Namespace,
+				authPolicy.Name,
+				err,
+			)
+		}
+		scope.IstioAmbientConfig = *istioAmbientConfig
 	}
 
 	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name %s/%s", authPolicy.Namespace, authPolicy.Name))
 
-	return &model.Scope{
-		Audiences:            *resolvedAudiences,
-		AuthPolicy:           authPolicy,
-		AutoLoginConfig:      autoLoginConfig,
-		OAuthCredentials:     *oAuthCredentials,
-		IdentityProviderUris: *identityProviderUris,
-	}, nil
+	return &scope, nil
+}
+
+func resolveCommon(
+	ctx context.Context,
+	k8sClient client.Client,
+	scope *model.Scope,
+) error {
+	identityProviderUris, errIdentityProviderUris := resolver.ResolveDiscoveryDocument(scope.AuthPolicy)
+	if errIdentityProviderUris != nil {
+		return errIdentityProviderUris
+	}
+	scope.IdentityProviderUris = *identityProviderUris
+
+	autoLoginConfig := resolver.ResolveAutoLoginConfig(scope.AuthPolicy, *identityProviderUris)
+	scope.AutoLoginConfig = autoLoginConfig
+
+	oAuthCredentials, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, scope.AuthPolicy)
+	if err != nil {
+		return err
+	}
+	scope.OAuthCredentials = *oAuthCredentials
+
+	resolvedAudiences, errAudiences := resolver.ResolveAudiences(
+		ctx,
+		k8sClient,
+		scope.AuthPolicy.Namespace,
+		scope.AuthPolicy.Spec.AllowedAudiences,
+	)
+	if errAudiences != nil {
+		return fmt.Errorf("failed to resolve audiences: %w", errAudiences)
+	}
+	scope.Audiences = *resolvedAudiences
+	return nil
+}
+
+func resolveIstioAmbientConfig(
+	ctx context.Context,
+	k8sClient client.Client,
+	scope *model.Scope,
+) (*model.IstioAmbientConfig, error) {
+	istioAmbientConfig := model.IstioAmbientConfig{Enabled: false}
+	namespace, err := helperfunctions.GetNamespace(ctx, k8sClient, scope.AuthPolicy.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to get namespace %s: %w",
+			scope.AuthPolicy.Namespace,
+			err,
+		)
+	}
+
+	deployment, err := helperfunctions.GetProtectedDeployment(ctx, k8sClient, scope.AuthPolicy)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to get deployment selected by AuthPolicy selector %v: %w",
+			scope.AuthPolicy.Spec.Selector,
+			err,
+		)
+	}
+
+	isIstioAmbientEnabled := helperfunctions.NamespaceIsIstioAmbientEligible(namespace) &&
+		helperfunctions.DeploymentIsIstioAmbientEligible(*deployment)
+
+	if isIstioAmbientEnabled {
+		envoyBootstrap, resolveEnvoyBootstrapErr := resolver.ResolveEnvoyBootstrap(
+			scope.AuthPolicy,
+			scope.AutoLoginConfig,
+			scope.OAuthCredentials,
+			scope.IdentityProviderUris,
+			scope.Audiences,
+			*deployment,
+		)
+		if resolveEnvoyBootstrapErr != nil {
+			return nil, resolveEnvoyBootstrapErr
+		}
+		istioAmbientConfig.Enabled = true
+		istioAmbientConfig.EnvoyBootstrap = envoyBootstrap
+	}
+	return &istioAmbientConfig, nil
 }
 
 func (r *AuthPolicyReconciler) failReconcile(
