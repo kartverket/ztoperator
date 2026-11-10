@@ -114,20 +114,13 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if !maps.Equal(originalAuthPolicy.Labels, authPolicy.Labels) {
 		err := r.Patch(ctx, originalAuthPolicy, client.MergeFrom(authPolicy))
 		if err != nil {
-			return ctrl.Result{}, err
+			return r.failReconcile(ctx, authPolicy, err, "failed to patch AuthPolicy with AuthPolicy standard labels")
 		}
 	}
 
 	scope, err := resolveAuthPolicy(ctx, r.Client, *authPolicy)
 	if err != nil {
-		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))
-		authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
-		authPolicy.Status.Message = err.Error()
-		updateStatusOnResolveFailedErr := statusmanager.UpdateStatus(ctx, r.Client, *authPolicy)
-		if updateStatusOnResolveFailedErr != nil {
-			return ctrl.Result{}, updateStatusOnResolveFailedErr
-		}
-		return reconcile.Result{}, err
+		return r.failReconcile(ctx, authPolicy, err, err.Error())
 	}
 
 	controllerResources := reconciler.ControllerResources(scope)
@@ -243,4 +236,20 @@ func resolveAuthPolicy(
 		OAuthCredentials:     *oAuthCredentials,
 		IdentityProviderUris: *identityProviderUris,
 	}, nil
+}
+
+func (r *AuthPolicyReconciler) failReconcile(
+	ctx context.Context,
+	authPolicy *ztoperatorv1alpha1.AuthPolicy,
+	err error,
+	errMsg string,
+) (ctrl.Result, error) {
+	rLog := log.GetLogger(ctx)
+	rLog.Error(err, errMsg)
+	authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
+	authPolicy.Status.Message = errMsg
+	if updateErr := statusmanager.UpdateStatus(ctx, r.Client, *authPolicy); updateErr != nil {
+		return ctrl.Result{}, updateErr
+	}
+	return ctrl.Result{}, err
 }
