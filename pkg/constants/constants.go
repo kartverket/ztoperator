@@ -16,6 +16,7 @@ const (
 	IstioAmbientRedirectionKey    = "ambient.istio.io/redirection"
 	IstioAmbientRedirectionOptOut = "disabled"
 
+	EnvoyBootstrapConfigMapKey        = "envoy.json"
 	EnvoyBootstrapUpstreamClusterName = "upstream"
 
 	EnvoyOAuth2TokenSecretFileName  = "token-secret.yaml"

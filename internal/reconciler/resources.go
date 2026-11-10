@@ -13,12 +13,14 @@ import (
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/deny"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/ignore"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/authorizationpolicy/require"
+	"github.com/kartverket/ztoperator/pkg/resourcegenerators/configmap"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/requestauthentication"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -31,6 +33,7 @@ func ControllerResources(scope *model.Scope) []reconciliation.ControllerResource
 		denyAuthorizationPolicyResource(scope),
 		ignoreAuthorizationPolicyResource(scope),
 		requireAuthorizationPolicyResource(scope),
+		envoyBootstrapConfigMap(scope),
 	}
 }
 
@@ -38,15 +41,15 @@ func ControllerResources(scope *model.Scope) []reconciliation.ControllerResource
 secretResource reconciles a Secret resource containing a HMAC secret (cookie signing key) and token secret
 (OAuth client secret), if auto-login is enabled. The secrets are used by Envoy during Authorization Code Flow.
 */
-func secretResource(scope *model.Scope) ControllerResourceAdapter[*v1.Secret] {
+func secretResource(scope *model.Scope) ControllerResourceAdapter[*corev1.Secret] {
 	desiredResource := secret.GetDesired(
 		scope,
 		buildObjectMeta(scope.AutoLoginConfig.EnvoySecretName, scope.AuthPolicy.Namespace),
 	)
 
-	return ControllerResourceAdapter[*v1.Secret]{
-		reconciliation.ReconcilerAdapter[*v1.Secret]{
-			Func: reconciliation.ResourceReconciler[*v1.Secret]{
+	return ControllerResourceAdapter[*corev1.Secret]{
+		reconciliation.ReconcilerAdapter[*corev1.Secret]{
+			Func: reconciliation.ResourceReconciler[*corev1.Secret]{
 				ResourceKind:    "Secret",
 				ResourceName:    scope.AutoLoginConfig.EnvoySecretName,
 				DesiredResource: helperfunctions.Ptr(desiredResource),
@@ -58,14 +61,14 @@ func secretResource(scope *model.Scope) ControllerResourceAdapter[*v1.Secret] {
 	}
 }
 
-func SecretShouldUpdate(current, desired *v1.Secret) bool {
+func SecretShouldUpdate(current, desired *corev1.Secret) bool {
 	desiredTokenSecret, hasDesired := desired.Data[constants.EnvoyOAuth2TokenSecretFileName]
 	currentTokenSecret, hasCurrent := current.Data[constants.EnvoyOAuth2TokenSecretFileName]
 	return !hasDesired || !hasCurrent || !bytes.Equal(currentTokenSecret, desiredTokenSecret) ||
 		labelsNeedUpdate(current, desired)
 }
 
-func SecretUpdateFields(current, desired *v1.Secret) {
+func SecretUpdateFields(current, desired *corev1.Secret) {
 	current.Data = desired.Data
 	current.Labels = desired.Labels
 }
@@ -76,17 +79,20 @@ behavior for unauthenticated requests when enabled. The EnvoyFilter handles OAut
 */
 func envoyFilterResource(scope *model.Scope) ControllerResourceAdapter[*v1alpha4.EnvoyFilter] {
 	autoLoginEnvoyFilterName := names.EnvoyFilter(scope.AuthPolicy.Name)
-	desiredResource := envoyfilter.GetDesired(
-		scope,
-		buildObjectMeta(autoLoginEnvoyFilterName, scope.AuthPolicy.Namespace),
-	)
+	var desiredResource *v1alpha4.EnvoyFilter
+	if !scope.IstioAmbientConfig.Enabled {
+		desiredResource = envoyfilter.GetDesired(
+			scope,
+			buildObjectMeta(autoLoginEnvoyFilterName, scope.AuthPolicy.Namespace),
+		)
+	}
 
 	return ControllerResourceAdapter[*v1alpha4.EnvoyFilter]{
 		reconciliation.ReconcilerAdapter[*v1alpha4.EnvoyFilter]{
 			Func: reconciliation.ResourceReconciler[*v1alpha4.EnvoyFilter]{
 				ResourceKind:    "EnvoyFilter",
 				ResourceName:    autoLoginEnvoyFilterName,
-				DesiredResource: helperfunctions.Ptr(desiredResource),
+				DesiredResource: new(desiredResource),
 				Scope:           scope,
 				ShouldUpdate:    EnvoyFilterShouldUpdate,
 				UpdateFields:    EnvoyFilterUpdateFields,
@@ -120,17 +126,20 @@ func requestAuthenticationResource(
 	scope *model.Scope,
 ) ControllerResourceAdapter[*istioclientsecurityv1.RequestAuthentication] {
 	requestAuthenticationName := scope.AuthPolicy.Name
-	desiredResource := requestauthentication.GetDesired(
-		scope,
-		buildObjectMeta(requestAuthenticationName, scope.AuthPolicy.Namespace),
-	)
+	var desiredResource *istioclientsecurityv1.RequestAuthentication
+	if !scope.IstioAmbientConfig.Enabled {
+		desiredResource = requestauthentication.GetDesired(
+			scope,
+			buildObjectMeta(requestAuthenticationName, scope.AuthPolicy.Namespace),
+		)
+	}
 
 	return ControllerResourceAdapter[*istioclientsecurityv1.RequestAuthentication]{
 		reconciliation.ReconcilerAdapter[*istioclientsecurityv1.RequestAuthentication]{
 			Func: reconciliation.ResourceReconciler[*istioclientsecurityv1.RequestAuthentication]{
 				ResourceKind:    "RequestAuthentication",
 				ResourceName:    requestAuthenticationName,
-				DesiredResource: helperfunctions.Ptr(desiredResource),
+				DesiredResource: new(desiredResource),
 				Scope:           scope,
 				ShouldUpdate:    RequestAuthenticationShouldUpdate,
 				UpdateFields:    RequestAuthenticationUpdateFields,
@@ -160,17 +169,20 @@ func denyAuthorizationPolicyResource(
 	scope *model.Scope,
 ) ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
 	denyAuthorizationPolicyName := names.DenyPolicy(scope.AuthPolicy.Name)
-	desiredResource := deny.GetDesired(
-		scope,
-		buildObjectMeta(denyAuthorizationPolicyName, scope.AuthPolicy.Namespace),
-	)
+	var desiredResource *istioclientsecurityv1.AuthorizationPolicy
+	if !scope.IstioAmbientConfig.Enabled {
+		desiredResource = deny.GetDesired(
+			scope,
+			buildObjectMeta(denyAuthorizationPolicyName, scope.AuthPolicy.Namespace),
+		)
+	}
 
 	return ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
 		reconciliation.ReconcilerAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
 			Func: reconciliation.ResourceReconciler[*istioclientsecurityv1.AuthorizationPolicy]{
 				ResourceKind:    "AuthorizationPolicy",
 				ResourceName:    denyAuthorizationPolicyName,
-				DesiredResource: helperfunctions.Ptr(desiredResource),
+				DesiredResource: new(desiredResource),
 				Scope:           scope,
 				ShouldUpdate:    AuthorizationPolicyShouldUpdate,
 				UpdateFields:    AuthorizationPolicyUpdateFields,
@@ -188,17 +200,20 @@ func ignoreAuthorizationPolicyResource(
 	scope *model.Scope,
 ) ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
 	ignoreAuthAuthorizationPolicyName := names.IgnorePolicy(scope.AuthPolicy.Name)
-	desiredResource := ignore.GetDesired(
-		scope,
-		buildObjectMeta(ignoreAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
-	)
+	var desiredResource *istioclientsecurityv1.AuthorizationPolicy
+	if !scope.IstioAmbientConfig.Enabled {
+		desiredResource = ignore.GetDesired(
+			scope,
+			buildObjectMeta(ignoreAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
+		)
+	}
 
 	return ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
 		reconciliation.ReconcilerAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
 			Func: reconciliation.ResourceReconciler[*istioclientsecurityv1.AuthorizationPolicy]{
 				ResourceKind:    "AuthorizationPolicy",
 				ResourceName:    ignoreAuthAuthorizationPolicyName,
-				DesiredResource: helperfunctions.Ptr(desiredResource),
+				DesiredResource: new(desiredResource),
 				Scope:           scope,
 				ShouldUpdate:    AuthorizationPolicyShouldUpdate,
 				UpdateFields:    AuthorizationPolicyUpdateFields,
@@ -216,17 +231,20 @@ func requireAuthorizationPolicyResource(
 	scope *model.Scope,
 ) ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy] {
 	requireAuthAuthorizationPolicyName := names.RequirePolicy(scope.AuthPolicy.Name)
-	desiredResource := require.GetDesired(
-		scope,
-		buildObjectMeta(requireAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
-	)
+	var desiredResource *istioclientsecurityv1.AuthorizationPolicy
+	if !scope.IstioAmbientConfig.Enabled {
+		desiredResource = require.GetDesired(
+			scope,
+			buildObjectMeta(requireAuthAuthorizationPolicyName, scope.AuthPolicy.Namespace),
+		)
+	}
 
 	return ControllerResourceAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
 		reconciliation.ReconcilerAdapter[*istioclientsecurityv1.AuthorizationPolicy]{
 			Func: reconciliation.ResourceReconciler[*istioclientsecurityv1.AuthorizationPolicy]{
 				ResourceKind:    "AuthorizationPolicy",
 				ResourceName:    requireAuthAuthorizationPolicyName,
-				DesiredResource: helperfunctions.Ptr(desiredResource),
+				DesiredResource: new(desiredResource),
 				Scope:           scope,
 				ShouldUpdate:    AuthorizationPolicyShouldUpdate,
 				UpdateFields:    AuthorizationPolicyUpdateFields,
@@ -247,6 +265,46 @@ func AuthorizationPolicyUpdateFields(current, desired *istioclientsecurityv1.Aut
 	current.Labels = desired.Labels
 }
 
+func envoyBootstrapConfigMap(scope *model.Scope) ControllerResourceAdapter[*corev1.ConfigMap] {
+	envoyBootstrapConfigMapName := names.EnvoyBootstrapConfigMap(scope.AuthPolicy.Name)
+	var desiredResource *corev1.ConfigMap
+	if scope.IstioAmbientConfig.Enabled {
+		desiredResource = configmap.GetDesired(
+			scope.IstioAmbientConfig.EnvoyBootstrap,
+			buildObjectMeta(envoyBootstrapConfigMapName, scope.AuthPolicy.Namespace),
+		)
+	}
+
+	return ControllerResourceAdapter[*corev1.ConfigMap]{
+		reconciliation.ReconcilerAdapter[*corev1.ConfigMap]{
+			Func: reconciliation.ResourceReconciler[*corev1.ConfigMap]{
+				ResourceKind:    "ConfigMap",
+				ResourceName:    envoyBootstrapConfigMapName,
+				DesiredResource: new(desiredResource),
+				Scope:           scope,
+				ShouldUpdate:    ConfigMapShouldUpdateFunc,
+				UpdateFields:    configMapUpdateFieldsFunc,
+			},
+		},
+	}
+}
+
+func ConfigMapShouldUpdateFunc(current, desired *corev1.ConfigMap) bool {
+	return !equality.Semantic.DeepEqual(current.BinaryData, desired.BinaryData) ||
+		!equality.Semantic.DeepEqual(current.Data, desired.Data) ||
+		!equality.Semantic.DeepEqual(current.Immutable, desired.Immutable) ||
+		labelsNeedUpdate(current, desired) ||
+		annotationsNeedUpdate(current, desired)
+}
+
+func configMapUpdateFieldsFunc(current, desired *corev1.ConfigMap) {
+	current.BinaryData = desired.BinaryData
+	current.Data = desired.Data
+	current.Immutable = desired.Immutable
+	current.Labels = desired.Labels
+	current.Annotations = desired.Annotations
+}
+
 type LabeledObject interface {
 	GetLabels() map[string]string
 }
@@ -258,6 +316,23 @@ func labelsNeedUpdate(current, desired LabeledObject) bool {
 	currentLabels := current.GetLabels()
 	for key, value := range desiredLabels {
 		if currentValue, ok := currentLabels[key]; !ok || currentValue != value {
+			return true
+		}
+	}
+	return false
+}
+
+type AnnotatedObject interface {
+	GetAnnotations() map[string]string
+}
+
+// annotationsNeedUpdate reports whether any of the desired annotations are missing from current or have a
+// different value. Annotations on current that are not part of the desired set are ignored.
+func annotationsNeedUpdate(current, desired AnnotatedObject) bool {
+	desiredAnnotations := desired.GetAnnotations()
+	currentAnnotations := current.GetAnnotations()
+	for key, value := range desiredAnnotations {
+		if currentValue, ok := currentAnnotations[key]; !ok || currentValue != value {
 			return true
 		}
 	}
