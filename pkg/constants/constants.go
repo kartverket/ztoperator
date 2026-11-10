@@ -4,7 +4,20 @@ const (
 	SkiperatorApplicationRefLabel  = "application.skiperator.no/app-name"
 	SkiperatorAppContainerPortName = "main"
 
+	IstioAmbientLabelKey    = "istio.io/dataplane-mode"
+	IstioAmbientLabelValue  = "ambient"
+	IstioAmbientOptOutValue = "none"
+
+	IstioInjectionLabelKey        = "istio-injection"
+	IstioInjectionEnabledValue    = "enabled"
+	IstioRevisionLabelKey         = "istio.io/rev"
+	IstioSidecarInjectLabelKey    = "sidecar.istio.io/inject"
+	IstioSidecarInjectTrueValue   = "true"
+	IstioAmbientRedirectionKey    = "ambient.istio.io/redirection"
+	IstioAmbientRedirectionOptOut = "disabled"
+
 	EnvoyBootstrapUpstreamClusterName = "upstream"
+
 	EnvoyOAuth2TokenSecretFileName  = "token-secret.yaml"
 	EnvoyOAuth2HmacSecretFileName   = "hmac-secret.yaml"
 	EnvoyOAuth2CredentialsDirectory = "/etc/istio/config"

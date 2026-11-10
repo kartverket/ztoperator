@@ -11,7 +11,10 @@ import (
 	"time"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
-	v1 "k8s.io/api/core/v1"
+	"github.com/kartverket/ztoperator/pkg/constants"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -51,8 +54,12 @@ func Ptr[T any](v T) *T {
 	return &v
 }
 
-func GetSecret(ctx context.Context, k8sClient client.Client, namespacedName types.NamespacedName) (v1.Secret, error) {
-	secret := v1.Secret{}
+func GetSecret(
+	ctx context.Context,
+	k8sClient client.Client,
+	namespacedName types.NamespacedName,
+) (corev1.Secret, error) {
+	secret := corev1.Secret{}
 
 	err := k8sClient.Get(ctx, namespacedName, &secret)
 
@@ -63,12 +70,22 @@ func GetConfigMap(
 	ctx context.Context,
 	k8sClient client.Client,
 	namespacedName types.NamespacedName,
-) (v1.ConfigMap, error) {
-	configMap := v1.ConfigMap{}
+) (corev1.ConfigMap, error) {
+	configMap := corev1.ConfigMap{}
 
 	err := k8sClient.Get(ctx, namespacedName, &configMap)
 
 	return configMap, err
+}
+
+func GetNamespace(
+	ctx context.Context,
+	k8sClient client.Client,
+	namespaceName string,
+) (corev1.Namespace, error) {
+	namespace := corev1.Namespace{}
+	err := k8sClient.Get(ctx, types.NamespacedName{Name: namespaceName}, &namespace)
+	return namespace, err
 }
 
 func GetParsedHttpURL(raw string) (*ParsedHttpURL, error) {
@@ -114,8 +131,12 @@ func GenerateHMACSecret(size int) (*string, error) {
 	return &base64EncodedSecret, nil
 }
 
-func GetProtectedPods(ctx context.Context, k8sClient client.Client, authPolicy v1alpha1.AuthPolicy) (*[]v1.Pod, error) {
-	var podList v1.PodList
+func GetProtectedPods(
+	ctx context.Context,
+	k8sClient client.Client,
+	authPolicy v1alpha1.AuthPolicy,
+) (*[]corev1.Pod, error) {
+	var podList corev1.PodList
 	if listErr := k8sClient.List(
 		ctx,
 		&podList,
@@ -131,6 +152,50 @@ func GetProtectedPods(ctx context.Context, k8sClient client.Client, authPolicy v
 		)
 	}
 	return &podList.Items, nil
+}
+
+func GetProtectedDeployment(
+	ctx context.Context,
+	k8sClient client.Client,
+	authPolicy v1alpha1.AuthPolicy,
+) (*appsv1.Deployment, error) {
+	var deploymentList appsv1.DeploymentList
+	if listErr := k8sClient.List(
+		ctx,
+		&deploymentList,
+		client.InNamespace(authPolicy.Namespace),
+	); listErr != nil {
+		return nil, fmt.Errorf(
+			"list deployments in namespace %s: %w",
+			authPolicy.Namespace,
+			listErr,
+		)
+	}
+
+	selector := labels.SelectorFromSet(authPolicy.Spec.Selector.MatchLabels)
+	matchingDeployments := make([]appsv1.Deployment, 0, len(deploymentList.Items))
+	for _, deployment := range deploymentList.Items {
+		if selector.Matches(labels.Set(deployment.Spec.Template.Labels)) {
+			matchingDeployments = append(matchingDeployments, deployment)
+		}
+	}
+
+	if len(matchingDeployments) > 1 {
+		return nil, fmt.Errorf(
+			"more than 1 deployment matched the selector %v in namespace %s",
+			authPolicy.Spec.Selector.MatchLabels,
+			authPolicy.Namespace,
+		)
+	}
+	if len(matchingDeployments) == 0 {
+		return nil, fmt.Errorf(
+			"no deployments matched the selector %v in namespace %s",
+			authPolicy.Spec.Selector.MatchLabels,
+			authPolicy.Namespace,
+		)
+	}
+
+	return &matchingDeployments[0], nil
 }
 
 func GetSkiperatorAppPort(deployment appsv1.Deployment) (int, error) {
@@ -179,4 +244,53 @@ func GetMockKubernetesClient(scheme *runtime.Scheme, objects ...client.Object) c
 		WithScheme(scheme).
 		WithObjects(objects...).
 		Build()
+}
+
+func PodIsIstioAmbientEligible(pod corev1.Pod) bool {
+	if pod.Labels[constants.IstioSidecarInjectLabelKey] == constants.IstioSidecarInjectTrueValue {
+		return false
+	}
+	if _, hasRevision := pod.Labels[constants.IstioRevisionLabelKey]; hasRevision {
+		return false
+	}
+	if pod.Labels[constants.IstioAmbientLabelKey] == constants.IstioAmbientOptOutValue {
+		return false
+	}
+	if pod.Annotations[constants.IstioAmbientRedirectionKey] == constants.IstioAmbientRedirectionOptOut {
+		return false
+	}
+	if pod.Spec.HostNetwork {
+		return false
+	}
+	return true
+}
+
+func DeploymentIsIstioAmbientEligible(deployment appsv1.Deployment) bool {
+	templateSpec := deployment.Spec.Template
+	if templateSpec.Labels[constants.IstioSidecarInjectLabelKey] == constants.IstioSidecarInjectTrueValue {
+		return false
+	}
+	if _, hasRevision := templateSpec.Labels[constants.IstioRevisionLabelKey]; hasRevision {
+		return false
+	}
+	if templateSpec.Labels[constants.IstioAmbientLabelKey] == constants.IstioAmbientOptOutValue {
+		return false
+	}
+	if templateSpec.Annotations[constants.IstioAmbientRedirectionKey] == constants.IstioAmbientRedirectionOptOut {
+		return false
+	}
+	return true
+}
+
+func NamespaceIsIstioAmbientEligible(namespace corev1.Namespace) bool {
+	if namespace.Labels[constants.IstioAmbientLabelKey] != constants.IstioAmbientLabelValue {
+		return false
+	}
+	if namespace.Labels[constants.IstioInjectionLabelKey] == constants.IstioInjectionEnabledValue {
+		return false
+	}
+	if _, hasRevision := namespace.Labels[constants.IstioRevisionLabelKey]; hasRevision {
+		return false
+	}
+	return true
 }
