@@ -31,6 +31,8 @@ func (providers *AllowedOAuthProviders) Decode(value string) error {
 
 type Config struct {
 	GitRef                string                `split_words:"true" default:"main"`
+
+	FeatureIstioAmbient bool `split_words:"true" default:"false"`
 	AllowedOAuthProviders AllowedOAuthProviders `envconfig:"allowed_oauth_providers" required:"true"`
 }
 
