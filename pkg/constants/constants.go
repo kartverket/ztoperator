@@ -1,6 +1,9 @@
 package constants
 
 const (
+	SkiperatorApplicationRefLabel  = "application.skiperator.no/app-name"
+	SkiperatorAppContainerPortName = "main"
+
 	EnvoyBootstrapUpstreamClusterName = "upstream"
 	EnvoyOAuth2TokenSecretFileName  = "token-secret.yaml"
 	EnvoyOAuth2HmacSecretFileName   = "hmac-secret.yaml"

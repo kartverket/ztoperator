@@ -133,6 +133,46 @@ func GetProtectedPods(ctx context.Context, k8sClient client.Client, authPolicy v
 	return &podList.Items, nil
 }
 
+func GetSkiperatorAppPort(deployment appsv1.Deployment) (int, error) {
+	skiperatorAppName, hasLabel := deployment.Labels[constants.SkiperatorApplicationRefLabel]
+	if !hasLabel {
+		return 0, fmt.Errorf(
+			"deployment %s/%s does not have the label %s",
+			deployment.Namespace,
+			deployment.Name,
+			constants.SkiperatorApplicationRefLabel,
+		)
+	}
+	for _, container := range deployment.Spec.Template.Spec.Containers {
+		if container.Name == skiperatorAppName {
+			if len(container.Ports) == 0 {
+				return 0, fmt.Errorf(
+					"container %s in deployment %s/%s does not have any ports defined",
+					skiperatorAppName,
+					deployment.Namespace,
+					deployment.Name,
+				)
+			}
+			for _, port := range container.Ports {
+				if port.Name == constants.SkiperatorAppContainerPortName {
+					return int(port.ContainerPort), nil
+				}
+			}
+			return 0, fmt.Errorf("container %s in deployment %s/%s does not have a port named %s",
+				skiperatorAppName,
+				deployment.Namespace,
+				deployment.Name,
+				constants.SkiperatorAppContainerPortName,
+			)
+		}
+	}
+	return 0, fmt.Errorf(" 	container %s not found in deployment %s/%s",
+		skiperatorAppName,
+		deployment.Namespace,
+		deployment.Name,
+	)
+}
+
 // GetMockKubernetesClient returns a fake Kubernetes client with the provided scheme and objects. Only used in testing.
 func GetMockKubernetesClient(scheme *runtime.Scheme, objects ...client.Object) client.Client {
 	return fake.NewClientBuilder().

@@ -16,6 +16,7 @@ import (
 	"github.com/kartverket/ztoperator/internal/webhook/authpolicy"
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
+	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -253,7 +254,7 @@ var _ = Describe("Pod validating webhook", func() {
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
-		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[constants.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 	})
@@ -302,7 +303,7 @@ var _ = Describe("Pod validating webhook", func() {
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
-		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[constants.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 	})
@@ -331,7 +332,7 @@ var _ = Describe("Pod validating webhook", func() {
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
-		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[constants.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring("no AuthPolicy resource was found for the corresponding Application")))
 	})
@@ -380,7 +381,7 @@ var _ = Describe("Pod validating webhook", func() {
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
-		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[constants.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 	})
@@ -429,7 +430,7 @@ var _ = Describe("Pod validating webhook", func() {
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
-		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[constants.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring("no AuthPolicy resource was found for the corresponding Application")))
 	})
@@ -475,7 +476,7 @@ var _ = Describe("Pod validating webhook", func() {
 				Name:      "pod-webhook-create",
 				Namespace: ns.Name,
 				Labels: map[string]string{
-					v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+					constants.SkiperatorApplicationRefLabel: skiperatorAppName,
 				},
 				Annotations: map[string]string{
 					v1.ZtoperatorVerifyAnnotationKey: v1.ZtoperatorVerifyAnnotationValue,
@@ -493,7 +494,7 @@ var _ = Describe("Pod validating webhook", func() {
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
-		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[constants.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 		Expect(pod.Spec.Volumes).To(HaveLen(1))

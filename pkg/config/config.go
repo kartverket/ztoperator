@@ -30,9 +30,14 @@ func (providers *AllowedOAuthProviders) Decode(value string) error {
 }
 
 type Config struct {
-	GitRef                string                `split_words:"true" default:"main"`
+	GitRef string `split_words:"true" default:"main"`
 
 	FeatureIstioAmbient bool `split_words:"true" default:"false"`
+
+	EnvoyPort      int32 `split_words:"true" default:"18080"`
+	EnvoyProbePort int32 `split_words:"true" default:"18081"`
+	EnvoyAdminPort int32 `split_words:"true" default:"18082"`
+
 	AllowedOAuthProviders AllowedOAuthProviders `envconfig:"allowed_oauth_providers" required:"true"`
 }
 

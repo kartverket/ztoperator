@@ -22,8 +22,6 @@ const (
 	CreatedBySkipNamespaceLabel      = "skip.kartverket.no/skip-managed"
 	CreatedBySkipNamespaceLabelValue = "true"
 
-	SkiperatorApplicationRefLabel = "application.skiperator.no/app-name"
-
 	ZtoperatorWebhookAnnotationPrefix = "ztoperator.kartverket.no/"
 	ZtoperatorVerifyAnnotationKey     = ZtoperatorWebhookAnnotationPrefix + "verify-authpolicy"
 	ZtoperatorAnnotationEnabledValue  = "true"
@@ -209,7 +207,7 @@ func GetPodAuthPolicyConfiguration(
 		return &PodAuthPolicyConfiguration{CreatedFromSkiperatorApplication: false}, nil
 	}
 
-	appName, isSkiperatorPod := pod.Labels[SkiperatorApplicationRefLabel]
+	appName, isSkiperatorPod := pod.Labels[constants.SkiperatorApplicationRefLabel]
 	if !isSkiperatorPod {
 		return &PodAuthPolicyConfiguration{CreatedFromSkiperatorApplication: false}, nil
 	}
@@ -251,7 +249,7 @@ func IsWebhookEligible(ctx context.Context, k8sClient client.Client, pod corev1.
 	if pod.Labels == nil {
 		return false, fmt.Sprintf("pod %s/%s has no labels", pod.Namespace, pod.Name)
 	}
-	_, isSkiperatorPod := pod.Labels[SkiperatorApplicationRefLabel]
+	_, isSkiperatorPod := pod.Labels[constants.SkiperatorApplicationRefLabel]
 	if !isSkiperatorPod {
 		return false, fmt.Sprintf("pod %s/%s is not created from a Skiperator Application", pod.Namespace, pod.Name)
 	}
