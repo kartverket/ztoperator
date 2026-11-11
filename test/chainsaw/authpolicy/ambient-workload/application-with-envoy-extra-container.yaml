@@ -1,0 +1,56 @@
+apiVersion: skiperator.kartverket.no/v1alpha1
+kind: Application
+metadata:
+  name: application
+spec:
+  podSettings:
+    annotations:
+      ztoperator.kartverket.no/verify-authpolicy: "true"
+  image: hashicorp/http-echo:latest
+  port: 5678
+  replicas: 1
+  routingProvider: Standard
+  ingresses:
+    - foo.bar
+  accessPolicy:
+    outbound:
+      rules:
+        - application: mock-oauth2
+          namespace: auth
+  extraContainers:
+    - image: envoyproxy/envoy:distroless-v1.40.2@sha256:09ca6f2140a61ad8df11779a4a30d52b48433d444466328494f9188c9c35eded
+      name: envoy
+      additionalPorts:
+        - name: envoy-main
+          port: 18080
+          protocol: TCP
+        - name: envoy-probe
+          port: 18081
+          protocol: TCP
+      args:
+        - "--config-path"
+        - "/etc/envoy/envoy.json"
+        - "-l"
+        - "info"
+        - "--concurrency"
+        - "1"
+      ingressPort: 18080
+      filesFrom:
+        - mountPath: /etc/envoy
+          configMap: auth-policy-envoy-bootstrap
+        - mountPath: /etc/istio/config
+          secret: auth-policy-envoy-secret
+      readiness:
+        path: /ready
+        port: 18081
+      startup:
+        path: /ready
+        port: 18081
+      resources:
+        limits:
+          memory: "128Mi"
+          cpu: "200m"
+        requests:
+          memory: "128Mi"
+          cpu: "1m"
+      type: init

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-policy-envoy-bootstrap
+data:
+  (contains(keys(@), 'envoy.json')): true
+  (length(keys(@))): 1
+  (length("envoy.json") > `0`): true
+
