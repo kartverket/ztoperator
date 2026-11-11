@@ -561,7 +561,7 @@ ensurerunningordeployed: ## Ensure ztoperator is running on host OR deployed in 
 		exit 1; \
 	fi; \
 	if [ "$$running" = "1" ]; then echo "✅ Ztoperator is running on the host."; fi; \
-	if [ "$$deployed" = "1" ]; then echo "✅ Ztoperator is deployed an running in the local cluster."; fi
+	if [ "$$deployed" = "1" ]; then echo "✅ Ztoperator is deployed and running on the local cluster."; fi
 
 .PHONY: webhook-test-manifests
 webhook-test-manifests: kustomize ## Build webhook manifests for envtest into webhook-tests/
