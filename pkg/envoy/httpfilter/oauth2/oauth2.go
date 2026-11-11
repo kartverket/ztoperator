@@ -20,8 +20,7 @@ const (
 	AuthorizationHeaderName        = "authorization"
 	AuthorizationHeaderValuePrefix = "Bearer "
 
-	HostUriFromEnvoyHeaders = "https://%REQ(:authority)%"
-
+	HostUriFromEnvoyHeaders  = "%REQ(x-forwarded-proto)%://%REQ(:authority)%"
 	SdsConfigTokenSecretName = "token"
 	SdsConfigHmacSecretName  = "hmac"
 )
