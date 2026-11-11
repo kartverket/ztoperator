@@ -219,7 +219,7 @@ func main() {
 		setupLog.Error(healthCheckErr, "unable to set up health check")
 		os.Exit(1)
 	}
-	if readyCheckErr := mgr.AddReadyzCheck("readyz", healthz.Ping); readyCheckErr != nil {
+	if readyCheckErr := mgr.AddReadyzCheck("webhook", mgr.GetWebhookServer().StartedChecker()); readyCheckErr != nil {
 		setupLog.Error(readyCheckErr, "unable to set up ready check")
 		os.Exit(1)
 	}
