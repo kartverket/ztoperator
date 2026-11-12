@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/kartverket/ztoperator/pkg/config"
@@ -11,6 +12,15 @@ const (
 	configTestURI1   = "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration"
 	configTestURI2   = "https://ansattporten.no/.well-known/openid-configuration"
 	configTestIssuer = "https://issuer.example.com"
+
+	validProvidersJSON = `{
+	"entraid": {
+		"wellKnownURI": "` + configTestURI1 + `",
+		"issuer": "` + configTestIssuer + `",
+		"tokenEndpoint": "https://issuer.example.com/token",
+		"jwksURI": "https://issuer.example.com/jwks"
+	}
+}`
 )
 
 func TestLoadAcceptsConfiguredOAuthProviders(t *testing.T) {
@@ -200,4 +210,34 @@ func TestLoadRejectsUnsafeProviderEndpoint(t *testing.T) {
 	err := config.Load()
 
 	require.ErrorContains(t, err, "jwksURI")
+}
+
+func TestLoadUsesDefaultEnvoyPorts(t *testing.T) {
+	t.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", validProvidersJSON)
+	unsetEnv(t, "ZTOPERATOR_ENVOY_PORT")
+	unsetEnv(t, "ZTOPERATOR_ENVOY_PROBE_PORT")
+
+	require.NoError(t, config.Load())
+	loaded := config.Get()
+
+	require.Equal(t, int32(18080), loaded.EnvoyPort)
+	require.Equal(t, int32(18081), loaded.EnvoyProbePort)
+}
+
+func TestLoadOverridesEnvoyPorts(t *testing.T) {
+	t.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", validProvidersJSON)
+	t.Setenv("ZTOPERATOR_ENVOY_PORT", "15000")
+	t.Setenv("ZTOPERATOR_ENVOY_PROBE_PORT", "15001")
+
+	require.NoError(t, config.Load())
+	loaded := config.Get()
+
+	require.Equal(t, int32(15000), loaded.EnvoyPort)
+	require.Equal(t, int32(15001), loaded.EnvoyProbePort)
+}
+
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+	t.Setenv(key, "") // registers restore on cleanup
+	require.NoError(t, os.Unsetenv(key))
 }

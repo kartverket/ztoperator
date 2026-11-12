@@ -10,8 +10,10 @@ import (
 )
 
 const (
-	BypassOauthLoginHeaderName = "x-bypass-login"
-	DenyRedirectHeaderName     = "x-deny-redirect"
+	OAuth2FilterPassThroughHeaderName   = "x-bypass-login"
+	OAuth2FilterPassThroughHeaderValue  = "true"
+	OAuth2FilterDenyRedirectHeaderName  = "x-deny-redirect"
+	OAuth2FilterDenyRedirectHeaderValue = "true"
 )
 
 //go:embed ztoperator.lua
@@ -89,8 +91,8 @@ func GenerateLuaScript(
 		EscapeLuaString(endSessionURI),
 		EscapeLuaString(queryEscapedPostLogoutRedirectURI),
 		EscapeLuaString(autoLoginConfig.LogoutPath),
-		BypassOauthLoginHeaderName,
-		DenyRedirectHeaderName,
+		OAuth2FilterPassThroughHeaderName,
+		OAuth2FilterDenyRedirectHeaderName,
 	)
 }
 

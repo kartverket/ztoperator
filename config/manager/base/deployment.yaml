@@ -54,6 +54,10 @@ spec:
             requests:
               cpu: 10m
               memory: 32Mi
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

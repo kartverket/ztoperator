@@ -121,18 +121,27 @@ isnotrunning: ## Check if ztoperator is NOT running on your host machine (i.e. f
 .PHONY: local
 local: cluster ztoperator-namespace cert-manager istio-gateways skiperator mock-oauth2 generate install ## Set up entire local development environment with external dependencies
 
-EXAMPLE_MANIFEST ?= examples/example.yaml
-EXAMPLE_HOST     ?= demo.localdev
-
 .PHONY: example
-example: kubectl ensurelocal ensurerunningordeployed ## Deploy examples/example.yaml and expose it on https://demo.localdev (gateway forward runs in the background)
-	@echo -e "🤞  Applying $(EXAMPLE_MANIFEST)..."
-	@"$(KUBECTL)" apply -f "$(EXAMPLE_MANIFEST)" --context $(KUBECONTEXT)
-	@echo -e "✅  Applied $(EXAMPLE_MANIFEST)"
+example: kubectl ensurelocal ensurerunningordeployed ## Deploy an example manifest and add host entries for its Skiperator ingresses. Usage: make example file=examples/example.yaml
+	$(if $(strip $(file)),,$(error file is not set. Usage: make example file=<PATH>))
+	$(if $(wildcard $(file)),,$(error File '$(file)' does not exist. Usage: make example file=<PATH>))
+	@echo -e "🤞  Applying $(file)..."
+	@"$(KUBECTL)" apply -f "$(file)" --context $(KUBECONTEXT)
+	@echo -e "✅  Applied $(file)"
 	@$(MAKE) --no-print-directory mock-oauth2-ingress
-	@$(MAKE) --no-print-directory host-entry host=$(EXAMPLE_HOST)
-	@$(MAKE) --no-print-directory gateway-forward GATEWAY_PORTS="443:443 80:80"
-	@echo -e "🌐  Open https://$(EXAMPLE_HOST)  (stop the forward with 'make gateway-forward-stop')"
+	@hosts=$$("$(KUBECTL)" get -f "$(file)" --context $(KUBECONTEXT) \
+	   -o jsonpath='{range .items[?(@.kind=="Application")]}{range .spec.ingresses[*]}{@}{"\n"}{end}{end}' 2>/dev/null \
+	   | sed -E 's#^[a-zA-Z]+://##; s#[/:].*$$##' | sort -u); \
+	if [ -z "$$hosts" ]; then \
+	   echo "ℹ️   No Skiperator Application ingresses found in $(file), skipping host entries and gateway forward"; \
+	   exit 0; \
+	fi; \
+	for h in $$hosts; do \
+	   $(MAKE) --no-print-directory host-entry host=$$h || exit 1; \
+	done; \
+	$(MAKE) --no-print-directory gateway-forward GATEWAY_PORTS="443:443 80:80" || exit 1; \
+	for h in $$hosts; do echo "🌐  Open https://$$h"; done; \
+	echo "    (stop the forward with 'make gateway-forward-stop')"
 
 .PHONY: clean
 clean: kind ## Clean up local environment by deleting kind cluster

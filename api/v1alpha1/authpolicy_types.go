@@ -387,6 +387,20 @@ type AuthPolicyStatus struct {
 	Phase              Phase              `json:"phase,omitempty"`
 	Message            string             `json:"message,omitempty"`
 	Ready              bool               `json:"ready"`
+	IstioAmbientConfig IstioAmbientConfig `json:"istioAmbientConfig,omitempty"`
+}
+
+// IstioAmbientConfig holds the relevant configuration if the AuthPolicy selects workloads
+//
+// +kubebuilder:object:generate=true
+type IstioAmbientConfig struct {
+	Enabled        bool           `json:"enabled,omitempty"`
+	EnvoyBootstrap EnvoyBootstrap `json:"envoyBootstrap,omitempty"`
+}
+
+type EnvoyBootstrap struct {
+	ConfigMapName string `json:"configMapName,omitempty"`
+	ConfigMapKey  string `json:"configMapKey,omitempty"`
 }
 
 type Phase string

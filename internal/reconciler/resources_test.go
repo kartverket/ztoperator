@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"time"
 
+	bootstrapv3 "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v3"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/internal/reconciler"
 	"github.com/kartverket/ztoperator/internal/resolver"
+	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
 	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
 	"github.com/kartverket/ztoperator/pkg/resourcegenerators/secret"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -31,13 +32,14 @@ import (
 
 var _ = Describe("ControllerResources", func() {
 	const authPolicyName = "test-app"
+	const authPolicyNamespace = "test-namespace"
 
-	scopeFor := func(namespace string) *model.Scope {
+	newScope := func() *model.Scope {
 		return &model.Scope{
 			AuthPolicy: ztoperatorv1alpha1.AuthPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      authPolicyName,
-					Namespace: namespace,
+					Namespace: authPolicyNamespace,
 				},
 			},
 			AutoLoginConfig: model.AutoLoginConfig{
@@ -46,8 +48,17 @@ var _ = Describe("ControllerResources", func() {
 		}
 	}
 
+	// nilByKindAndName maps "<kind>/<name>" to whether the desired resource is nil (i.e. it will be deleted).
+	nilByKindAndName := func(resources []reconciliation.ControllerResource) map[string]bool {
+		result := make(map[string]bool, len(resources))
+		for _, r := range resources {
+			result[fmt.Sprintf("%s/%s", r.GetResourceKind(), r.GetResourceName())] = r.IsResourceNil()
+		}
+		return result
+	}
+
 	It("returns resources with correct kinds", func() {
-		resources := reconciler.ControllerResources(scopeFor("some-namespace"))
+		resources := reconciler.ControllerResources(newScope())
 		kinds := make([]string, len(resources))
 		for i, r := range resources {
 			kinds[i] = r.GetResourceKind()
@@ -60,12 +71,13 @@ var _ = Describe("ControllerResources", func() {
 				"AuthorizationPolicy",
 				"AuthorizationPolicy",
 				"AuthorizationPolicy",
+				"ConfigMap",
 			),
 		)
 	})
 
 	It("returns resources with correct names", func() {
-		resources := reconciler.ControllerResources(scopeFor("some-namespace"))
+		resources := reconciler.ControllerResources(newScope())
 
 		resourceKindsAndNames := make([]string, len(resources))
 		for i, r := range resources {
@@ -80,7 +92,44 @@ var _ = Describe("ControllerResources", func() {
 				fmt.Sprintf("%s/%s", "AuthorizationPolicy", names.DenyPolicy(authPolicyName)),
 				fmt.Sprintf("%s/%s", "AuthorizationPolicy", names.IgnorePolicy(authPolicyName)),
 				fmt.Sprintf("%s/%s", "AuthorizationPolicy", names.RequirePolicy(authPolicyName)),
+				fmt.Sprintf("%s/%s", "ConfigMap", names.EnvoyBootstrapConfigMap(authPolicyName)),
 			),
+		)
+	})
+
+	It("only keeps the envoy bootstrap ConfigMap and the auto login Secret when Istio ambient is enabled", func() {
+		scope := newScope()
+		scope.AuthPolicy.Spec.Enabled = true
+		scope.AuthPolicy.Spec.AutoLogin = &ztoperatorv1alpha1.AutoLogin{Enabled: true}
+		scope.OAuthCredentials = model.OAuthCredentials{ClientSecret: helperfunctions.Ptr("client-secret")}
+		scope.IstioAmbientConfig = model.IstioAmbientConfig{
+			Enabled:        true,
+			EnvoyBootstrap: &bootstrapv3.Bootstrap{},
+		}
+
+		resources := reconciler.ControllerResources(scope)
+
+		Expect(resources).To(HaveLen(7))
+		Expect(nilByKindAndName(resources)).To(Equal(map[string]bool{
+			"Secret/" + names.EnvoySecret(authPolicyName):                false,
+			"ConfigMap/" + names.EnvoyBootstrapConfigMap(authPolicyName): false,
+			"EnvoyFilter/" + names.EnvoyFilter(authPolicyName):           true,
+			"RequestAuthentication/" + authPolicyName:                    true,
+			"AuthorizationPolicy/" + names.DenyPolicy(authPolicyName):    true,
+			"AuthorizationPolicy/" + names.IgnorePolicy(authPolicyName):  true,
+			"AuthorizationPolicy/" + names.RequirePolicy(authPolicyName): true,
+		}))
+	})
+
+	It("deletes the envoy bootstrap ConfigMap when Istio ambient is disabled", func() {
+		scope := newScope()
+		scope.IstioAmbientConfig = model.IstioAmbientConfig{Enabled: false}
+
+		resources := reconciler.ControllerResources(scope)
+
+		Expect(resources).To(HaveLen(7))
+		Expect(nilByKindAndName(resources)).To(
+			HaveKeyWithValue("ConfigMap/"+names.EnvoyBootstrapConfigMap(authPolicyName), true),
 		)
 	})
 
@@ -203,7 +252,7 @@ var _ = Describe("auto-login Secret reconciliation", func() {
 			Name:      adapter.GetResourceName(),
 			Namespace: testNamespace,
 		}, createdSecret)).To(Succeed())
-		Expect(createdSecret.Data).To(HaveKey(configpatch.TokenSecretFileName))
+		Expect(createdSecret.Data).To(HaveKey(constants.EnvoyOAuth2TokenSecretFileName))
 		Expect(createdSecret.Labels).To(SatisfyAll(
 			HaveKeyWithValue(labels.ManagedByLabelKey, labels.ManagedByLabelValue),
 			HaveKeyWithValue(labels.ControllerLabelKey, labels.AuthPolicyControllerLabelValue),
@@ -234,7 +283,7 @@ var _ = Describe("auto-login Secret reconciliation", func() {
 			Name:      scope.AutoLoginConfig.EnvoySecretName,
 			Namespace: testNamespace,
 		}, updated)).To(Succeed())
-		Expect(updated.Data).ToNot(HaveKey(configpatch.TokenSecretFileName))
+		Expect(updated.Data).ToNot(HaveKey(constants.EnvoyOAuth2TokenSecretFileName))
 	})
 
 	It("updates a Secret when it needs updating and is owned by AuthPolicy", func() {
@@ -259,7 +308,7 @@ var _ = Describe("auto-login Secret reconciliation", func() {
 			Name:      scope.AutoLoginConfig.EnvoySecretName,
 			Namespace: testNamespace,
 		}, updated)).To(Succeed())
-		Expect(updated.Data).To(HaveKey(configpatch.TokenSecretFileName))
+		Expect(updated.Data).To(HaveKey(constants.EnvoyOAuth2TokenSecretFileName))
 	})
 
 	It("does not update a Secret when the OAuth client secret is unchanged", func() {
@@ -289,7 +338,7 @@ var _ = Describe("SecretShouldUpdate", func() {
 	secretWithToken := func(token string, lbls map[string]string) *corev1.Secret {
 		return &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{Labels: lbls},
-			Data:       map[string][]byte{configpatch.TokenSecretFileName: []byte(token)},
+			Data:       map[string][]byte{constants.EnvoyOAuth2TokenSecretFileName: []byte(token)},
 		}
 	}
 
@@ -435,6 +484,38 @@ var _ = Describe("AuthorizationPolicyShouldUpdate", func() {
 			ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labels.ManagedByLabelKey: labels.ManagedByLabelValue}},
 		}
 		Expect(reconciler.AuthorizationPolicyShouldUpdate(current, desired)).To(BeTrue())
+	})
+})
+
+var _ = Describe("ConfigMapShouldUpdateFunc", func() {
+	It("returns false when only extra labels and annotations exist on current", func() {
+		current := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels:      map[string]string{"a": "1", "extra": "x"},
+				Annotations: map[string]string{"b": "2", "extra": "y"},
+			},
+			Data: map[string]string{"k": "v"},
+		}
+		desired := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels:      map[string]string{"a": "1"},
+				Annotations: map[string]string{"b": "2"},
+			},
+			Data: map[string]string{"k": "v"},
+		}
+		Expect(reconciler.ConfigMapShouldUpdateFunc(current, desired)).To(BeFalse())
+	})
+
+	It("returns true when the data differs", func() {
+		current := &corev1.ConfigMap{Data: map[string]string{"k": "old"}}
+		desired := &corev1.ConfigMap{Data: map[string]string{"k": "new"}}
+		Expect(reconciler.ConfigMapShouldUpdateFunc(current, desired)).To(BeTrue())
+	})
+
+	It("returns true when a desired annotation differs on current", func() {
+		current := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"b": "old"}}}
+		desired := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"b": "new"}}}
+		Expect(reconciler.ConfigMapShouldUpdateFunc(current, desired)).To(BeTrue())
 	})
 })
 

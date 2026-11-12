@@ -1,0 +1,61 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: ambient-workload
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio.io/dataplane-mode: ambient
+  steps:
+    - name: ambient workload gets envoy bootstrap ConfigMap
+      try:
+        - script:
+            content: |
+              set -e
+              cd "$(git rev-parse --show-toplevel)"
+              if env -u KUBECONFIG make -s ensureztoperatordeployed >/dev/null 2>&1; then
+                echo "ztoperator deployed in-cluster: enabling ZTOPERATOR_FEATURE_ISTIO_AMBIENT"
+                ./bin/kubectl -n ztoperator-system set env deploy/ztoperator ZTOPERATOR_FEATURE_ISTIO_AMBIENT=true
+                ./bin/kubectl -n ztoperator-system rollout status deploy/ztoperator --timeout=150s
+              elif grep -Eq '^ZTOPERATOR_FEATURE_ISTIO_AMBIENT=true$' config/manager/base/.env; then
+                echo "ztoperator runs on host with ZTOPERATOR_FEATURE_ISTIO_AMBIENT=true"
+              else
+                echo "❌ This test is not supported when ztoperator runs on host with ZTOPERATOR_FEATURE_ISTIO_AMBIENT=false."
+                echo "   Set ZTOPERATOR_FEATURE_ISTIO_AMBIENT=true in config/manager/base/.env and restart ztoperator, or deploy it with 'make deploy'."
+                exit 1
+              fi
+        - create:
+            file: application-with-envoy-extra-container.yaml
+        - apply:
+            file: ../../../resources/ingress/wildcard-ingress.yaml
+        - create:
+            file: ../../../resources/secret/oauth-secret.yaml
+        - create:
+            file: authpolicy.yaml
+        - assert:
+            file: envoy-bootstrap-cm.yaml
+        - assert:
+            file: envoy-login-secret.yaml
+        - assert:
+            file: authpolicy-assert.yaml
+        - assert:
+            file: endpointslice-ready.yaml
+        - script:
+            content: |
+              hurl --error-format long \
+              --insecure --test tests.hurl \
+              --variable location_header="http://mock-oauth2.auth:8080/entraid/authorize?client_id=entraid_server&code_challenge=" \
+              --variable entraid_access_token="$(../../../../venv/bin/python ./../../../../scripts/get-mock-oauth2-token.py --issuer entraid --code entraid_client --token_name access_token)"
+      cleanup:
+        - script:
+            timeout: 3m
+            content: |
+              cd "$(git rev-parse --show-toplevel)"
+              if env -u KUBECONFIG make -s ensureztoperatordeployed >/dev/null 2>&1; then
+                ./bin/kubectl -n ztoperator-system set env deploy/ztoperator ZTOPERATOR_FEATURE_ISTIO_AMBIENT-
+                ./bin/kubectl -n ztoperator-system rollout status deploy/ztoperator --timeout=150s
+              fi

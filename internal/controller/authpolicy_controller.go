@@ -7,11 +7,13 @@ import (
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/eventhandler/configmap"
+	"github.com/kartverket/ztoperator/internal/eventhandler/deployments"
 	"github.com/kartverket/ztoperator/internal/eventhandler/secret"
 	"github.com/kartverket/ztoperator/internal/predicates"
 	"github.com/kartverket/ztoperator/internal/reconciler"
 	"github.com/kartverket/ztoperator/internal/resolver"
 	"github.com/kartverket/ztoperator/internal/statusmanager"
+	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
 	"github.com/kartverket/ztoperator/pkg/log"
@@ -20,7 +22,8 @@ import (
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	v1alpha4 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	istioclientsecurityv1 "istio.io/client-go/pkg/apis/security/v1"
-	v1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sErrors "k8s.io/apimachinery/pkg/util/errors"
@@ -49,9 +52,11 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&istioclientsecurityv1.RequestAuthentication{}, builder.WithPredicates(predicates.SpecOrLabelsChanged())).
 		Owns(&istioclientsecurityv1.AuthorizationPolicy{}, builder.WithPredicates(predicates.SpecOrLabelsChanged())).
 		Owns(&v1alpha4.EnvoyFilter{}, builder.WithPredicates(predicates.SpecOrLabelsChanged())).
-		Owns(&v1.Secret{}, builder.WithPredicates(predicates.SecretContentOrLabelsChanged())).
-		Watches(&v1.Secret{}, secret.EventHandler(r.Client), builder.WithPredicates(predicates.SecretContentOrLabelsChanged())).
-		Watches(&v1.ConfigMap{}, configmap.EventHandler(r.Client), builder.WithPredicates(predicates.ConfigMapContentOrLabelsChanged())).
+		Owns(&corev1.Secret{}, builder.WithPredicates(predicates.SecretContentOrLabelsChanged())).
+		Owns(&corev1.ConfigMap{}, builder.WithPredicates(predicates.ConfigMapContentOrLabelsChanged())).
+		Watches(&corev1.Secret{}, secret.EventHandler(r.Client), builder.WithPredicates(predicates.SecretContentOrLabelsChanged())).
+		Watches(&corev1.ConfigMap{}, configmap.EventHandler(r.Client), builder.WithPredicates(predicates.ConfigMapContentOrLabelsChanged())).
+		Watches(&appsv1.Deployment{}, deployments.EventHandler(r.Client), builder.WithPredicates(predicates.DeploymentPodTemplateMetadataOrLabelsChanged())).
 		Complete(r)
 }
 
@@ -60,10 +65,10 @@ func (r *AuthPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // +kubebuilder:rbac:groups=ztoperator.kartverket.no,resources=authpolicies/finalizers,verbs=update
 // +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=core,resources=namespaces;pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch
 // +kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies;requestauthentications,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=secrets;configmaps,verbs=get;list;watch;create;update;patch;delete
 
 func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	rLog := log.GetLogger(ctx)
@@ -110,20 +115,13 @@ func (r *AuthPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if !maps.Equal(originalAuthPolicy.Labels, authPolicy.Labels) {
 		err := r.Patch(ctx, originalAuthPolicy, client.MergeFrom(authPolicy))
 		if err != nil {
-			return ctrl.Result{}, err
+			return r.failReconcile(ctx, authPolicy, err, "failed to patch AuthPolicy with AuthPolicy standard labels")
 		}
 	}
 
 	scope, err := resolveAuthPolicy(ctx, r.Client, *authPolicy)
 	if err != nil {
-		rLog.Error(err, fmt.Sprintf("Failed to resolve AuthPolicy with name %s", req.String()))
-		authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
-		authPolicy.Status.Message = err.Error()
-		updateStatusOnResolveFailedErr := statusmanager.UpdateStatus(ctx, r.Client, *authPolicy)
-		if updateStatusOnResolveFailedErr != nil {
-			return ctrl.Result{}, updateStatusOnResolveFailedErr
-		}
-		return reconcile.Result{}, err
+		return r.failReconcile(ctx, authPolicy, err, err.Error())
 	}
 
 	controllerResources := reconciler.ControllerResources(scope)
@@ -198,45 +196,120 @@ func resolveAuthPolicy(
 	authPolicy ztoperatorv1alpha1.AuthPolicy,
 ) (*model.Scope, error) {
 	rLog := log.GetLogger(ctx)
-	rLog.Info(fmt.Sprintf("Trying to resolve auth policy %s/%s", authPolicy.Namespace, authPolicy.Name))
+	rLog.Info(fmt.Sprintf("Trying to resolve AuthPolicy %s/%s", authPolicy.Namespace, authPolicy.Name))
 
-	oAuthCredentials, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, authPolicy)
-	if err != nil {
-		return nil, err
+	scope := model.Scope{AuthPolicy: authPolicy}
+	if err := resolveCommon(ctx, k8sClient, &scope); err != nil {
+		return nil, fmt.Errorf("failed to resolve common AuthPolicy fields: %w", err)
 	}
-
-	rLog.Info(
-		fmt.Sprintf(
-			"Trying to resolve discovery document from well-known uri: %s for AuthPolicy with name %s/%s",
-			authPolicy.Spec.WellKnownURI,
-			authPolicy.Namespace,
-			authPolicy.Name,
-		),
-	)
-	identityProviderUris, errIdentityProviderUris := resolver.ResolveDiscoveryDocument(authPolicy)
-	if errIdentityProviderUris != nil {
-		return nil, errIdentityProviderUris
-	}
-
-	autoLoginConfig := resolver.ResolveAutoLoginConfig(authPolicy, *identityProviderUris)
-
-	resolvedAudiences, errAudiences := resolver.ResolveAudiences(
-		ctx,
-		k8sClient,
-		authPolicy.Namespace,
-		authPolicy.Spec.AllowedAudiences,
-	)
-	if errAudiences != nil {
-		return nil, fmt.Errorf("failed to resolve audiences: %w", errAudiences)
+	if config.Get().FeatureIstioAmbient {
+		istioAmbientConfig, err := resolveIstioAmbientConfig(ctx, k8sClient, &scope)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"failed to resolve Istio Ambient config for AuthPolicy %s/%s: %w",
+				authPolicy.Namespace,
+				authPolicy.Name,
+				err,
+			)
+		}
+		scope.IstioAmbientConfig = *istioAmbientConfig
 	}
 
 	rLog.Info(fmt.Sprintf("Successfully resolved AuthPolicy with name %s/%s", authPolicy.Namespace, authPolicy.Name))
 
-	return &model.Scope{
-		Audiences:            *resolvedAudiences,
-		AuthPolicy:           authPolicy,
-		AutoLoginConfig:      autoLoginConfig,
-		OAuthCredentials:     *oAuthCredentials,
-		IdentityProviderUris: *identityProviderUris,
-	}, nil
+	return &scope, nil
+}
+
+func resolveCommon(
+	ctx context.Context,
+	k8sClient client.Client,
+	scope *model.Scope,
+) error {
+	identityProviderUris, errIdentityProviderUris := resolver.ResolveDiscoveryDocument(scope.AuthPolicy)
+	if errIdentityProviderUris != nil {
+		return errIdentityProviderUris
+	}
+	scope.IdentityProviderUris = *identityProviderUris
+
+	autoLoginConfig := resolver.ResolveAutoLoginConfig(scope.AuthPolicy, *identityProviderUris)
+	scope.AutoLoginConfig = autoLoginConfig
+
+	oAuthCredentials, err := resolver.ResolveOAuthCredentials(ctx, k8sClient, scope.AuthPolicy)
+	if err != nil {
+		return err
+	}
+	scope.OAuthCredentials = *oAuthCredentials
+
+	resolvedAudiences, errAudiences := resolver.ResolveAudiences(
+		ctx,
+		k8sClient,
+		scope.AuthPolicy.Namespace,
+		scope.AuthPolicy.Spec.AllowedAudiences,
+	)
+	if errAudiences != nil {
+		return fmt.Errorf("failed to resolve audiences: %w", errAudiences)
+	}
+	scope.Audiences = *resolvedAudiences
+	return nil
+}
+
+func resolveIstioAmbientConfig(
+	ctx context.Context,
+	k8sClient client.Client,
+	scope *model.Scope,
+) (*model.IstioAmbientConfig, error) {
+	istioAmbientConfig := model.IstioAmbientConfig{Enabled: false}
+	namespace, err := helperfunctions.GetNamespace(ctx, k8sClient, scope.AuthPolicy.Namespace)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to get namespace %s: %w",
+			scope.AuthPolicy.Namespace,
+			err,
+		)
+	}
+
+	deployment, err := helperfunctions.GetProtectedDeployment(ctx, k8sClient, scope.AuthPolicy)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to get deployment selected by AuthPolicy selector %v: %w",
+			scope.AuthPolicy.Spec.Selector,
+			err,
+		)
+	}
+
+	isIstioAmbientEnabled := helperfunctions.NamespaceIsIstioAmbientEligible(namespace) &&
+		helperfunctions.DeploymentIsIstioAmbientEligible(*deployment)
+
+	if isIstioAmbientEnabled {
+		envoyBootstrap, resolveEnvoyBootstrapErr := resolver.ResolveEnvoyBootstrap(
+			scope.AuthPolicy,
+			scope.AutoLoginConfig,
+			scope.OAuthCredentials,
+			scope.IdentityProviderUris,
+			scope.Audiences,
+			*deployment,
+		)
+		if resolveEnvoyBootstrapErr != nil {
+			return nil, resolveEnvoyBootstrapErr
+		}
+		istioAmbientConfig.Enabled = true
+		istioAmbientConfig.EnvoyBootstrap = envoyBootstrap
+	}
+	return &istioAmbientConfig, nil
+}
+
+func (r *AuthPolicyReconciler) failReconcile(
+	ctx context.Context,
+	authPolicy *ztoperatorv1alpha1.AuthPolicy,
+	err error,
+	errMsg string,
+) (ctrl.Result, error) {
+	rLog := log.GetLogger(ctx)
+	rLog.Error(err, errMsg)
+	authPolicy.Status.Phase = ztoperatorv1alpha1.PhaseFailed
+	authPolicy.Status.Message = errMsg
+	if updateErr := statusmanager.UpdateStatus(ctx, r.Client, *authPolicy); updateErr != nil {
+		return ctrl.Result{}, updateErr
+	}
+	return ctrl.Result{}, err
 }

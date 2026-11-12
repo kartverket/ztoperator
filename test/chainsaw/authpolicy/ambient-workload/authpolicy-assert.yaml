@@ -1,0 +1,41 @@
+apiVersion: ztoperator.kartverket.no/v1alpha1
+kind: AuthPolicy
+metadata:
+  name: auth-policy
+spec:
+  allowedAudiences:
+    - value: entraid_server
+  autoLogin:
+    enabled: true
+    scopes:
+      - openid
+  enabled: true
+  oAuthCredentials:
+    clientIDKey: CLIENT_ID
+    clientSecretKey: CLIENT_SECRET
+    secretRef: oauth-secret
+  selector:
+    matchLabels:
+      app: application
+  wellKnownURI: http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration
+status:
+  conditions:
+    - message: Descendants of AuthPolicy reconciled successfully.
+      reason: ReconciliationSuccess
+      status: "True"
+      type: AuthPolicy-auth-policy
+    - reason: Success
+      status: "True"
+      type: Secret-auth-policy-envoy-secret
+    - reason: Success
+      status: "True"
+      type: ConfigMap-auth-policy-envoy-bootstrap
+  istioAmbientConfig:
+    enabled: true
+    envoyBootstrap:
+      configMapKey: envoy.json
+      configMapName: auth-policy-envoy-bootstrap
+  message: AuthPolicy ready.
+  observedGeneration: 1
+  phase: Ready
+  ready: true

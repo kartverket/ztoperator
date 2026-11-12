@@ -6,7 +6,7 @@ import (
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/pkg/config"
-	"github.com/kartverket/ztoperator/pkg/resourcegenerators/envoyfilter/configpatch"
+	"github.com/kartverket/ztoperator/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -38,7 +38,7 @@ func ValidatePod(pod *corev1.Pod, authPolicy v1alpha1.AuthPolicy) error {
 		return fmt.Errorf(
 			"secret with name '%s' used by OAuth-EnvoyFilter is not mounted at '%s' in the %s container, %s",
 			envoySecretName,
-			configpatch.IstioCredentialsDirectory,
+			constants.EnvoyOAuth2CredentialsDirectory,
 			IstioProxyContainerName,
 			PodErrorMessageSuffix(),
 		)
@@ -104,7 +104,7 @@ func runningContainers(pod *corev1.Pod) []corev1.Container {
 
 func mountsCredentialsDirectory(container corev1.Container, volumes map[string]bool) bool {
 	for _, mount := range container.VolumeMounts {
-		if mount.MountPath == configpatch.IstioCredentialsDirectory &&
+		if mount.MountPath == constants.EnvoyOAuth2CredentialsDirectory &&
 			mount.SubPath == "" && mount.SubPathExpr == "" && volumes[mount.Name] {
 			return true
 		}
@@ -124,7 +124,7 @@ func exposesCredentialFiles(secret *corev1.SecretVolumeSource) bool {
 			exposed[item.Path] = true
 		}
 	}
-	return exposed[configpatch.TokenSecretFileName] && exposed[configpatch.HmacSecretFileName]
+	return exposed[constants.EnvoyOAuth2TokenSecretFileName] && exposed[constants.EnvoyOAuth2HmacSecretFileName]
 }
 
 func PodErrorMessageSuffix() string {

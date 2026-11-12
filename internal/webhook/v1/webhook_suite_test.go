@@ -16,6 +16,7 @@ import (
 	"github.com/kartverket/ztoperator/internal/webhook/authpolicy"
 	v1 "github.com/kartverket/ztoperator/internal/webhook/v1"
 	"github.com/kartverket/ztoperator/pkg/config"
+	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -228,6 +229,19 @@ func getWebhookNamespace(name string, webhookEnabled bool) *corev1.Namespace {
 	return ns
 }
 
+func getIstioAmbientWebhookNamespace(name string, webhookEnabled bool) *corev1.Namespace {
+	ns := &corev1.Namespace{
+		Name: name,
+		Labels: map[string]string{
+			constants.IstioAmbientLabelKey: constants.IstioAmbientLabelValue,
+		},
+	}
+	if webhookEnabled {
+		ns.Labels[v1.CreatedBySkipNamespaceLabel] = v1.CreatedBySkipNamespaceLabelValue
+	}
+	return ns
+}
+
 var _ = Describe("Pod validating webhook", func() {
 	It("does not block pod creation when pod is annotated correctly and AuthPolicy does not exists, because it lies in webhook disabled namespace", func() {
 		ns := getWebhookNamespace("pod-webhook-create-succeeds-disabled-ns", false)
@@ -253,7 +267,7 @@ var _ = Describe("Pod validating webhook", func() {
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
-		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[constants.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 	})
@@ -302,7 +316,7 @@ var _ = Describe("Pod validating webhook", func() {
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
-		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[constants.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 	})
@@ -331,7 +345,7 @@ var _ = Describe("Pod validating webhook", func() {
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
-		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[constants.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring("no AuthPolicy resource was found for the corresponding Application")))
 	})
@@ -380,7 +394,7 @@ var _ = Describe("Pod validating webhook", func() {
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
-		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[constants.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 	})
@@ -429,7 +443,7 @@ var _ = Describe("Pod validating webhook", func() {
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
-		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[constants.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring("no AuthPolicy resource was found for the corresponding Application")))
 	})
@@ -475,7 +489,7 @@ var _ = Describe("Pod validating webhook", func() {
 				Name:      "pod-webhook-create",
 				Namespace: ns.Name,
 				Labels: map[string]string{
-					v1.SkiperatorApplicationRefLabel: skiperatorAppName,
+					constants.SkiperatorApplicationRefLabel: skiperatorAppName,
 				},
 				Annotations: map[string]string{
 					v1.ZtoperatorVerifyAnnotationKey: v1.ZtoperatorVerifyAnnotationValue,
@@ -493,7 +507,7 @@ var _ = Describe("Pod validating webhook", func() {
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
-		pod.Labels[v1.SkiperatorApplicationRefLabel] = skiperatorAppName
+		pod.Labels[constants.SkiperatorApplicationRefLabel] = skiperatorAppName
 
 		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 		Expect(pod.Spec.Volumes).To(HaveLen(1))
@@ -525,6 +539,77 @@ var _ = Describe("Pod validating webhook", func() {
 		annotatedPod.Annotations["sidecar.istio.io/userVolume"] = "[]"
 		annotatedPod.Spec = corev1.PodSpec{Containers: []corev1.Container{{Name: skiperatorAppName, Image: "nginx:stable"}}}
 		Expect(k8sClient.Create(ctx, annotatedPod)).To(MatchError(ContainSubstring("is not mounted at '/etc/istio/config' in the istio-proxy container")))
+	})
+
+	When("the pod is Istio Ambient enabled", func() {
+		BeforeEach(func() {
+			Expect(os.Setenv("ZTOPERATOR_FEATURE_ISTIO_AMBIENT", "true")).To(Succeed())
+			Expect(config.Load()).To(Succeed())
+			DeferCleanup(func() {
+				Expect(os.Unsetenv("ZTOPERATOR_FEATURE_ISTIO_AMBIENT")).To(Succeed())
+				Expect(config.Load()).To(Succeed())
+			})
+		})
+
+		It("creates a pod even when it is missing annotations (authPolicy has enabled autoLogin)", func() {
+			ns := getIstioAmbientWebhookNamespace(
+				"pod-webhook-istio-ambient-invalid-annotations",
+				true,
+			)
+			skiperatorAppName := skiperatorAppName
+			authPolicyName := authPolicyName
+			Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+			DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
+
+			authPolicy := ztoperatorv1.AuthPolicy{
+				Name:      authPolicyName,
+				Namespace: ns.GetName(),
+				Spec: ztoperatorv1.AuthPolicySpec{
+					WellKnownURI: testWellKnownURI,
+					AllowedAudiences: []ztoperatorv1.AllowedAudience{{
+						Value: helperfunctions.Ptr("entraid_server"),
+					}},
+					Selector: ztoperatorv1.WorkloadSelector{
+						MatchLabels: map[string]string{"app": skiperatorAppName},
+					},
+					AutoLogin: &ztoperatorv1.AutoLogin{
+						Enabled: true,
+						Scopes:  []string{"openid"},
+					},
+					OAuthCredentials: &ztoperatorv1.OAuthCredentials{
+						SecretRef:       "secret",
+						ClientSecretKey: "CLIENT_ID",
+						ClientIDKey:     "CLIENT_SECRET",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, &authPolicy)).To(Succeed())
+			authPolicy.Status.Ready = true
+			Expect(k8sClient.Status().Update(ctx, &authPolicy)).To(Succeed())
+
+			pod := &corev1.Pod{
+				Name:      "pod-webhook-create",
+				Namespace: ns.Name,
+				Labels: map[string]string{
+					constants.SkiperatorApplicationRefLabel: skiperatorAppName,
+				},
+				Annotations: map[string]string{
+					v1.ZtoperatorVerifyAnnotationKey: v1.ZtoperatorVerifyAnnotationValue,
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:  skiperatorAppName,
+						Image: "nginx:stable",
+					}},
+				},
+			}
+			if pod.Labels == nil {
+				pod.Labels = make(map[string]string)
+			}
+			pod.Labels[constants.SkiperatorApplicationRefLabel] = skiperatorAppName
+
+			Expect(k8sClient.Create(ctx, pod)).To(Succeed())
+		})
 	})
 })
 
