@@ -1,0 +1,35 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: webhook-invalid-annotations
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+        skip.kartverket.no/skip-managed: "true"
+  steps:
+    - try:
+        - create:
+            file: application.yaml
+        - assert:
+            file: replicaset-invalid-value-assert.yaml
+        - assert:
+            file: replicaset-unknown-key-assert.yaml
+        - error:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                labels:
+                  app: app-invalid-value
+        - error:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                labels:
+                  app: app-unknown-key

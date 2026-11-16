@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  labels:
+    app: app-invalid-value
+status:
+  conditions:
+    - message: 'admission webhook "mpod-v1.kb.io" denied the request: invalid value "yes" for annotation ztoperator.kartverket.no/verify-authpolicy: must be "true" or "false"'
+      reason: FailedCreate
+      status: "True"
+      type: ReplicaFailure
