@@ -16,6 +16,21 @@ spec:
         - create:
             file: application.yaml
         - assert:
+            resource:
+              apiVersion: v1
+              kind: ServiceAccount
+              metadata:
+                name: app-invalid-value
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: ServiceAccount
+              metadata:
+                name: app-unknown-key
+        # Restart to clear stale conditions from before the ServiceAccounts existed
+        - script:
+            content: kubectl delete replicaset -n $NAMESPACE -l 'app in (app-invalid-value, app-unknown-key)' --ignore-not-found
+        - assert:
             file: replicaset-invalid-value-assert.yaml
         - assert:
             file: replicaset-unknown-key-assert.yaml

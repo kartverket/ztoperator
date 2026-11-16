@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  labels:
+    app: app-no-sidecar
+status:
+  conditions:
+    - message: 'admission webhook "vpod-v1.kb.io" denied the request: pod opts out of Istio sidecar injection (sidecar.istio.io/inject: "false"), but the enabled AuthPolicy ''auth-policy'' is enforced by the sidecar'
+      reason: FailedCreate
+      status: "True"
+      type: ReplicaFailure

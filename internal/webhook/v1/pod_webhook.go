@@ -211,7 +211,7 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 		return nil, nil
 	}
 
-	if !isAnnotationEnabled(pod, ZtoperatorVerifyAnnotationKey) {
+	if !isAnnotationEnabled(pod, ZtoperatorVerifyAnnotationKey) && !isAnnotationEnabled(pod, ZtoperatorInjectAnnotationKey) {
 		return nil, nil
 	}
 
