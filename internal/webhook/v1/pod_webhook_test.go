@@ -215,15 +215,17 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 			return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{key: value}}}
 		}
 
-		It("accepts true and false", func() {
-			Expect(v1.ValidateAnnotations(podWith(v1.ZtoperatorInjectAnnotationKey, "true"))).To(Succeed())
-			Expect(v1.ValidateAnnotations(podWith(v1.ZtoperatorVerifyAnnotationKey, "false"))).To(Succeed())
-		})
+		for _, key := range []string{v1.ZtoperatorInjectAnnotationKey, v1.ZtoperatorVerifyAnnotationKey} {
+			It("accepts true and false for "+key, func() {
+				Expect(v1.ValidateAnnotations(podWith(key, "true"))).To(Succeed())
+				Expect(v1.ValidateAnnotations(podWith(key, "false"))).To(Succeed())
+			})
 
-		It("rejects any other value", func() {
-			err := v1.ValidateAnnotations(podWith(v1.ZtoperatorVerifyAnnotationKey, "yes"))
-			Expect(err).To(MatchError(ContainSubstring("invalid value \"yes\"")))
-		})
+			It("rejects any other value for "+key, func() {
+				err := v1.ValidateAnnotations(podWith(key, "yes"))
+				Expect(err).To(MatchError(ContainSubstring("invalid value \"yes\"")))
+			})
+		}
 
 		It("rejects unsupported annotations under the prefix", func() {
 			err := v1.ValidateAnnotations(podWith(v1.ZtoperatorWebhookAnnotationPrefix+"does-not-exist", "true"))
