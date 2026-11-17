@@ -210,6 +210,33 @@ var _ = Describe("pod_webhook.go unit tests", func() {
 		})
 	})
 
+	Describe("ValidateAnnotations", func() {
+		podWith := func(key, value string) *corev1.Pod {
+			return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{key: value}}}
+		}
+
+		for _, key := range []string{v1.ZtoperatorInjectAnnotationKey, v1.ZtoperatorVerifyAnnotationKey} {
+			It("accepts true and false for "+key, func() {
+				Expect(v1.ValidateAnnotations(podWith(key, "true"))).To(Succeed())
+				Expect(v1.ValidateAnnotations(podWith(key, "false"))).To(Succeed())
+			})
+
+			It("rejects any other value for "+key, func() {
+				err := v1.ValidateAnnotations(podWith(key, "yes"))
+				Expect(err).To(MatchError(ContainSubstring("invalid value \"yes\"")))
+			})
+		}
+
+		It("rejects unsupported annotations under the prefix", func() {
+			err := v1.ValidateAnnotations(podWith(v1.ZtoperatorWebhookAnnotationPrefix+"does-not-exist", "true"))
+			Expect(err).To(MatchError(ContainSubstring("unsupported annotation")))
+		})
+
+		It("ignores annotations outside the prefix", func() {
+			Expect(v1.ValidateAnnotations(podWith("example.com/foo", "bar"))).To(Succeed())
+		})
+	})
+
 	Describe("IsWebhookEligible", func() {
 		newPod := func() corev1.Pod {
 			return corev1.Pod{

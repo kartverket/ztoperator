@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/kartverket/ztoperator/api/v1alpha1"
@@ -28,6 +29,7 @@ const (
 	ZtoperatorWebhookAnnotationPrefix = "ztoperator.kartverket.no/"
 	ZtoperatorVerifyAnnotationKey     = ZtoperatorWebhookAnnotationPrefix + "verify-authpolicy"
 	ZtoperatorAnnotationEnabledValue  = "true"
+	ZtoperatorAnnotationDisabledValue = "false"
 	ZtoperatorVerifyAnnotationValue   = ZtoperatorAnnotationEnabledValue
 	ZtoperatorInjectAnnotationKey     = ZtoperatorWebhookAnnotationPrefix + "inject"
 	ZtoperatorInjectAnnotationValue   = ZtoperatorAnnotationEnabledValue
@@ -62,6 +64,10 @@ func (d *PodCustomDefaulter) Default(ctx context.Context, pod *corev1.Pod) error
 	if !isPodWebhookEligible {
 		podlog.Info("Pod is not eligible for Ztoperator mutation", "reason", errMsg)
 		return nil
+	}
+
+	if err := ValidateAnnotations(pod); err != nil {
+		return err
 	}
 
 	podAuthPolicyConfiguration, err := GetPodAuthPolicyConfiguration(ctx, d.Client, pod)
@@ -191,6 +197,10 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 		return nil, nil
 	}
 
+	if err := ValidateAnnotations(pod); err != nil {
+		return nil, err
+	}
+
 	podAuthPolicyConfiguration, err := GetPodAuthPolicyConfiguration(ctx, k8sClient, pod)
 	if err != nil {
 		return nil, err
@@ -201,7 +211,7 @@ func validatePod(ctx context.Context, k8sClient client.Client, pod *corev1.Pod) 
 		return nil, nil
 	}
 
-	if !isAnnotationEnabled(pod, ZtoperatorVerifyAnnotationKey) {
+	if !isAnnotationEnabled(pod, ZtoperatorVerifyAnnotationKey) && !isAnnotationEnabled(pod, ZtoperatorInjectAnnotationKey) {
 		return nil, nil
 	}
 
@@ -281,6 +291,30 @@ func GetPodAuthPolicyConfiguration(
 		AppName:                          appName,
 		CreatedFromSkiperatorApplication: true,
 	}, nil
+}
+
+// ValidateAnnotations ensures only supported annotations are used under the Ztoperator prefix,
+// and that their values are either "true" or "false".
+func ValidateAnnotations(pod *corev1.Pod) error {
+	supported := []string{ZtoperatorInjectAnnotationKey, ZtoperatorVerifyAnnotationKey}
+	for key, value := range pod.Annotations {
+		if !strings.HasPrefix(key, ZtoperatorWebhookAnnotationPrefix) {
+			continue
+		}
+		if !slices.Contains(supported, key) {
+			return fmt.Errorf(
+				"unsupported annotation %s: supported annotations are %s",
+				key, strings.Join(supported, ", "),
+			)
+		}
+		if value != ZtoperatorAnnotationEnabledValue && value != ZtoperatorAnnotationDisabledValue {
+			return fmt.Errorf(
+				"invalid value %q for annotation %s: must be %q or %q",
+				value, key, ZtoperatorAnnotationEnabledValue, ZtoperatorAnnotationDisabledValue,
+			)
+		}
+	}
+	return nil
 }
 
 func isAnnotationEnabled(pod *corev1.Pod, key string) bool {

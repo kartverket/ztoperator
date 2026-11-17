@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
+	"github.com/kartverket/ztoperator/pkg/validation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -611,6 +613,141 @@ var _ = Describe("Pod validating webhook", func() {
 			Expect(k8sClient.Create(ctx, pod)).To(Succeed())
 		})
 	})
+})
+
+var _ = Describe("Pod webhook annotation handling and validation", func() {
+	newPod := func(namespace string, annotations map[string]string) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "pod-webhook-annotations",
+				Namespace:   namespace,
+				Annotations: annotations,
+				Labels:      map[string]string{constants.SkiperatorApplicationRefLabel: skiperatorAppName},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: skiperatorAppName, Image: "nginx:stable"}},
+			},
+		}
+	}
+
+	newNamespace := func(name string) *corev1.Namespace {
+		ns := getWebhookNamespace(name, true)
+		Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, ns) })
+		return ns
+	}
+
+	for _, key := range []string{v1.ZtoperatorInjectAnnotationKey, v1.ZtoperatorVerifyAnnotationKey} {
+		It("rejects a pod where "+key+" has a value other than true or false", func() {
+			ns := newNamespace("pod-webhook-invalid-" + path.Base(key))
+			pod := newPod(ns.Name, map[string]string{key: "yes"})
+
+			Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring(
+				"invalid value \"yes\" for annotation " + key,
+			)))
+		})
+	}
+
+	It("rejects a pod with an unsupported annotation under the Ztoperator prefix", func() {
+		ns := newNamespace("pod-webhook-annotation-unknown-key-ns")
+		pod := newPod(ns.Name, map[string]string{v1.ZtoperatorWebhookAnnotationPrefix + "does-not-exist": "true"})
+
+		Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring(
+			"unsupported annotation " + v1.ZtoperatorWebhookAnnotationPrefix + "does-not-exist",
+		)))
+	})
+
+	createAuthPolicy := func(namespace string, autoLogin bool) {
+		authPolicy := ztoperatorv1.AuthPolicy{
+			ObjectMeta: metav1.ObjectMeta{Name: authPolicyName, Namespace: namespace},
+			Spec: ztoperatorv1.AuthPolicySpec{
+				Enabled:      true,
+				WellKnownURI: testWellKnownURI,
+				AllowedAudiences: []ztoperatorv1.AllowedAudience{{
+					Value: helperfunctions.Ptr("entraid_server"),
+				}},
+				Selector: ztoperatorv1.WorkloadSelector{
+					MatchLabels: map[string]string{"app": skiperatorAppName},
+				},
+			},
+		}
+		if autoLogin {
+			authPolicy.Spec.AutoLogin = &ztoperatorv1.AutoLogin{Enabled: true, Scopes: []string{"openid"}}
+			authPolicy.Spec.OAuthCredentials = &ztoperatorv1.OAuthCredentials{
+				SecretRef:       "secret",
+				ClientSecretKey: "CLIENT_SECRET",
+				ClientIDKey:     "CLIENT_ID",
+			}
+		}
+		Expect(k8sClient.Create(ctx, &authPolicy)).To(Succeed())
+		authPolicy.Status.Ready = true
+		Expect(k8sClient.Status().Update(ctx, &authPolicy)).To(Succeed())
+	}
+
+	withIstioProxyMountingEnvoySecret := func(pod *corev1.Pod) *corev1.Pod {
+		pod.Spec.Volumes = []corev1.Volume{{
+			Name:         "envoy-secret",
+			VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: names.EnvoySecret(authPolicyName)}},
+		}}
+		pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
+			Name:         "istio-proxy",
+			Image:        "nginx:stable",
+			VolumeMounts: []corev1.VolumeMount{{Name: "envoy-secret", MountPath: constants.EnvoyOAuth2CredentialsDirectory}},
+		})
+		return pod
+	}
+
+	// The validating webhook validates the final pod when either annotation is "true".
+	for _, key := range []string{v1.ZtoperatorInjectAnnotationKey, v1.ZtoperatorVerifyAnnotationKey} {
+		suffix := path.Base(key)
+		enabled := map[string]string{key: "true"}
+
+		It("rejects a pod when "+key+" is true and no AuthPolicy exists", func() {
+			ns := newNamespace("pod-webhook-no-authpolicy-" + suffix)
+
+			Expect(k8sClient.Create(ctx, newPod(ns.Name, enabled))).To(MatchError(ContainSubstring(
+				"no AuthPolicy resource was found for the corresponding Application",
+			)))
+		})
+
+		It("rejects a pod that opts out of sidecar injection when "+key+" is true", func() {
+			ns := newNamespace("pod-webhook-no-sidecar-" + suffix)
+			createAuthPolicy(ns.Name, false)
+			pod := newPod(ns.Name, map[string]string{key: "true", validation.IstioInjectKey: "false"})
+
+			Expect(k8sClient.Create(ctx, pod)).To(MatchError(ContainSubstring("opts out of Istio sidecar injection")))
+		})
+
+		It("rejects a pod without the envoy secret mounted in istio-proxy when "+key+" is true and autoLogin is enabled", func() {
+			ns := newNamespace("pod-webhook-no-mount-" + suffix)
+			createAuthPolicy(ns.Name, true)
+
+			Expect(k8sClient.Create(ctx, newPod(ns.Name, enabled))).To(MatchError(ContainSubstring(
+				"is not mounted at '/etc/istio/config' in the istio-proxy container",
+			)))
+		})
+
+		It("allows a pod with the envoy secret mounted in istio-proxy when "+key+" is true and autoLogin is enabled", func() {
+			ns := newNamespace("pod-webhook-mounted-" + suffix)
+			createAuthPolicy(ns.Name, true)
+
+			Expect(k8sClient.Create(ctx, withIstioProxyMountingEnvoySecret(newPod(ns.Name, enabled)))).To(Succeed())
+		})
+
+		It("allows a pod without any mount when "+key+" is true and autoLogin is disabled", func() {
+			ns := newNamespace("pod-webhook-no-autologin-" + suffix)
+			createAuthPolicy(ns.Name, false)
+
+			Expect(k8sClient.Create(ctx, newPod(ns.Name, enabled))).To(Succeed())
+		})
+
+		It("does not validate the pod when "+key+" is false", func() {
+			ns := newNamespace("pod-webhook-false-" + suffix)
+			pod := newPod(ns.Name, map[string]string{key: "false", validation.IstioInjectKey: "false"})
+
+			Expect(k8sClient.Create(ctx, pod)).To(Succeed())
+		})
+	}
 })
 
 var _ = Describe("AuthPolicy validating webhook", func() {

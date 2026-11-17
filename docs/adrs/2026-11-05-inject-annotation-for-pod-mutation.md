@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Partly superseded by [2026-11-16-validating-webhook-also-acts-on-inject](2026-11-16-validating-webhook-also-acts-on-inject.md):
+the validating webhook now also acts on `inject: "true"`, so `verify-authpolicy` is no longer the only trigger for
+validation and setting both annotations is no longer needed to get the final pod verified. The rest of this decision
+still stands.
 
 Deciders: Team tilgangsstyring
 
