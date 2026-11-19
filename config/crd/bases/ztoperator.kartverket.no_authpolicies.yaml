@@ -426,6 +426,7 @@ spec:
                     description: ClientIDKey specifies the data key to access the
                       client ID.
                     maxLength: 253
+                    minLength: 1
                     type: string
                   clientSecretKey:
                     description: |-
@@ -439,6 +440,7 @@ spec:
                       PrivateJwkKey specifies the data key to access the private JSON Web Key (JWK).
                       Exactly one of ClientSecretKey and PrivateJwkKey must be set.
                     maxLength: 253
+                    minLength: 1
                     type: string
                   secretRef:
                     description: SecretRef specifies the name of the kubernetes secret.

@@ -240,6 +240,7 @@ type OAuthCredentials struct {
 	// ClientSecretKey specifies the data key to access the client secret.
 	// Exactly one of ClientSecretKey and PrivateJwkKey must be set.
 	//
+	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:Optional
 	ClientSecretKey string `json:"clientSecretKey,omitempty"`
@@ -254,6 +255,7 @@ type OAuthCredentials struct {
 
 	// ClientIDKey specifies the data key to access the client ID.
 	//
+	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:Required
 	ClientIDKey string `json:"clientIDKey"`
