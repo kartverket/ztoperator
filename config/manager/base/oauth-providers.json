@@ -1,0 +1,48 @@
+{
+  "entraid": {
+    "wellKnownURI": "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration",
+    "requireAudience": true,
+    "issuer": "http://mock-oauth2.auth:8080/entraid",
+    "authorizationEndpoint": "http://mock-oauth2.auth:8080/entraid/authorize",
+    "tokenEndpoint": "http://mock-oauth2.auth:8080/entraid/token",
+    "jwksURI": "http://mock-oauth2.auth:8080/entraid/jwks",
+    "endSessionEndpoint": "http://mock-oauth2.auth:8080/entraid/endsession"
+  },
+  "smapi": {
+    "wellKnownURI": "http://mock-oauth2.auth:8080/smapi/.well-known/openid-configuration",
+    "requireAudience": true,
+    "issuer": "http://mock-oauth2.auth:8080/smapi",
+    "authorizationEndpoint": "http://mock-oauth2.auth:8080/smapi/authorize",
+    "tokenEndpoint": "http://mock-oauth2.auth:8080/smapi/token",
+    "jwksURI": "http://mock-oauth2.auth:8080/smapi/jwks",
+    "endSessionEndpoint": "http://mock-oauth2.auth:8080/smapi/endsession"
+  },
+  "maskinporten": {
+    "wellKnownURI": "http://mock-oauth2.auth:8080/maskinporten/.well-known/openid-configuration",
+    "requireAudience": false,
+    "issuer": "http://mock-oauth2.auth:8080/maskinporten",
+    "authorizationEndpoint": "http://mock-oauth2.auth:8080/maskinporten/authorize",
+    "tokenEndpoint": "http://mock-oauth2.auth:8080/maskinporten/token",
+    "jwksURI": "http://mock-oauth2.auth:8080/maskinporten/jwks",
+    "endSessionEndpoint": "http://mock-oauth2.auth:8080/maskinporten/endsession"
+  },
+  "ztoperator": {
+    "wellKnownURI": "http://mock-oauth2.auth:8080/ztoperator/.well-known/openid-configuration",
+    "requireAudience": false,
+    "issuer": "http://mock-oauth2.auth:8080/ztoperator",
+    "authorizationEndpoint": "http://mock-oauth2.auth:8080/ztoperator/authorize",
+    "tokenEndpoint": "http://mock-oauth2.auth:8080/ztoperator/token",
+    "jwksURI": "http://mock-oauth2.auth:8080/ztoperator/jwks",
+    "endSessionEndpoint": "http://mock-oauth2.auth:8080/ztoperator/endsession"
+  },
+  "private-jwk": {
+    "wellKnownURI": "http://mock-oauth2.auth:8080/private-jwk/.well-known/openid-configuration",
+    "requireAudience": true,
+    "issuer": "http://mock-oauth2.auth:8080/private-jwk",
+    "privateKeyJwtAssertionAudience": "http://mock-oauth2.auth:8080/private-jwk",
+    "authorizationEndpoint": "http://mock-oauth2.auth:8080/private-jwk/authorize",
+    "tokenEndpoint": "http://mock-oauth2.auth:8080/private-jwk/token",
+    "jwksURI": "http://mock-oauth2.auth:8080/private-jwk/jwks",
+    "endSessionEndpoint": "http://mock-oauth2.auth:8080/private-jwk/endsession"
+  }
+}
