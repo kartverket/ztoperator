@@ -21,6 +21,7 @@ const (
 	testTokenURI         = "https://token.example.com/oauth2/token"
 	testAuthorizationURI = "https://issuer.example.com/authorize"
 	testClientID         = "my-client-id"
+	testAuthType         = oauth2v3.OAuth2Config_URL_ENCODED_BODY
 )
 
 var testAudiences = []string{"my-audience"}
@@ -115,6 +116,8 @@ func TestGetEnvoyHttpFilterConfig_ReturnsNothingWhenAuthPolicyDisabled(t *testin
 				testIdentityProviderUris(),
 				testAudiences,
 				new(testClientID),
+				testAuthType,
+				nil,
 			)
 			require.NoError(t, err)
 
@@ -132,6 +135,8 @@ func TestGetEnvoyHttpFilterConfig_AutoLoginDisabled(t *testing.T) {
 		testIdentityProviderUris(),
 		testAudiences,
 		nil, // client ID is not resolved when auto login is disabled
+		testAuthType,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -156,6 +161,8 @@ func TestGetEnvoyHttpFilterConfig_AutoLoginEnabled(t *testing.T) {
 		testIdentityProviderUris(),
 		testAudiences,
 		new(testClientID),
+		testAuthType,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -184,6 +191,8 @@ func TestGetEnvoyHttpFilterConfig_GroupsFiltersAndClusters(t *testing.T) {
 		testIdentityProviderUris(),
 		testAudiences,
 		new(testClientID),
+		testAuthType,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -217,6 +226,8 @@ func TestGetEnvoyHttpFilterConfig_ContainsNoNilFiltersOrClusters(t *testing.T) {
 				testIdentityProviderUris(),
 				testAudiences,
 				new(testClientID),
+				testAuthType,
+				nil,
 			)
 			require.NoError(t, err)
 			assert.NotContains(t, config.GetHttpFilters(), (*httpconnectionmanagerv3.HttpFilter)(nil))
@@ -234,6 +245,8 @@ func TestGetEnvoyHttpFilterConfig_NeverContainsRouterFilter(t *testing.T) {
 			testIdentityProviderUris(),
 			testAudiences,
 			new(testClientID),
+			testAuthType,
+			nil,
 		)
 		require.NoError(t, err)
 		assert.NotContains(t, filterNames(config.GetHttpFilters()), httpfilter.EnvoyExtensionHttpFilterRouter)
@@ -247,6 +260,8 @@ func TestGetEnvoyHttpFilterConfigFilters_ReferenceExistingClusters(t *testing.T)
 		testIdentityProviderUris(),
 		testAudiences,
 		new(testClientID),
+		testAuthType,
+		nil,
 	)
 	require.NoError(t, err)
 	httpFilters := config.GetHttpFilters()
@@ -285,6 +300,8 @@ func TestGetEnvoyHttpFilterConfig_FailsWhenAutoLoginEnabledWithoutClientID(t *te
 		autoLoginEnabledConfig(),
 		testIdentityProviderUris(),
 		testAudiences,
+		nil,
+		testAuthType,
 		nil,
 	)
 	require.Error(t, err)

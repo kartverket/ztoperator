@@ -28,6 +28,8 @@ const (
 func OAuth2(
 	identityProviderUris model.IdentityProviderUris,
 	clientID string,
+	authType oauth2v3.OAuth2Config_AuthType,
+	privateKeyJwtConfig *oauth2v3.PrivateKeyJwtConfig,
 	resources, scopes []string,
 	signoutPath, redirectPath, tokenClusterName string,
 	postLogoutRedirectUri *string,
@@ -102,7 +104,7 @@ func OAuth2(
 			},
 			AuthScopes:      scopes,
 			Resources:       resources,
-			AuthType:        oauth2v3.OAuth2Config_URL_ENCODED_BODY,
+			AuthType:        authType,
 			UseRefreshToken: &wrapperspb.BoolValue{Value: true},
 			DenyRedirectMatcher: []*routev3.HeaderMatcher{
 				{
@@ -127,6 +129,10 @@ func OAuth2(
 			},
 			DisableTokenEncryption: false,
 		},
+	}
+
+	if authType == oauth2v3.OAuth2Config_PRIVATE_KEY_JWT {
+		oauth2Filter.Config.PrivateKeyJwtConfig = privateKeyJwtConfig
 	}
 
 	if identityProviderUris.EndSessionURI != nil {

@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	clusterv3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
+	oauth2v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/oauth2/v3"
 	httpconnectionmanagerv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/pkg/envoy/cluster"
@@ -120,6 +121,8 @@ func GetEnvoyHttpFilterConfig(
 	identityProviderUris model.IdentityProviderUris,
 	audiences []string,
 	clientID *string,
+	authType oauth2v3.OAuth2Config_AuthType,
+	privateKeyJwtConfig *oauth2v3.PrivateKeyJwtConfig,
 ) (*HttpFilterConfig, error) {
 	envoyHttpFilterConfig := HttpFilterConfig{}
 	if !authPolicy.Spec.Enabled {
@@ -132,6 +135,8 @@ func GetEnvoyHttpFilterConfig(
 			autoLoginConfig,
 			identityProviderUris,
 			clientID,
+			authType,
+			privateKeyJwtConfig,
 		)
 		if err != nil {
 			return nil, err
@@ -155,6 +160,8 @@ func GetAutoLoginFiltersAndClusters(
 	autoLoginConfig model.AutoLoginConfig,
 	identityProviderUris model.IdentityProviderUris,
 	clientID *string,
+	authType oauth2v3.OAuth2Config_AuthType,
+	privateKeyJwtConfig *oauth2v3.PrivateKeyJwtConfig,
 ) (*AutoLoginFiltersAndClusters, error) {
 	if clientID == nil {
 		return nil, errors.New(
@@ -175,6 +182,8 @@ func GetAutoLoginFiltersAndClusters(
 		autoLoginConfig,
 		identityProviderUris,
 		*clientID,
+		authType,
+		privateKeyJwtConfig,
 		TokenEndpointClusterName,
 	)
 	if err != nil {

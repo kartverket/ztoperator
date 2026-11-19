@@ -3,70 +3,69 @@ package secret
 import (
 	"fmt"
 
+	tlsv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
+	discoveryv3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	"github.com/kartverket/ztoperator/pkg/constants"
-	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/model"
-	v1 "k8s.io/api/core/v1"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/anypb"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/kustomize/kyaml/yaml"
+	"sigs.k8s.io/yaml"
 )
 
-func GetDesired(scope *model.Scope, objectMeta metav1.ObjectMeta) *v1.Secret {
+func GetDesired(scope *model.Scope, objectMeta metav1.ObjectMeta) *corev1.Secret {
 	if !scope.AuthPolicy.Spec.Enabled || scope.InvalidConfig || scope.AuthPolicy.Spec.AutoLogin == nil ||
 		!scope.AuthPolicy.Spec.AutoLogin.Enabled {
 		return nil
 	}
 
-	envoySecret, err := getEnvoySecret(objectMeta, *scope.OAuthCredentials.ClientSecret)
+	hmacSecretBytes, err := marshalSdsSecret(scope.OAuthCredentials.HmacSecret.Value)
 	if err != nil {
-		return nil
+		panic(
+			fmt.Sprintf(
+				"failed to marshal hmac secret for AuthPolicy %s/%s: %v",
+				scope.AuthPolicy.Namespace,
+				scope.AuthPolicy.Name,
+				err,
+			),
+		)
 	}
-	return envoySecret
-}
 
-func getEnvoySecret(objectMeta metav1.ObjectMeta, clientSecret string) (*v1.Secret, error) {
-	secretData := map[string][]byte{}
-
-	hmacSecret, err := helperfunctions.GenerateHMACSecret(32)
+	tokenSecretBytes, err := marshalSdsSecret(scope.OAuthCredentials.TokenSecret.Value)
 	if err != nil {
-		return nil, err
+		panic(
+			fmt.Sprintf(
+				"failed to marshal token secret for AuthPolicy %s/%s: %v",
+				scope.AuthPolicy.Namespace,
+				scope.AuthPolicy.Name,
+				err,
+			),
+		)
 	}
-	hmacSecretDataValue, err := getEnvoySecretDataValue("hmac", *hmacSecret, "inline_bytes")
-	if err != nil {
-		return nil, err
-	}
-	secretData[constants.EnvoyOAuth2HmacSecretFileName] = *hmacSecretDataValue
 
-	tokenSecretDataValue, err := getEnvoySecretDataValue("token", clientSecret, "inline_string")
-	if err != nil {
-		return nil, err
-	}
-	secretData[constants.EnvoyOAuth2TokenSecretFileName] = *tokenSecretDataValue
-
-	return &v1.Secret{
+	return &corev1.Secret{
 		ObjectMeta: objectMeta,
-		Type:       v1.SecretTypeOpaque,
-		Data:       secretData,
-	}, nil
-}
-
-func getEnvoySecretDataValue(resourceName string, secret string, secretType string) (*[]byte, error) {
-	data := map[string]interface{}{
-		"resources": []map[string]interface{}{
-			{
-				"@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret",
-				"name":  resourceName,
-				"generic_secret": map[string]interface{}{
-					"secret": map[string]string{
-						secretType: secret,
-					},
-				},
-			},
+		Type:       corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			constants.EnvoyOAuth2HmacSecretFileName:  hmacSecretBytes,
+			constants.EnvoyOAuth2TokenSecretFileName: tokenSecretBytes,
 		},
 	}
-	yamlData, err := yaml.Marshal(data)
+}
+
+func marshalSdsSecret(secret *tlsv3.Secret) ([]byte, error) {
+	res, err := anypb.New(secret)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal yaml: %w", err)
+		return nil, fmt.Errorf("failed to wrap secret in protobuf Any: %w", err)
 	}
-	return &yamlData, nil
+
+	jsonBytes, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(
+		&discoveryv3.DiscoveryResponse{Resources: []*anypb.Any{res}},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal SDS response: %w", err)
+	}
+
+	return yaml.JSONToYAML(jsonBytes)
 }

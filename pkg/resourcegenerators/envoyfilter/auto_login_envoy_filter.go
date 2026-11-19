@@ -19,6 +19,8 @@ func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 		scope.AutoLoginConfig,
 		scope.IdentityProviderUris,
 		scope.OAuthCredentials.ClientID,
+		scope.OAuthCredentials.TokenSecret.AuthType,
+		scope.OAuthCredentials.TokenSecret.PrivateKeyJwtConfig,
 	)
 	if err != nil {
 		panic("failed to get envoy http filter config: " + err.Error())

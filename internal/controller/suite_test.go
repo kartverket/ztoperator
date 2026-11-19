@@ -45,21 +45,12 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	ctx, cancel = context.WithCancel(context.TODO())
-	providers := `{
-		"entraid": {
-			"wellKnownURI": "http://mock-oauth2.auth:8080/entraid/.well-known/openid-configuration",
-			"requireAudience": true,
-			"issuer": "http://mock-oauth2.auth:8080/entraid",
-			"authorizationEndpoint": "http://mock-oauth2.auth:8080/entraid/authorize",
-			"tokenEndpoint": "http://mock-oauth2.auth:8080/entraid/token",
-			"jwksURI": "http://mock-oauth2.auth:8080/entraid/jwks",
-			"endSessionEndpoint": "http://mock-oauth2.auth:8080/entraid/endsession"
-		}
-	}`
-	Expect(os.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", providers)).To(Succeed())
+	// Same providers as local development and e2e tests.
+	providers, err := os.ReadFile(filepath.Join("..", "..", "config", "manager", "base", "oauth-providers.json"))
+	Expect(err).NotTo(HaveOccurred())
+	Expect(os.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", string(providers))).To(Succeed())
 	Expect(config.Load()).To(Succeed())
 
-	var err error
 	err = ztoperatorv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = istionetworkingv1.AddToScheme(scheme.Scheme)

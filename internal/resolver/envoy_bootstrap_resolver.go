@@ -42,6 +42,8 @@ func ResolveEnvoyBootstrap(
 		identityProviderUris,
 		audiences,
 		oAuthCredentials.ClientID,
+		oAuthCredentials.TokenSecret.AuthType,
+		oAuthCredentials.TokenSecret.PrivateKeyJwtConfig,
 		fmt.Sprintf("http://%s:%d", loopbackAddress, skiperatorAppPort),
 		envoymodel.BindAddresses{
 			Ingress: netip.AddrPortFrom(

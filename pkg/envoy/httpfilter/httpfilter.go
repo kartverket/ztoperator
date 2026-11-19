@@ -3,6 +3,7 @@ package httpfilter
 import (
 	"fmt"
 
+	oauth2v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/oauth2/v3"
 	routerv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/router/v3"
 	httpconnectionmanagerv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	"github.com/kartverket/ztoperator/pkg/envoy/httpfilter/jwtauthn"
@@ -79,11 +80,15 @@ func OAuth2HttpFilter(
 	autoLoginConfig model.AutoLoginConfig,
 	identityProviderUris model.IdentityProviderUris,
 	clientID string,
+	authType oauth2v3.OAuth2Config_AuthType,
+	privateKeyJwtConfig *oauth2v3.PrivateKeyJwtConfig,
 	tokenEndpointClusterName string,
 ) (*httpconnectionmanagerv3.HttpFilter, error) {
 	oAuth2, err := oauth2.OAuth2(
 		identityProviderUris,
 		clientID,
+		authType,
+		privateKeyJwtConfig,
 		autoLoginConfig.ResourceIndicators,
 		autoLoginConfig.Scopes,
 		autoLoginConfig.LogoutPath,
