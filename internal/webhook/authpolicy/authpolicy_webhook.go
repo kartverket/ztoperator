@@ -53,23 +53,15 @@ func validateAuthPolicy(authPolicy *ztoperatorv1alpha1.AuthPolicy) error {
 		return errors.New("AuthPolicy must not be nil")
 	}
 
-	provider, found := findOAuthProvider(authPolicy.Spec.WellKnownURI)
+	provider, found := config.GetOAuthProvider(authPolicy.Spec.WellKnownURI)
 	if !found {
 		return fmt.Errorf("wellKnownURI %q is not in the configured allowlist", authPolicy.Spec.WellKnownURI)
 	}
 	if provider.RequireAudience && len(authPolicy.Spec.AllowedAudiences) == 0 {
 		return fmt.Errorf("allowedAudiences must be non-empty for wellKnownURI %q", authPolicy.Spec.WellKnownURI)
 	}
-	if authPolicy.Spec.AutoLogin != nil && authPolicy.Spec.AutoLogin.Enabled {
-		if provider.AuthorizationEndpoint == "" || provider.EndSessionEndpoint == "" {
-			return fmt.Errorf(
-				"issuer %s for AuthPolicy with name %s/%s does not support authorization endpoint "+
-					"or end session endpoint required for autologin",
-				provider.Issuer,
-				authPolicy.Namespace,
-				authPolicy.Name,
-			)
-		}
+	if err := validateProviderCapabilities(authPolicy, provider); err != nil {
+		return err
 	}
 	if err := validation.ValidatePaths(authPolicy.GetPaths()); err != nil {
 		return err
@@ -77,11 +69,22 @@ func validateAuthPolicy(authPolicy *ztoperatorv1alpha1.AuthPolicy) error {
 	return nil
 }
 
-func findOAuthProvider(wellKnownURI string) (config.OAuthProvider, bool) {
-	for _, provider := range config.Get().AllowedOAuthProviders {
-		if provider.WellKnownURI == wellKnownURI {
-			return provider, true
-		}
+func validateProviderCapabilities(authPolicy *ztoperatorv1alpha1.AuthPolicy, provider config.OAuthProvider) error {
+	if authPolicy.Spec.AutoLogin != nil && authPolicy.Spec.AutoLogin.Enabled &&
+		provider.AuthorizationEndpoint == "" {
+		return fmt.Errorf(
+			"the configured OAuth provider does not support user login (no authorization endpoint configured "+
+				"for wellKnownURI %q)",
+			authPolicy.Spec.WellKnownURI,
+		)
 	}
-	return config.OAuthProvider{}, false
+	if authPolicy.Spec.OAuthCredentials != nil && authPolicy.Spec.OAuthCredentials.PrivateJwkKey != "" &&
+		provider.PrivateKeyJwtAssertionAudience == "" {
+		return fmt.Errorf(
+			"the configured OAuth provider does not support private_key_jwt client authentication "+
+				"(no private key JWT assertion audience configured for wellKnownURI %q)",
+			authPolicy.Spec.WellKnownURI,
+		)
+	}
+	return nil
 }

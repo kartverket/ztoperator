@@ -12,13 +12,14 @@ import (
 
 // OAuthProvider configures an allowed provider and its discovery document values.
 type OAuthProvider struct {
-	WellKnownURI          string `json:"wellKnownURI"`
-	RequireAudience       bool   `json:"requireAudience"`
-	Issuer                string `json:"issuer"`
-	AuthorizationEndpoint string `json:"authorizationEndpoint"`
-	TokenEndpoint         string `json:"tokenEndpoint"`
-	JwksURI               string `json:"jwksURI"`
-	EndSessionEndpoint    string `json:"endSessionEndpoint"`
+	WellKnownURI                   string `json:"wellKnownURI"`
+	RequireAudience                bool   `json:"requireAudience"`
+	Issuer                         string `json:"issuer"`
+	AuthorizationEndpoint          string `json:"authorizationEndpoint"`
+	TokenEndpoint                  string `json:"tokenEndpoint"`
+	JwksURI                        string `json:"jwksURI"`
+	EndSessionEndpoint             string `json:"endSessionEndpoint"`
+	PrivateKeyJwtAssertionAudience string `json:"privateKeyJwtAssertionAudience"`
 }
 
 // AllowedOAuthProviders maps provider names to their configuration.
@@ -48,13 +49,25 @@ func Load() error {
 	if err := envconfig.Process("ztoperator", &loaded); err != nil {
 		return err
 	}
-	if len(loaded.AllowedOAuthProviders) == 0 {
+	if err := validateProviders(loaded.AllowedOAuthProviders); err != nil {
+		return err
+	}
+
+	cfg = loaded
+	return nil
+}
+
+func validateProviders(providers AllowedOAuthProviders) error {
+	if len(providers) == 0 {
 		return errors.New("at least one OAuth provider must be configured")
 	}
-	configuredURIs := make(map[string]string, len(loaded.AllowedOAuthProviders))
-	for name, provider := range loaded.AllowedOAuthProviders {
+	configuredURIs := make(map[string]string, len(providers))
+	for name, provider := range providers {
 		if name == "" {
 			return errors.New("OAuth provider name must not be empty")
+		}
+		if provider.Issuer == "" {
+			return errors.New("OAuth provider issuer must not be empty")
 		}
 		for _, endpoint := range []struct {
 			field    string
@@ -62,7 +75,6 @@ func Load() error {
 			required bool
 		}{
 			{field: "wellKnownURI", uri: provider.WellKnownURI, required: true},
-			{field: "issuer", uri: provider.Issuer, required: true},
 			{field: "tokenEndpoint", uri: provider.TokenEndpoint, required: true},
 			{field: "jwksURI", uri: provider.JwksURI, required: true},
 			{field: "authorizationEndpoint", uri: provider.AuthorizationEndpoint},
@@ -82,13 +94,20 @@ func Load() error {
 		}
 		configuredURIs[provider.WellKnownURI] = name
 	}
-
-	cfg = loaded
 	return nil
 }
 
 func Get() Config {
 	return cfg
+}
+
+func GetOAuthProvider(wellKnownURI string) (OAuthProvider, bool) {
+	for _, provider := range Get().AllowedOAuthProviders {
+		if provider.WellKnownURI == wellKnownURI {
+			return provider, true
+		}
+	}
+	return OAuthProvider{}, false
 }
 
 func validateProviderURI(providerName, field, uri string, required bool) error {

@@ -13,6 +13,8 @@ import (
 const (
 	webhookAllowedURI  = "https://idp.example.com/.well-known/openid-configuration"
 	webhookOptionalURI = "https://optional-idp.example.com/.well-known/openid-configuration"
+
+	webhookPrivateKeyJwtURI = "https://pkjwt.example.com/.well-known/openid-configuration"
 )
 
 var _ = Describe("AuthPolicy validator", func() {
@@ -63,7 +65,7 @@ var _ = Describe("AuthPolicy validator", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("rejects auto-login when the provider lacks required endpoints", func() {
+	It("rejects auto-login when the provider has no authorization endpoint", func() {
 		authPolicy := validWebhookAuthPolicy()
 		authPolicy.Spec.WellKnownURI = webhookOptionalURI
 		authPolicy.Spec.AutoLogin = &ztoperatorv1alpha1.AutoLogin{Enabled: true}
@@ -75,16 +77,45 @@ var _ = Describe("AuthPolicy validator", func() {
 
 		_, err := validator.ValidateCreate(context.Background(), authPolicy)
 
-		Expect(err).To(MatchError(ContainSubstring("does not support authorization endpoint")))
+		Expect(err).To(MatchError(ContainSubstring("does not support user login")))
 	})
 
-	It("accepts auto-login when the provider has required endpoints", func() {
+	It("accepts auto-login when the provider has an authorization endpoint but no end session endpoint", func() {
 		authPolicy := validWebhookAuthPolicy()
 		authPolicy.Spec.AutoLogin = &ztoperatorv1alpha1.AutoLogin{Enabled: true}
 		authPolicy.Spec.OAuthCredentials = &ztoperatorv1alpha1.OAuthCredentials{
 			SecretRef:       "oauth-credentials",
 			ClientIDKey:     "client-id",
 			ClientSecretKey: "client-secret",
+		}
+
+		_, err := validator.ValidateCreate(context.Background(), authPolicy)
+
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("rejects a private JWK when the provider does not support private_key_jwt", func() {
+		authPolicy := validWebhookAuthPolicy()
+		authPolicy.Spec.AutoLogin = &ztoperatorv1alpha1.AutoLogin{Enabled: true}
+		authPolicy.Spec.OAuthCredentials = &ztoperatorv1alpha1.OAuthCredentials{
+			SecretRef:     "oauth-credentials",
+			ClientIDKey:   "client-id",
+			PrivateJwkKey: "private-jwk",
+		}
+
+		_, err := validator.ValidateCreate(context.Background(), authPolicy)
+
+		Expect(err).To(MatchError(ContainSubstring("does not support private_key_jwt client authentication")))
+	})
+
+	It("accepts a private JWK when the provider supports private_key_jwt", func() {
+		authPolicy := validWebhookAuthPolicy()
+		authPolicy.Spec.WellKnownURI = webhookPrivateKeyJwtURI
+		authPolicy.Spec.AutoLogin = &ztoperatorv1alpha1.AutoLogin{Enabled: true}
+		authPolicy.Spec.OAuthCredentials = &ztoperatorv1alpha1.OAuthCredentials{
+			SecretRef:     "oauth-credentials",
+			ClientIDKey:   "client-id",
+			PrivateJwkKey: "private-jwk",
 		}
 
 		_, err := validator.ValidateCreate(context.Background(), authPolicy)
