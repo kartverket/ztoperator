@@ -3,6 +3,7 @@ package controller_test
 import (
 	"context"
 	"os"
+	"strings"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/controller"
@@ -308,6 +309,59 @@ var _ = Describe("AuthPolicy Controller Reconcile", func() {
 
 				Expect(updated.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseReady))
 				Expect(updated.Status.IstioAmbientConfig.Enabled).To(BeTrue())
+			})
+
+			When("the OAuth credentials hold a private JWK", func() {
+				const privateJwkWithAlg = `{"kty":"EC","kid":"test-key","crv":"P-256","alg":"ES256",` +
+					`"x":"PYuI5ShhEUCEYQh5XF8k1iGqXwV3O7woKYGvj-6aeKA",` +
+					`"y":"h2Vbpep2Kv8tCo6D2HSowCpquv39lUg7csHM8v5WEgg",` +
+					`"d":"gF-axGvZ3hItLVcPVWDoNxeiSPU_2hIICK1kO7wWrQI"}`
+
+				setUpPrivateJwkPolicy := func(privateJwk string) {
+					createAmbientWorkload()
+
+					Expect(fakeClient.Create(testCtx, &corev1.Secret{
+						Name: "oauth-credentials", Namespace: namespace,
+						Data: map[string][]byte{
+							"CLIENT_ID":   []byte("my-client-id"),
+							"PRIVATE_JWK": []byte(privateJwk),
+						},
+					})).To(Succeed())
+
+					authPolicy := &ztoperatorv1alpha1.AuthPolicy{}
+					Expect(fakeClient.Get(testCtx, policyKey, authPolicy)).To(Succeed())
+					authPolicy.Spec.AutoLogin = &ztoperatorv1alpha1.AutoLogin{Enabled: true}
+					authPolicy.Spec.WellKnownURI = "http://mock-oauth2.auth:8080/private-jwk/.well-known/openid-configuration"
+					authPolicy.Spec.OAuthCredentials = &ztoperatorv1alpha1.OAuthCredentials{
+						SecretRef:     "oauth-credentials",
+						ClientIDKey:   "CLIENT_ID",
+						PrivateJwkKey: "PRIVATE_JWK",
+					}
+					Expect(fakeClient.Update(testCtx, authPolicy)).To(Succeed())
+				}
+
+				It("creates the Envoy Secret and sets Ready status", func() {
+					setUpPrivateJwkPolicy(privateJwkWithAlg)
+
+					updated := reconcileAndGetPolicy()
+
+					envoySecret := &corev1.Secret{}
+					Expect(fakeClient.Get(testCtx, types.NamespacedName{
+						Name:      names.EnvoySecret(appName),
+						Namespace: namespace,
+					}, envoySecret)).To(Succeed())
+					Expect(envoySecret.Data).To(HaveKey(constants.EnvoyOAuth2TokenSecretFileName))
+					Expect(updated.Status.Phase).To(Equal(ztoperatorv1alpha1.PhaseReady))
+				})
+
+				It("returns an error and creates no Envoy Secret when the JWK has no supported alg", func() {
+					setUpPrivateJwkPolicy(strings.Replace(privateJwkWithAlg, `"alg":"ES256",`, "", 1))
+
+					_, err := reconciler.Reconcile(testCtx, ctrl.Request{NamespacedName: policyKey})
+
+					Expect(err).To(MatchError(ContainSubstring("unsupported signing algorithm")))
+					expectNotFound(&corev1.Secret{}, names.EnvoySecret(appName))
+				})
 			})
 		})
 	})
