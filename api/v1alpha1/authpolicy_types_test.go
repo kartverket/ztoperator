@@ -302,6 +302,37 @@ var _ = Describe("AuthPolicy CRD", func() {
 			Expect(err.Error()).To(ContainSubstring("may not be more than 2048 bytes"))
 		})
 
+		DescribeTable("oAuthCredentials requires exactly one of clientSecretKey and privateJwkKey",
+			func(clientSecretKey, privateJwkKey string, shouldSucceed bool) {
+				authPolicy := getValidAuthPolicy()
+				Expect(k8sClient.Create(testCtx, authPolicy)).To(Succeed())
+
+				authPolicy.Spec.AutoLogin = &ztoperatorv1alpha1.AutoLogin{
+					Enabled: true,
+					Scopes:  []string{"openid"},
+				}
+				authPolicy.Spec.OAuthCredentials = &ztoperatorv1alpha1.OAuthCredentials{
+					SecretRef:       "oauth-secret",
+					ClientIDKey:     "client-id",
+					ClientSecretKey: clientSecretKey,
+					PrivateJwkKey:   privateJwkKey,
+				}
+
+				err := k8sClient.Update(testCtx, authPolicy)
+				if shouldSucceed {
+					Expect(err).NotTo(HaveOccurred())
+				} else {
+					Expect(err).To(HaveOccurred())
+					Expect(apierrors.IsInvalid(err)).To(BeTrue())
+					Expect(err.Error()).To(ContainSubstring("exactly one of 'clientSecretKey' or 'privateJwkKey' must be set"))
+				}
+			},
+			Entry("accepts only clientSecretKey", "client-secret", "", true),
+			Entry("accepts only privateJwkKey", "", "private-jwk", true),
+			Entry("rejects both clientSecretKey and privateJwkKey", "client-secret", "private-jwk", false),
+			Entry("rejects neither clientSecretKey nor privateJwkKey", "", "", false),
+		)
+
 		DescribeTable("wellKnownURI pattern validation",
 			func(uri string, shouldSucceed bool) {
 				authPolicy := getValidAuthPolicy()

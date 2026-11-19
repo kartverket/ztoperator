@@ -229,6 +229,7 @@ type AutoLogin struct {
 // OAuthCredentials specifies the kubernetes secret holding OAuth credentials used for authentication.
 //
 // +kubebuilder:object:generate=true
+// +kubebuilder:validation:XValidation:message="exactly one of 'clientSecretKey' or 'privateJwkKey' must be set",rule="has(self.clientSecretKey) != has(self.privateJwkKey)"
 type OAuthCredentials struct {
 	// SecretRef specifies the name of the kubernetes secret.
 	//
@@ -237,10 +238,19 @@ type OAuthCredentials struct {
 	SecretRef string `json:"secretRef"`
 
 	// ClientSecretKey specifies the data key to access the client secret.
+	// Exactly one of ClientSecretKey and PrivateJwkKey must be set.
 	//
 	// +kubebuilder:validation:MaxLength=253
-	// +kubebuilder:validation:Required
-	ClientSecretKey string `json:"clientSecretKey"`
+	// +kubebuilder:validation:Optional
+	ClientSecretKey string `json:"clientSecretKey,omitempty"`
+
+	// PrivateJwkKey specifies the data key to access the private JSON Web Key (JWK).
+	// Exactly one of ClientSecretKey and PrivateJwkKey must be set.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Optional
+	PrivateJwkKey string `json:"privateJwkKey,omitempty"`
 
 	// ClientIDKey specifies the data key to access the client ID.
 	//
