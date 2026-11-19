@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	github.com/envoyproxy/go-control-plane/envoy v1.40.0
+	github.com/go-jose/go-jose/v4 v4.1.9
 	github.com/go-logr/logr v1.4.4
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo/v2 v2.34.0
@@ -20,7 +21,7 @@ require (
 	k8s.io/apimachinery v0.37.2
 	k8s.io/client-go v0.37.2
 	sigs.k8s.io/controller-runtime v0.25.2
-	sigs.k8s.io/kustomize/kyaml v0.21.2
+	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
