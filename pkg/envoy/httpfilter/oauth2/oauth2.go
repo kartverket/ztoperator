@@ -33,6 +33,7 @@ func OAuth2(
 	resources, scopes []string,
 	signoutPath, redirectPath, tokenClusterName string,
 	postLogoutRedirectUri *string,
+	credentialsDirectory string,
 ) (*oauth2v3.OAuth2, error) {
 	oauth2Filter := oauth2v3.OAuth2{
 		Config: &oauth2v3.OAuth2Config{
@@ -49,14 +50,14 @@ func OAuth2(
 				ClientId: clientID,
 				TokenSecret: sdsFileSecret(
 					SdsConfigTokenSecretName,
-					constants.EnvoyOAuth2TokenSecretFilePath,
-					constants.EnvoyOAuth2CredentialsDirectory,
+					credentialsDirectory+"/"+constants.EnvoyOAuth2TokenSecretFileName,
+					credentialsDirectory,
 				),
 				TokenFormation: &oauth2v3.OAuth2Credentials_HmacSecret{
 					HmacSecret: sdsFileSecret(
 						SdsConfigHmacSecretName,
-						constants.EnvoyOAuth2HmacSecretFilePath,
-						constants.EnvoyOAuth2CredentialsDirectory,
+						credentialsDirectory+"/"+constants.EnvoyOAuth2HmacSecretFileName,
+						credentialsDirectory,
 					),
 				},
 			},

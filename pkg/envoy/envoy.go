@@ -123,6 +123,7 @@ func GetEnvoyHttpFilterConfig(
 	clientID *string,
 	authType oauth2v3.OAuth2Config_AuthType,
 	privateKeyJwtConfig *oauth2v3.PrivateKeyJwtConfig,
+	credentialsDirectory string,
 ) (*HttpFilterConfig, error) {
 	envoyHttpFilterConfig := HttpFilterConfig{}
 	if !authPolicy.Spec.Enabled {
@@ -137,6 +138,7 @@ func GetEnvoyHttpFilterConfig(
 			clientID,
 			authType,
 			privateKeyJwtConfig,
+			credentialsDirectory,
 		)
 		if err != nil {
 			return nil, err
@@ -162,6 +164,7 @@ func GetAutoLoginFiltersAndClusters(
 	clientID *string,
 	authType oauth2v3.OAuth2Config_AuthType,
 	privateKeyJwtConfig *oauth2v3.PrivateKeyJwtConfig,
+	credentialsDirectory string,
 ) (*AutoLoginFiltersAndClusters, error) {
 	if clientID == nil {
 		return nil, errors.New(
@@ -185,6 +188,7 @@ func GetAutoLoginFiltersAndClusters(
 		authType,
 		privateKeyJwtConfig,
 		TokenEndpointClusterName,
+		credentialsDirectory,
 	)
 	if err != nil {
 		return nil, err

@@ -155,5 +155,6 @@ func buildOAuth2(
 		"/oauth2/callback",
 		"token-cluster",
 		postLogoutRedirectURI,
+		"/tmp/istio",
 	)
 }

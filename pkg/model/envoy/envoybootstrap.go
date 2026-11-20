@@ -57,6 +57,7 @@ func ToEnvoyBootstrap(
 	privateKeyJwtConfig *oauth2v3.PrivateKeyJwtConfig,
 	upstreamURL string,
 	bindAddresses BindAddresses,
+	credentialsDirectory string,
 ) (*bootstrapv3.Bootstrap, error) {
 	_, err := helperfunctions.GetParsedHttpURL(upstreamURL)
 	if err != nil {
@@ -79,6 +80,7 @@ func ToEnvoyBootstrap(
 		oAuthClientID,
 		oAuthAuthType,
 		privateKeyJwtConfig,
+		credentialsDirectory,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get envoy http filter config: %w", err)

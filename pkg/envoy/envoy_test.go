@@ -118,6 +118,7 @@ func TestGetEnvoyHttpFilterConfig_ReturnsNothingWhenAuthPolicyDisabled(t *testin
 				new(testClientID),
 				testAuthType,
 				nil,
+				"/tmp/istio",
 			)
 			require.NoError(t, err)
 
@@ -137,6 +138,7 @@ func TestGetEnvoyHttpFilterConfig_AutoLoginDisabled(t *testing.T) {
 		nil, // client ID is not resolved when auto login is disabled
 		testAuthType,
 		nil,
+		"/tmp/istio",
 	)
 	require.NoError(t, err)
 
@@ -163,6 +165,7 @@ func TestGetEnvoyHttpFilterConfig_AutoLoginEnabled(t *testing.T) {
 		new(testClientID),
 		testAuthType,
 		nil,
+		"/tmp/istio",
 	)
 	require.NoError(t, err)
 
@@ -193,6 +196,7 @@ func TestGetEnvoyHttpFilterConfig_GroupsFiltersAndClusters(t *testing.T) {
 		new(testClientID),
 		testAuthType,
 		nil,
+		"/tmp/istio",
 	)
 	require.NoError(t, err)
 
@@ -228,6 +232,7 @@ func TestGetEnvoyHttpFilterConfig_ContainsNoNilFiltersOrClusters(t *testing.T) {
 				new(testClientID),
 				testAuthType,
 				nil,
+				"/tmp/istio",
 			)
 			require.NoError(t, err)
 			assert.NotContains(t, config.GetHttpFilters(), (*httpconnectionmanagerv3.HttpFilter)(nil))
@@ -247,6 +252,7 @@ func TestGetEnvoyHttpFilterConfig_NeverContainsRouterFilter(t *testing.T) {
 			new(testClientID),
 			testAuthType,
 			nil,
+			"/tmp/istio",
 		)
 		require.NoError(t, err)
 		assert.NotContains(t, filterNames(config.GetHttpFilters()), httpfilter.EnvoyExtensionHttpFilterRouter)
@@ -262,6 +268,7 @@ func TestGetEnvoyHttpFilterConfigFilters_ReferenceExistingClusters(t *testing.T)
 		new(testClientID),
 		testAuthType,
 		nil,
+		"/tmp/istio",
 	)
 	require.NoError(t, err)
 	httpFilters := config.GetHttpFilters()
@@ -303,6 +310,7 @@ func TestGetEnvoyHttpFilterConfig_FailsWhenAutoLoginEnabledWithoutClientID(t *te
 		nil,
 		testAuthType,
 		nil,
+		"/tmp/istio",
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "client ID")

@@ -7,6 +7,7 @@ import (
 	bootstrapv3 "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v3"
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/pkg/config"
+	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/model"
 	envoymodel "github.com/kartverket/ztoperator/pkg/model/envoy"
@@ -59,5 +60,6 @@ func ResolveEnvoyBootstrap(
 				uint16(config.Get().EnvoyAdminPort),
 			),
 		},
+		constants.EnvoyOAuth2CredentialsDirectory,
 	)
 }

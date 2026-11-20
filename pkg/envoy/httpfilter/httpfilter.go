@@ -83,6 +83,7 @@ func OAuth2HttpFilter(
 	authType oauth2v3.OAuth2Config_AuthType,
 	privateKeyJwtConfig *oauth2v3.PrivateKeyJwtConfig,
 	tokenEndpointClusterName string,
+	credentialsDirectory string,
 ) (*httpconnectionmanagerv3.HttpFilter, error) {
 	oAuth2, err := oauth2.OAuth2(
 		identityProviderUris,
@@ -95,6 +96,7 @@ func OAuth2HttpFilter(
 		autoLoginConfig.RedirectPath,
 		tokenEndpointClusterName,
 		autoLoginConfig.PostLogoutRedirectURI,
+		credentialsDirectory,
 	)
 	if err != nil {
 		return nil, err

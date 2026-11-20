@@ -90,6 +90,7 @@ func buildBootstrap(t *testing.T, autoLoginConfig model.AutoLoginConfig) *bootst
 		nil,
 		testUpstreamURL,
 		testBindAddresses,
+		"/tmp/istio",
 	)
 	require.NoError(t, err)
 	require.NotNil(t, bootstrap)
@@ -197,6 +198,7 @@ func TestToEnvoyBootstrap_InvalidUpstreamURLReturnsError(t *testing.T) {
 		nil,
 		"not a url",
 		testBindAddresses,
+		"/tmp/istio",
 	)
 
 	require.Error(t, err)
@@ -268,6 +270,7 @@ func TestToEnvoyBootstrap_DisabledAuthPolicyOnlyProxiesToUpstream(t *testing.T) 
 		nil,
 		testUpstreamURL,
 		testBindAddresses,
+		"/tmp/istio",
 	)
 	require.NoError(t, err)
 
