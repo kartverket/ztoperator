@@ -104,7 +104,7 @@ help: ## Display this help.
 
 .PHONY: run-local
 run-local: ensurelocal ensureztoperatornotdeployed generate install webhooks ## Run ztoperator from your host.
-	set -a; . config/manager/base/.env; set +a; go run ./cmd/main.go -webhook-cert-path=./webhook-certs
+	set -a; eval "$$(./scripts/local-env.sh --export)"; set +a; go run ./cmd/main.go -webhook-cert-path=./webhook-certs
 
 .PHONY: isrunning
 isrunning: ## Check if ztoperator is running on your host machine (i.e. from IDE or with 'make run-local')

@@ -1,0 +1,34 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: auto-login-private-jwk
+spec:
+  skip: false
+  concurrent: true
+  skipDelete: false
+  namespaceTemplate:
+    metadata:
+      labels:
+        istio-injection: enabled
+  steps:
+    - name: private-jwk-auto-login
+      try:
+        - create:
+            file: ../../../resources/skiperator/application-with-istio-mount.yaml
+        - apply:
+            file: ../../../resources/ingress/wildcard-ingress.yaml
+        - create:
+            file: oauth-secret.yaml
+        - create:
+            file: authpolicy.yaml
+        - assert:
+            file: authpolicy-assert.yaml
+        - assert:
+            file: envoy-secret-assert.yaml
+        - script:
+            content: sleep 14
+        - script:
+            content: |
+              hurl --error-format long \
+              --insecure --test tests.hurl \
+              --variable location_header="http://mock-oauth2.auth:8080/private-jwk/authorize?client_id=private_jwk_client&code_challenge="

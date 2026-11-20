@@ -65,11 +65,14 @@ func SecretShouldUpdate(current, desired *corev1.Secret) bool {
 	desiredTokenSecret, hasDesired := desired.Data[constants.EnvoyOAuth2TokenSecretFileName]
 	currentTokenSecret, hasCurrent := current.Data[constants.EnvoyOAuth2TokenSecretFileName]
 	return !hasDesired || !hasCurrent || !bytes.Equal(currentTokenSecret, desiredTokenSecret) ||
+		current.Type != desired.Type || !equality.Semantic.DeepEqual(current.Immutable, desired.Immutable) ||
 		labelsNeedUpdate(current, desired)
 }
 
 func SecretUpdateFields(current, desired *corev1.Secret) {
 	current.Data = desired.Data
+	current.Type = desired.Type
+	current.Immutable = desired.Immutable
 	current.Labels = desired.Labels
 }
 

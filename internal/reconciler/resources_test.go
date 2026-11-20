@@ -5,12 +5,12 @@ import (
 	"time"
 
 	bootstrapv3 "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v3"
+	tlsv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/internal/reconciler"
 	"github.com/kartverket/ztoperator/internal/resolver"
 	"github.com/kartverket/ztoperator/pkg/constants"
-	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/labels"
 	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
@@ -101,7 +101,7 @@ var _ = Describe("ControllerResources", func() {
 		scope := newScope()
 		scope.AuthPolicy.Spec.Enabled = true
 		scope.AuthPolicy.Spec.AutoLogin = &ztoperatorv1alpha1.AutoLogin{Enabled: true}
-		scope.OAuthCredentials = model.OAuthCredentials{ClientSecret: helperfunctions.Ptr("client-secret")}
+		scope.OAuthCredentials = model.OAuthCredentials{}
 		scope.IstioAmbientConfig = model.IstioAmbientConfig{
 			Enabled:        true,
 			EnvoyBootstrap: &bootstrapv3.Bootstrap{},
@@ -224,7 +224,8 @@ var _ = Describe("auto-login Secret reconciliation", func() {
 				},
 			},
 			OAuthCredentials: model.OAuthCredentials{
-				ClientSecret: helperfunctions.Ptr("super-secret"),
+				HmacSecret:  model.HmacSecret{Value: &tlsv3.Secret{Name: "hmac"}},
+				TokenSecret: model.TokenSecret{Value: &tlsv3.Secret{Name: "token"}},
 			},
 			AutoLoginConfig: model.AutoLoginConfig{
 				EnvoySecretName: names.EnvoySecret("test-app"),
@@ -520,23 +521,25 @@ var _ = Describe("ConfigMapShouldUpdateFunc", func() {
 })
 
 var _ = Describe("SecretUpdateFields", func() {
-	It("copies the data and labels from desired to current and leaves the type untouched", func() {
+	It("copies the data, type, immutable flag and labels from desired to current", func() {
 		current := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"stale": "label"}},
 			Data:       map[string][]byte{"old": []byte("value")},
-			Type:       corev1.SecretTypeOpaque,
+			Type:       corev1.SecretTypeBasicAuth,
 		}
 		desired := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{Labels: labels.AuthPolicyStandardLabels()},
 			Data:       map[string][]byte{"new": []byte("value")},
+			Type:       corev1.SecretTypeOpaque,
+			Immutable:  new(true),
 		}
 
 		reconciler.SecretUpdateFields(current, desired)
 
 		Expect(current.Data).To(Equal(desired.Data))
 		Expect(current.Labels).To(Equal(desired.Labels))
-		// Type is intentionally not managed by the update.
-		Expect(current.Type).To(Equal(corev1.SecretTypeOpaque))
+		Expect(current.Type).To(Equal(desired.Type))
+		Expect(current.Immutable).To(Equal(desired.Immutable))
 	})
 })
 

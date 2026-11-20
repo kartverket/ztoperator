@@ -1,6 +1,7 @@
 package envoyfilter
 
 import (
+	"github.com/kartverket/ztoperator/pkg/constants"
 	"github.com/kartverket/ztoperator/pkg/envoy"
 	"github.com/kartverket/ztoperator/pkg/model"
 	"istio.io/api/networking/v1alpha3"
@@ -19,6 +20,9 @@ func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFil
 		scope.AutoLoginConfig,
 		scope.IdentityProviderUris,
 		scope.OAuthCredentials.ClientID,
+		scope.OAuthCredentials.TokenSecret.AuthType,
+		scope.OAuthCredentials.TokenSecret.PrivateKeyJwtConfig,
+		constants.EnvoyOAuth2CredentialsDirectory,
 	)
 	if err != nil {
 		panic("failed to get envoy http filter config: " + err.Error())

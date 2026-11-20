@@ -82,7 +82,7 @@ func TestLoadRejectsInvalidProviderJSON(t *testing.T) {
 
 func TestLoadRejectsInvalidWellKnownURI(t *testing.T) {
 	t.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", `{
-		"invalid": {"wellKnownURI": "not-a-uri", "requireAudience": true}
+		"invalid": {"wellKnownURI": "not-a-uri", "requireAudience": true, "issuer": "https://issuer.example.com"}
 	}`)
 
 	err := config.Load()
@@ -234,6 +234,85 @@ func TestLoadOverridesEnvoyPorts(t *testing.T) {
 
 	require.Equal(t, int32(15000), loaded.EnvoyPort)
 	require.Equal(t, int32(15001), loaded.EnvoyProbePort)
+}
+
+func TestGetOAuthProvider(t *testing.T) {
+	t.Setenv("ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS", `{
+		"entraid": {
+			"wellKnownURI": "`+configTestURI1+`",
+			"requireAudience": true,
+			"issuer": "`+configTestIssuer+`",
+			"tokenEndpoint": "https://issuer.example.com/token",
+			"jwksURI": "https://issuer.example.com/jwks",
+			"privateKeyJwtAssertionAudience": "https://issuer.example.com"
+		},
+		"ansattporten": {
+			"wellKnownURI": "`+configTestURI2+`",
+			"issuer": "https://ansattporten.no",
+			"tokenEndpoint": "https://ansattporten.no/token",
+			"jwksURI": "https://ansattporten.no/jwks"
+		}
+	}`)
+	require.NoError(t, config.Load())
+
+	tests := []struct {
+		name         string
+		wellKnownURI string
+		expected     config.OAuthProvider
+		found        bool
+	}{
+		{
+			name:         "returns matching provider",
+			wellKnownURI: configTestURI1,
+			expected: config.OAuthProvider{
+				WellKnownURI:                   configTestURI1,
+				RequireAudience:                true,
+				Issuer:                         configTestIssuer,
+				TokenEndpoint:                  "https://issuer.example.com/token",
+				JwksURI:                        "https://issuer.example.com/jwks",
+				PrivateKeyJwtAssertionAudience: "https://issuer.example.com",
+			},
+			found: true,
+		},
+		{
+			name:         "returns other matching provider",
+			wellKnownURI: configTestURI2,
+			expected: config.OAuthProvider{
+				WellKnownURI:  configTestURI2,
+				Issuer:        "https://ansattporten.no",
+				TokenEndpoint: "https://ansattporten.no/token",
+				JwksURI:       "https://ansattporten.no/jwks",
+			},
+			found: true,
+		},
+		{
+			name:         "returns zero value for unknown URI",
+			wellKnownURI: "https://unknown.example.com/.well-known/openid-configuration",
+			expected:     config.OAuthProvider{},
+			found:        false,
+		},
+		{
+			name:         "returns zero value for empty URI",
+			wellKnownURI: "",
+			expected:     config.OAuthProvider{},
+			found:        false,
+		},
+		{
+			name:         "requires exact match",
+			wellKnownURI: configTestURI1 + "/",
+			expected:     config.OAuthProvider{},
+			found:        false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			provider, found := config.GetOAuthProvider(test.wellKnownURI)
+
+			require.Equal(t, test.found, found)
+			require.Equal(t, test.expected, provider)
+		})
+	}
 }
 
 func unsetEnv(t *testing.T, key string) {

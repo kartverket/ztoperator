@@ -426,11 +426,21 @@ spec:
                     description: ClientIDKey specifies the data key to access the
                       client ID.
                     maxLength: 253
+                    minLength: 1
                     type: string
                   clientSecretKey:
-                    description: ClientSecretKey specifies the data key to access
-                      the client secret.
+                    description: |-
+                      ClientSecretKey specifies the data key to access the client secret.
+                      Exactly one of ClientSecretKey and PrivateJwkKey must be set.
                     maxLength: 253
+                    minLength: 1
+                    type: string
+                  privateJwkKey:
+                    description: |-
+                      PrivateJwkKey specifies the data key to access the private JSON Web Key (JWK).
+                      Exactly one of ClientSecretKey and PrivateJwkKey must be set.
+                    maxLength: 253
+                    minLength: 1
                     type: string
                   secretRef:
                     description: SecretRef specifies the name of the kubernetes secret.
@@ -438,9 +448,12 @@ spec:
                     type: string
                 required:
                 - clientIDKey
-                - clientSecretKey
                 - secretRef
                 type: object
+                x-kubernetes-validations:
+                - message: exactly one of 'clientSecretKey' or 'privateJwkKey' must
+                    be set
+                  rule: has(self.clientSecretKey) != has(self.privateJwkKey)
               outputClaimToHeaders:
                 description: |-
                   OutputClaimsToHeaders specifies a list of operations to copy the claim to HTTP headers on a successfully verified token.

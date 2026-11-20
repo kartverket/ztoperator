@@ -9,6 +9,7 @@ import (
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	listenerv3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	overloadv3 "github.com/envoyproxy/go-control-plane/envoy/config/overload/v3"
+	oauth2v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/oauth2/v3"
 	caresv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/network/dns_resolver/cares/v3"
 	regexenginesv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/regex_engines/v3"
 	cgroupmemoryv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/resource_monitors/cgroup_memory/v3"
@@ -52,8 +53,11 @@ func ToEnvoyBootstrap(
 	identityProviderUris model.IdentityProviderUris,
 	allowedAudiences []string,
 	oAuthClientID *string,
+	oAuthAuthType oauth2v3.OAuth2Config_AuthType,
+	privateKeyJwtConfig *oauth2v3.PrivateKeyJwtConfig,
 	upstreamURL string,
 	bindAddresses BindAddresses,
+	credentialsDirectory string,
 ) (*bootstrapv3.Bootstrap, error) {
 	_, err := helperfunctions.GetParsedHttpURL(upstreamURL)
 	if err != nil {
@@ -74,6 +78,9 @@ func ToEnvoyBootstrap(
 		identityProviderUris,
 		allowedAudiences,
 		oAuthClientID,
+		oAuthAuthType,
+		privateKeyJwtConfig,
+		credentialsDirectory,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get envoy http filter config: %w", err)

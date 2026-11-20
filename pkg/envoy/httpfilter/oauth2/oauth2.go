@@ -28,9 +28,12 @@ const (
 func OAuth2(
 	identityProviderUris model.IdentityProviderUris,
 	clientID string,
+	authType oauth2v3.OAuth2Config_AuthType,
+	privateKeyJwtConfig *oauth2v3.PrivateKeyJwtConfig,
 	resources, scopes []string,
 	signoutPath, redirectPath, tokenClusterName string,
 	postLogoutRedirectUri *string,
+	credentialsDirectory string,
 ) (*oauth2v3.OAuth2, error) {
 	oauth2Filter := oauth2v3.OAuth2{
 		Config: &oauth2v3.OAuth2Config{
@@ -47,14 +50,14 @@ func OAuth2(
 				ClientId: clientID,
 				TokenSecret: sdsFileSecret(
 					SdsConfigTokenSecretName,
-					constants.EnvoyOAuth2TokenSecretFilePath,
-					constants.EnvoyOAuth2CredentialsDirectory,
+					credentialsDirectory+"/"+constants.EnvoyOAuth2TokenSecretFileName,
+					credentialsDirectory,
 				),
 				TokenFormation: &oauth2v3.OAuth2Credentials_HmacSecret{
 					HmacSecret: sdsFileSecret(
 						SdsConfigHmacSecretName,
-						constants.EnvoyOAuth2HmacSecretFilePath,
-						constants.EnvoyOAuth2CredentialsDirectory,
+						credentialsDirectory+"/"+constants.EnvoyOAuth2HmacSecretFileName,
+						credentialsDirectory,
 					),
 				},
 			},
@@ -102,7 +105,7 @@ func OAuth2(
 			},
 			AuthScopes:      scopes,
 			Resources:       resources,
-			AuthType:        oauth2v3.OAuth2Config_URL_ENCODED_BODY,
+			AuthType:        authType,
 			UseRefreshToken: &wrapperspb.BoolValue{Value: true},
 			DenyRedirectMatcher: []*routev3.HeaderMatcher{
 				{
@@ -127,6 +130,10 @@ func OAuth2(
 			},
 			DisableTokenEncryption: false,
 		},
+	}
+
+	if authType == oauth2v3.OAuth2Config_PRIVATE_KEY_JWT {
+		oauth2Filter.Config.PrivateKeyJwtConfig = privateKeyJwtConfig
 	}
 
 	if identityProviderUris.EndSessionURI != nil {

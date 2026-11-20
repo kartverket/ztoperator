@@ -208,7 +208,7 @@ The Lua script (`pkg/luascript/ztoperator.lua`) is embedded at compile time via 
 - **RFC 8707**: `acceptedResources` implements Resource Indicators for audience-restricted access tokens.
 - **RP-Initiated Logout**: `autoLogin.logoutPath` triggers redirect to the IdP's `end_session_endpoint`.
 - **Known Norwegian IdPs**: ID-porten, Ansattporten (hardcoded well-known URIs in CRD CEL validation to enforce `acceptedResources`).
-- **Configured Discovery Documents**: every allowed provider supplies `issuer`, `tokenEndpoint`, and `jwksURI`; `authorizationEndpoint` and `endSessionEndpoint` are required when auto-login is enabled.
+- **Configured Discovery Documents**: every allowed provider supplies `issuer`, `tokenEndpoint`, and `jwksURI`; `authorizationEndpoint` is required when auto-login is enabled, `endSessionEndpoint` is optional (enables RP-initiated logout) and `privateKeyJwtAssertionAudience` is required when an `AuthPolicy` sets `oAuthCredentials.privateJwkKey`. The AuthPolicy webhook enforces both.
 
 ### Skiperator Integration
 
@@ -233,7 +233,7 @@ Both webhooks only apply to Skiperator-managed pods with a `ztoperator.kartverke
 - **Flox**: Development environment manager (`.flox/env/manifest.toml`). `flox activate` sets up everything.
 - **Kind**: Local Kubernetes cluster (`kind-ztoperator` context).
 - Components installed locally: Istio, cert-manager, Skiperator, mock-oauth2-server.
-- Env vars: `config/manager/base/.env` contains `ZTOPERATOR_GIT_REF` and `ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS`.
+- Local config: `config/manager/base/.env` holds `ZTOPERATOR_GIT_REF`; `config/manager/base/oauth-providers.json` holds `ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS` (multiline JSON). It is the single source for `make deploy` (kustomize `configMapGenerator` `files:`), `make run-local` and the IDE run config (both via `scripts/local-env.sh`), and the envtest suite in `internal/controller`. Other Go tests define their own hermetic providers.
 - IDE run configs: `.run/Ztoperator.run.xml`, `.run/Setup.run.xml` (JetBrains GoLand/IntelliJ).
 
 ### Key Make Targets

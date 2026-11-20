@@ -25,6 +25,15 @@ var _ = BeforeSuite(func() {
 			"jwksURI": "https://required.example.com/jwks",
 			"endSessionEndpoint": "https://required.example.com/logout"
 		},
+		"private-key-jwt": {
+			"wellKnownURI": "` + webhookPrivateKeyJwtURI + `",
+			"requireAudience": false,
+			"issuer": "https://pkjwt.example.com",
+			"privateKeyJwtAssertionAudience": "https://pkjwt.example.com",
+			"authorizationEndpoint": "https://pkjwt.example.com/authorize",
+			"tokenEndpoint": "https://pkjwt.example.com/token",
+			"jwksURI": "https://pkjwt.example.com/jwks"
+		},
 		"optional": {
 			"wellKnownURI": "` + webhookOptionalURI + `",
 			"requireAudience": false,

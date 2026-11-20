@@ -20,5 +20,7 @@ images:
 configMapGenerator:
 - envs:
   - base/.env
+  files:
+  - ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS=base/oauth-providers.json
   name: ztoperator-env
   namespace: ztoperator-system

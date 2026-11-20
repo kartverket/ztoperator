@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
+	"github.com/kartverket/ztoperator/pkg/config"
 	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/model"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,28 +37,17 @@ func ResolveOAuthCredentials(
 		)
 	}
 
-	clientID := string(oAuthSecret.Data[authPolicy.Spec.OAuthCredentials.ClientIDKey])
-	if clientID == "" {
+	oAuthProvider, found := config.GetOAuthProvider(authPolicy.Spec.WellKnownURI)
+	if !found {
 		return nil, fmt.Errorf(
-			"client id with key: %s was nil or empty when retrieving it from Secret with name %s/%s",
-			authPolicy.Spec.OAuthCredentials.ClientIDKey,
-			authPolicy.Namespace,
-			authPolicy.Spec.OAuthCredentials.SecretRef,
+			"wellKnownURI %q is not in the configured allowlist",
+			authPolicy.Spec.WellKnownURI,
 		)
 	}
 
-	clientSecret := string(oAuthSecret.Data[authPolicy.Spec.OAuthCredentials.ClientSecretKey])
-	if clientSecret == "" {
-		return nil, fmt.Errorf(
-			"client secret with key: %s was nil or empty when retrieving it from Secret with name %s/%s",
-			authPolicy.Spec.OAuthCredentials.ClientSecretKey,
-			authPolicy.Namespace,
-			authPolicy.Spec.OAuthCredentials.SecretRef,
-		)
-	}
-
-	return &model.OAuthCredentials{
-		ClientID:     &clientID,
-		ClientSecret: &clientSecret,
-	}, nil
+	return model.ToOAuthCredentials(
+		authPolicy,
+		oAuthSecret.Data,
+		oAuthProvider.PrivateKeyJwtAssertionAudience,
+	)
 }

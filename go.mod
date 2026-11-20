@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	github.com/envoyproxy/go-control-plane/envoy v1.40.0
+	github.com/go-jose/go-jose/v4 v4.1.9
 	github.com/go-logr/logr v1.4.4
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo/v2 v2.34.0
@@ -14,13 +15,13 @@ require (
 	go.uber.org/zap v1.28.0
 	go.yaml.in/yaml/v4 v4.0.0
 	google.golang.org/protobuf v1.36.12
-	istio.io/api v1.31.4
-	istio.io/client-go v1.31.4
+	istio.io/api v1.32.0
+	istio.io/client-go v1.32.0
 	k8s.io/api v0.37.2
 	k8s.io/apimachinery v0.37.2
 	k8s.io/client-go v0.37.2
 	sigs.k8s.io/controller-runtime v0.25.2
-	sigs.k8s.io/kustomize/kyaml v0.21.2
+	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
@@ -40,7 +41,6 @@ require (
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.10.0 // indirect
-	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v1.0.2 // indirect
@@ -119,5 +119,4 @@ require (
 	sigs.k8s.io/json v0.0.0-20260909141634-11ed52e25bc5 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
-	sigs.k8s.io/yaml v1.6.0 // indirect
 )

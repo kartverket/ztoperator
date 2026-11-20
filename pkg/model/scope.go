@@ -5,6 +5,8 @@ import (
 	"slices"
 
 	bootstrapv3 "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v3"
+	oauth2v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/oauth2/v3"
+	tlsv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -23,9 +25,20 @@ type Scope struct {
 	ValidationErrorMessage *string
 }
 
-type IstioAmbientConfig struct {
-	Enabled        bool
-	EnvoyBootstrap *bootstrapv3.Bootstrap
+type OAuthCredentials struct {
+	ClientID    *string
+	HmacSecret  HmacSecret
+	TokenSecret TokenSecret
+}
+
+type HmacSecret struct {
+	Value *tlsv3.Secret
+}
+
+type TokenSecret struct {
+	AuthType            oauth2v3.OAuth2Config_AuthType
+	Value               *tlsv3.Secret
+	PrivateKeyJwtConfig *oauth2v3.PrivateKeyJwtConfig
 }
 
 type IdentityProviderUris struct {
@@ -36,9 +49,9 @@ type IdentityProviderUris struct {
 	EndSessionURI    *string
 }
 
-type OAuthCredentials struct {
-	ClientID     *string
-	ClientSecret *string
+type IstioAmbientConfig struct {
+	Enabled        bool
+	EnvoyBootstrap *bootstrapv3.Bootstrap
 }
 
 type Descendant[T client.Object] struct {

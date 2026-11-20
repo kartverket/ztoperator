@@ -3,7 +3,6 @@ package helperfunctions
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"net"
 	"net/url"
@@ -121,14 +120,13 @@ func GetParsedHttpURL(raw string) (*ParsedHttpURL, error) {
 	return &ParsedHttpURL{Host: host, Port: int32(port), Tls: tls}, nil
 }
 
-func GenerateHMACSecret(size int) (*string, error) {
+func GenerateHMACSecret(size int) ([]byte, error) {
 	secret := make([]byte, size)
 	_, err := rand.Read(secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate HMAC secret: %w", err)
 	}
-	base64EncodedSecret := base64.StdEncoding.EncodeToString(secret)
-	return &base64EncodedSecret, nil
+	return secret, nil
 }
 
 func GetProtectedPods(

@@ -8,6 +8,7 @@ import (
 	bootstrapv3 "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v3"
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	listenerv3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	oauth2v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/oauth2/v3"
 	httpconnectionmanagerv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	"github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/pkg/config"
@@ -21,8 +22,9 @@ import (
 )
 
 const (
-	testClientID    = "my-client-id"
-	testUpstreamURL = "http://127.0.0.1:8080"
+	testClientID      = "my-client-id"
+	testUpstreamURL   = "http://127.0.0.1:8080"
+	testOAuthAuthType = oauth2v3.OAuth2Config_URL_ENCODED_BODY
 )
 
 var (
@@ -84,8 +86,11 @@ func buildBootstrap(t *testing.T, autoLoginConfig model.AutoLoginConfig) *bootst
 		testIdentityProviderUris(),
 		testAudiences,
 		new(testClientID),
+		testOAuthAuthType,
+		nil,
 		testUpstreamURL,
 		testBindAddresses,
+		"/tmp/istio",
 	)
 	require.NoError(t, err)
 	require.NotNil(t, bootstrap)
@@ -189,8 +194,11 @@ func TestToEnvoyBootstrap_InvalidUpstreamURLReturnsError(t *testing.T) {
 		testIdentityProviderUris(),
 		testAudiences,
 		new(testClientID),
+		testOAuthAuthType,
+		nil,
 		"not a url",
 		testBindAddresses,
+		"/tmp/istio",
 	)
 
 	require.Error(t, err)
@@ -258,8 +266,11 @@ func TestToEnvoyBootstrap_DisabledAuthPolicyOnlyProxiesToUpstream(t *testing.T) 
 		testIdentityProviderUris(),
 		testAudiences,
 		new(testClientID),
+		testOAuthAuthType,
+		nil,
 		testUpstreamURL,
 		testBindAddresses,
+		"/tmp/istio",
 	)
 	require.NoError(t, err)
 

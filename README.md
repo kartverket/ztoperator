@@ -134,8 +134,10 @@ ZTOPERATOR_ALLOWED_OAUTH_PROVIDERS: |
 ```
 
 When `requireAudience` is enabled, the webhook requires `allowedAudiences` in the `AuthPolicy`.
-`issuer`, `tokenEndpoint`, and `jwksURI` are required for every provider. `authorizationEndpoint` and
-`endSessionEndpoint` are optional, but both are required when an `AuthPolicy` enables auto-login.
+`issuer`, `tokenEndpoint`, and `jwksURI` are required for every provider. `authorizationEndpoint` is
+optional, but required when an `AuthPolicy` enables auto-login. `endSessionEndpoint` is optional and enables
+RP-initiated logout. `privateKeyJwtAssertionAudience` is optional, but required when an `AuthPolicy` uses
+`oAuthCredentials.privateJwkKey` (`private_key_jwt` client authentication).
 Ztoperator reads these values from configuration and does not fetch the `wellKnownURI` at runtime.
 
 ## 🧪 Local Development
