@@ -424,7 +424,8 @@ host-entry: ## Point a hostname at 127.0.0.1 in /etc/hosts. Usage: make host-ent
 	   exit 0; \
 	fi; \
 	echo "🤞  Adding '$(host)' to $(HOSTS_FILE) (requires sudo)"; \
-	printf '127.0.0.1\t%s\t%s\n' "$(host)" "$$marker" | sudo tee -a "$(HOSTS_FILE)" > /dev/null; \
+	sudo -l /usr/bin/tee -a "$(HOSTS_FILE)" > /dev/null 2>&1 || { echo "❌  You are not allowed to run 'sudo tee -a $(HOSTS_FILE)'"; exit 1; }; \
+	printf '127.0.0.1\t%s\t%s\n' "$(host)" "$$marker" | sudo tee -a "$(HOSTS_FILE)" > /dev/null || { echo "❌  Failed to write to $(HOSTS_FILE)"; exit 1; }; \
 	echo "✅  Added: 127.0.0.1 $(host)  $$marker"; \
 	case "$(host)" in \
 	   *.skip.statkart.no|*.kartverket-intern.cloud) \
@@ -472,6 +473,7 @@ gateway-forward: kubectl ## Forward the istio gateway to localhost in the backgr
 	   exit 0; \
 	fi; \
 	rm -f "$(GATEWAY_FORWARD_PID)"; \
+	sudo -l "$(KUBECTL)" port-forward -n $(GATEWAY_NS) "svc/$(GATEWAY)-istio" $(GATEWAY_PORTS) --context $(KUBECONTEXT) > /dev/null 2>&1 || { echo "❌  You are not allowed to run 'sudo kubectl port-forward'"; exit 1; }; \
 	echo "🔍  Checking gateway '$(GATEWAY)' in namespace '$(GATEWAY_NS)'..."; \
 	"$(KUBECTL)" wait gateway $(GATEWAY) -n $(GATEWAY_NS) --for=condition=Programmed \
 	   --timeout=30s --context $(KUBECONTEXT) > /dev/null 2>&1 || { \
@@ -503,7 +505,6 @@ gateway-forward: kubectl ## Forward the istio gateway to localhost in the backgr
 	   done; \
 	fi; \
 	echo "🔌  Forwarding $(GATEWAY_PORTS) from $$svc in the background (sudo needed for ports below 1024)"; \
-	sudo -v || { echo "❌  sudo authentication failed"; exit 1; }; \
 	nohup sudo KUBECONFIG="$$HOME/.kube/config" "$(KUBECTL)" port-forward \
 	   -n $(GATEWAY_NS) "svc/$$svc" $(GATEWAY_PORTS) --context $(KUBECONTEXT) \
 	   > "$(GATEWAY_FORWARD_LOG)" 2>&1 & \
@@ -569,7 +570,7 @@ ensurerunningordeployed: ## Ensure ztoperator is running on host OR deployed in 
 		exit 1; \
 	fi; \
 	if [ "$$running" = "1" ]; then echo "✅ Ztoperator is running on the host."; fi; \
-	if [ "$$deployed" = "1" ]; then echo "✅ Ztoperator is deployed an running in the local cluster."; fi
+	if [ "$$deployed" = "1" ]; then echo "✅ Ztoperator is deployed and running on the local cluster."; fi
 
 .PHONY: webhook-test-manifests
 webhook-test-manifests: kustomize ## Build webhook manifests for envtest into webhook-tests/
