@@ -18,22 +18,6 @@ func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 		return nil
 	}
 
-	if scope.InvalidConfig {
-		// We deny requests for all paths if the configuration is invalid
-		allPathsRule := []*v1beta1.Rule{
-			{
-				To: []*v1beta1.Rule_To{
-					{
-						Operation: &v1beta1.Operation{
-							Paths: []string{"*"},
-						},
-					},
-				},
-			},
-		}
-		return authorizationpolicy.DenyAuthorizationPolicy(scope, objectMeta, allPathsRule)
-	}
-
 	if scope.AuthPolicy.Spec.AuthRules == nil || len(*scope.AuthPolicy.Spec.AuthRules) == 0 {
 		// No AuthRules defined, thus no deny rules to create
 		return nil

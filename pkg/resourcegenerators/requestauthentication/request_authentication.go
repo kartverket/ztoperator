@@ -14,10 +14,6 @@ func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 		return nil
 	}
 
-	if scope.InvalidConfig {
-		return nil
-	}
-
 	var audiences []string
 
 	if len(scope.Audiences) > 0 {

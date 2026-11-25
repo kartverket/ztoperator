@@ -16,7 +16,6 @@ import (
 func BuildConditions(
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
 	reconciliationState ReconciliationState,
-	validationErrorMessage *string,
 	descendants []model.Descendant[client.Object],
 	reconcileFuncs []reconciliation.ControllerResource,
 	existingConditions []metav1.Condition,
@@ -24,7 +23,6 @@ func BuildConditions(
 	authPolicyCondition := BuildAuthPolicyCondition(
 		authPolicy,
 		reconciliationState,
-		validationErrorMessage,
 		existingConditions,
 	)
 	descendantConditions := BuildDescendantConditions(descendants, existingConditions)
@@ -37,7 +35,6 @@ func BuildConditions(
 func BuildAuthPolicyCondition(
 	authPolicy *ztoperatorv1alpha1.AuthPolicy,
 	reconciliationState ReconciliationState,
-	validationErrorMessage *string,
 	existingConditions []metav1.Condition,
 ) metav1.Condition {
 	conditionType := model.GetID(strings.TrimPrefix(authPolicy.Kind, "*"), authPolicy.Name)
@@ -48,11 +45,6 @@ func BuildAuthPolicyCondition(
 	}
 
 	switch reconciliationState {
-	case StateInvalid:
-		condition.Status = metav1.ConditionFalse
-		condition.Reason = "InvalidConfiguration"
-		condition.Message = *validationErrorMessage
-
 	case StatePending:
 		condition.Status = metav1.ConditionUnknown
 		condition.Reason = "ReconciliationPending"

@@ -22,19 +22,6 @@ func TestGetDesiredReturnsNilWhenDisabledOrWithoutAuthRules(t *testing.T) {
 	}
 }
 
-func TestGetDesiredDeniesAllPathsForInvalidConfig(t *testing.T) {
-	scope := &model.Scope{
-		AuthPolicy:    v1alpha1.AuthPolicy{Spec: v1alpha1.AuthPolicySpec{Enabled: true}},
-		InvalidConfig: true,
-	}
-
-	result := deny.GetDesired(scope, metav1.ObjectMeta{Name: "deny", Namespace: "default"})
-
-	require.NotNil(t, result)
-	require.Equal(t, istiov1beta1.AuthorizationPolicy_DENY, result.Spec.Action)
-	require.Equal(t, []string{"*"}, result.Spec.Rules[0].To[0].Operation.Paths)
-}
-
 func TestGetDesiredBuildsDenyRulesFromAuthRulesAndConditions(t *testing.T) {
 	authRules := []v1alpha1.RequestAuthRule{{
 		RequestMatcher: v1alpha1.RequestMatcher{Paths: []string{"/admin/{*}"}, Methods: []string{"POST"}},

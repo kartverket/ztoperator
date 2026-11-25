@@ -5,7 +5,6 @@ import (
 
 	ztoperatorv1alpha1 "github.com/kartverket/ztoperator/api/v1alpha1"
 	"github.com/kartverket/ztoperator/internal/statusmanager"
-	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/stretchr/testify/assert"
@@ -18,27 +17,6 @@ import (
 const forceConditionChangeMessage = "Different message to force condition change"
 const createdSuccessfullyMessage = "Created successfully"
 
-func TestBuildAuthPolicyCondition_WithInvalidState_ReturnsFalseCondition_WithErrorMessage(t *testing.T) {
-	// 1. Arrange
-	authPolicy := createTestAuthPolicy()
-	validationError := "some validation error"
-
-	// 2. Act
-	condition := statusmanager.BuildAuthPolicyCondition(
-		authPolicy,
-		statusmanager.StateInvalid,
-		&validationError,
-		[]metav1.Condition{},
-	)
-
-	// 3. Assert
-	assert.Equal(t, "AuthPolicy-test-policy", condition.Type)
-	assert.Equal(t, metav1.ConditionFalse, condition.Status)
-	assert.Equal(t, "InvalidConfiguration", condition.Reason)
-	assert.Equal(t, validationError, condition.Message)
-	assert.False(t, condition.LastTransitionTime.IsZero())
-}
-
 func TestBuildAuthPolicyCondition_WithPendingState_ReturnsUnknownCondition(t *testing.T) {
 	// 1. Arrange
 	authPolicy := createTestAuthPolicy()
@@ -47,7 +25,6 @@ func TestBuildAuthPolicyCondition_WithPendingState_ReturnsUnknownCondition(t *te
 	condition := statusmanager.BuildAuthPolicyCondition(
 		authPolicy,
 		statusmanager.StatePending,
-		helperfunctions.Ptr("ignored"),
 		[]metav1.Condition{},
 	)
 
@@ -66,7 +43,6 @@ func TestBuildAuthPolicyCondition_WithFailedState_ReturnsFalseCondition(t *testi
 	condition := statusmanager.BuildAuthPolicyCondition(
 		authPolicy,
 		statusmanager.StateFailed,
-		helperfunctions.Ptr("ignored"),
 		[]metav1.Condition{},
 	)
 
@@ -85,7 +61,6 @@ func TestBuildAuthPolicyCondition_WithReadyState_ReturnsTrueCondition(t *testing
 	condition := statusmanager.BuildAuthPolicyCondition(
 		authPolicy,
 		statusmanager.StateReady,
-		helperfunctions.Ptr("ignored"),
 		[]metav1.Condition{},
 	)
 
@@ -104,7 +79,6 @@ func TestBuildAuthPolicyCondition_WithNoExistingConditions_SetsNewLastTransition
 	condition := statusmanager.BuildAuthPolicyCondition(
 		authPolicy,
 		statusmanager.StateReady,
-		helperfunctions.Ptr("ignored"),
 		[]metav1.Condition{},
 	)
 
@@ -120,7 +94,6 @@ func TestBuildAuthPolicyCondition_WithIdenticalExistingCondition_PreservesLastTr
 	existingCondition := statusmanager.BuildAuthPolicyCondition(
 		authPolicy,
 		statusmanager.StateReady,
-		helperfunctions.Ptr("ignored"),
 		[]metav1.Condition{},
 	)
 
@@ -128,7 +101,6 @@ func TestBuildAuthPolicyCondition_WithIdenticalExistingCondition_PreservesLastTr
 	condition := statusmanager.BuildAuthPolicyCondition(
 		authPolicy,
 		statusmanager.StateReady,
-		helperfunctions.Ptr("ignored"),
 		[]metav1.Condition{existingCondition},
 	)
 
@@ -150,7 +122,6 @@ func TestBuildAuthPolicyCondition_WithDifferentExistingCondition_UpdatesLastTran
 	existingCondition := statusmanager.BuildAuthPolicyCondition(
 		authPolicy,
 		statusmanager.StateReady,
-		helperfunctions.Ptr("ignored"),
 		[]metav1.Condition{},
 	)
 	existingCondition.Message = forceConditionChangeMessage
@@ -159,7 +130,6 @@ func TestBuildAuthPolicyCondition_WithDifferentExistingCondition_UpdatesLastTran
 	condition := statusmanager.BuildAuthPolicyCondition(
 		authPolicy,
 		statusmanager.StateReady,
-		helperfunctions.Ptr("ignored"),
 		[]metav1.Condition{existingCondition},
 	)
 
@@ -534,7 +504,6 @@ func TestBuildConditions_IncludesAllConditionTypes(t *testing.T) {
 	conditions := statusmanager.BuildConditions(
 		authPolicy,
 		reconciliationState,
-		helperfunctions.Ptr("ignored"),
 		descendants,
 		reconcileFuncs,
 		[]metav1.Condition{},

@@ -25,9 +25,8 @@ An `AuthPolicy` targets workloads via `spec.selector.matchLabels` and generates 
 
 ### Status Phases
 
-`AuthPolicy.status.phase` transitions through: `Pending` → `Ready` | `Failed` | `Invalid`.
+`AuthPolicy.status.phase` transitions through: `Pending` → `Ready` | `Failed`. Invalid configuration is rejected at admission (CRD validation and webhooks), so the controller never reconciles it.
 
-- **Invalid**: CRD validation (paths, pod annotations) fails; results in default-deny on all paths.
 - **Failed**: Reconciliation of child resources errors out.
 - **Ready**: All child resources reconciled successfully.
 
@@ -109,14 +108,13 @@ The adapter handles the full lifecycle: **create if not found**, **update if cha
 
 ```go
 type Scope struct {
-    AuthPolicy             AuthPolicy
-    Audiences              []string
-    AutoLoginConfig        AutoLoginConfig
-    OAuthCredentials       OAuthCredentials
-    IdentityProviderUris   IdentityProviderUris
-    Descendants            []Descendant[client.Object]  // tracks reconciled child resources + their status
-    InvalidConfig          bool
-    ValidationErrorMessage *string
+    AuthPolicy           AuthPolicy
+    Audiences            []string
+    AutoLoginConfig      AutoLoginConfig
+    OAuthCredentials     OAuthCredentials
+    IdentityProviderUris IdentityProviderUris
+    IstioAmbientConfig   IstioAmbientConfig
+    Descendants          []Descendant[client.Object]  // tracks reconciled child resources + their status
 }
 ```
 

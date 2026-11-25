@@ -100,8 +100,8 @@ Add validation for overlapping auth rules
 
 Previously, overlapping paths between authRules and ignoreAuthRules
 were silently accepted and produced undefined Istio behavior. This
-change detects overlaps during validation and sets the AuthPolicy
-to Invalid with a descriptive error message.
+change detects overlaps in the validating webhook and rejects the
+AuthPolicy with a descriptive error message.
 ```
 
 ## Managing dependencies and patching vulnerabilities

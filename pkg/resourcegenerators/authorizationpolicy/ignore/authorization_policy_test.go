@@ -11,10 +11,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestGetDesiredReturnsNilWhenDisabledOrInvalid(t *testing.T) {
+func TestGetDesiredReturnsNilWhenDisabledOrWithoutRules(t *testing.T) {
 	for name, scope := range map[string]*model.Scope{
 		"disabled":      {AuthPolicy: v1alpha1.AuthPolicy{Spec: v1alpha1.AuthPolicySpec{Enabled: false}}},
-		"invalid":       {AuthPolicy: v1alpha1.AuthPolicy{Spec: v1alpha1.AuthPolicySpec{Enabled: true}}, InvalidConfig: true},
 		"without rules": {AuthPolicy: v1alpha1.AuthPolicy{Spec: v1alpha1.AuthPolicySpec{Enabled: true}}},
 	} {
 		t.Run(name, func(t *testing.T) {
