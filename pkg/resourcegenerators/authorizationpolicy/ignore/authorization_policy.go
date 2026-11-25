@@ -14,11 +14,6 @@ func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *istioclientsecuri
 		return nil
 	}
 
-	if scope.InvalidConfig {
-		// We rely on deny.authorizationpolicy to create an auth policy which block all requests.
-		return nil
-	}
-
 	ignoreAuthRequestMatchers := scope.AuthPolicy.GetIgnoreAuthRequestMatchers()
 
 	if len(ignoreAuthRequestMatchers) == 0 {

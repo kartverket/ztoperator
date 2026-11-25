@@ -12,7 +12,7 @@ import (
 )
 
 func GetDesired(scope *model.Scope, objectMeta metav1.ObjectMeta) *v1.Secret {
-	if !scope.AuthPolicy.Spec.Enabled || scope.InvalidConfig || scope.AuthPolicy.Spec.AutoLogin == nil ||
+	if !scope.AuthPolicy.Spec.Enabled || scope.AuthPolicy.Spec.AutoLogin == nil ||
 		!scope.AuthPolicy.Spec.AutoLogin.Enabled {
 		return nil
 	}

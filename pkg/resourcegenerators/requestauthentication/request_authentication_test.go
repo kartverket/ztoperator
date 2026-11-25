@@ -17,12 +17,6 @@ func TestGetDesired_ReturnsNil_WhenDisabled(t *testing.T) {
 	assert.Nil(t, requestauthentication.GetDesired(&scope, defaultObjectMeta()))
 }
 
-func TestGetDesired_ReturnsNil_WhenInvalidConfig(t *testing.T) {
-	scope := defaultScope()
-	scope.InvalidConfig = true
-	assert.Nil(t, requestauthentication.GetDesired(&scope, defaultObjectMeta()))
-}
-
 func TestGetDesired_ObjectMetaIsPreserved(t *testing.T) {
 	scope := defaultScope()
 	name := "my-request-auth"
@@ -174,7 +168,6 @@ func defaultScope() model.Scope {
 			IssuerURI: "https://login.example.com",
 			JwksURI:   "https://login.example.com/.well-known/jwks.json",
 		},
-		InvalidConfig: false,
 	}
 }
 

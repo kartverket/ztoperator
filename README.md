@@ -200,7 +200,7 @@ as well as a **custom metric** called `ztoperator_authpolicy_info`.
 
 - `name`: Name of the `AuthPolicy`
 - `namespace`: Namespace where the `AuthPolicy` resides
-- `state`: Observed state of the `AuthPolicy` (`Pending`, `Ready`, `Failed`, `Invalid`)
+- `state`: Observed state of the `AuthPolicy` (`Pending`, `Ready`, `Failed`)
 - `owner`: Value of the `team` label on the namespace resource where the `AuthPolicy` resides
 - `issuer`: Configured OAuth 2.0 issuer
 - `enabled`: Whether the `AuthPolicy` is enabled

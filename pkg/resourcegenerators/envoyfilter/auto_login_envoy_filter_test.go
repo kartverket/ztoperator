@@ -34,12 +34,6 @@ func TestGetDesired_ReturnsNil_WhenAutoLoginDisabled(t *testing.T) {
 	assert.Nil(t, envoyfilter.GetDesired(&scope, defaultObjectMeta()))
 }
 
-func TestGetDesired_ReturnsNil_WhenInvalidConfig(t *testing.T) {
-	scope := defaultScope()
-	scope.InvalidConfig = true
-	assert.Nil(t, envoyfilter.GetDesired(&scope, defaultObjectMeta()))
-}
-
 func TestGetDesired_ObjectMetaIsPreserved(t *testing.T) {
 	scope := defaultScope()
 	name := "auth-policy-login"

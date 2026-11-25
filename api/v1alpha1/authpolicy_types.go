@@ -403,13 +403,14 @@ type EnvoyBootstrap struct {
 	ConfigMapKey  string `json:"configMapKey,omitempty"`
 }
 
+// Phase is the observed lifecycle phase of an AuthPolicy.
+// +kubebuilder:validation:Enum=Pending;Ready;Failed
 type Phase string
 
 const (
 	PhasePending Phase = "Pending"
 	PhaseReady   Phase = "Ready"
 	PhaseFailed  Phase = "Failed"
-	PhaseInvalid Phase = "Invalid"
 )
 
 // +kubebuilder:object:root=true

@@ -12,15 +12,13 @@ import (
 const openIDScope = "openid"
 
 type Scope struct {
-	AuthPolicy             ztoperatorv1alpha1.AuthPolicy
-	Audiences              []string
-	AutoLoginConfig        AutoLoginConfig
-	OAuthCredentials       OAuthCredentials
-	IdentityProviderUris   IdentityProviderUris
-	IstioAmbientConfig     IstioAmbientConfig
-	Descendants            []Descendant[client.Object]
-	InvalidConfig          bool
-	ValidationErrorMessage *string
+	AuthPolicy           ztoperatorv1alpha1.AuthPolicy
+	Audiences            []string
+	AutoLoginConfig      AutoLoginConfig
+	OAuthCredentials     OAuthCredentials
+	IdentityProviderUris IdentityProviderUris
+	IstioAmbientConfig   IstioAmbientConfig
+	Descendants          []Descendant[client.Object]
 }
 
 type IstioAmbientConfig struct {

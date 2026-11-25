@@ -19,8 +19,7 @@ type ReconciliationState int
 
 // NB: used in switch cases, ensure they are exhaustive.
 const (
-	StateInvalid ReconciliationState = iota
-	StatePending
+	StatePending ReconciliationState = iota
 	StateFailed
 	StateReady
 )
@@ -50,11 +49,10 @@ func UpdateAuthPolicyStatus(
 	ap.Status.ObservedGeneration = ap.GetGeneration()
 	ap.Status.Phase = determinePhase(reconciliationState)
 	ap.Status.Ready = determineReadiness(reconciliationState)
-	ap.Status.Message = statusMessage(reconciliationState, scope.ValidationErrorMessage)
+	ap.Status.Message = statusMessage(reconciliationState)
 	ap.Status.Conditions = BuildConditions(
 		ap,
 		reconciliationState,
-		scope.ValidationErrorMessage,
 		scope.Descendants,
 		controllerResources,
 		originalAuthPolicy.Status.Conditions,
@@ -87,8 +85,6 @@ func DetermineReconciliationState(
 	controllerResources []reconciliation.ControllerResource,
 ) ReconciliationState {
 	switch {
-	case scope.InvalidConfig:
-		return StateInvalid
 	case len(scope.Descendants) != reconciliation.CountNonNilResources(controllerResources):
 		return StatePending
 	case len(scope.GetErrors()) > 0:
@@ -100,8 +96,6 @@ func DetermineReconciliationState(
 
 func determinePhase(reconciliationState ReconciliationState) ztoperatorv1alpha1.Phase {
 	switch reconciliationState {
-	case StateInvalid:
-		return ztoperatorv1alpha1.PhaseInvalid
 	case StatePending:
 		return ztoperatorv1alpha1.PhasePending
 	case StateFailed:
@@ -114,7 +108,7 @@ func determinePhase(reconciliationState ReconciliationState) ztoperatorv1alpha1.
 
 func determineReadiness(reconciliationState ReconciliationState) bool {
 	switch reconciliationState {
-	case StateInvalid, StatePending, StateFailed:
+	case StatePending, StateFailed:
 		return false
 	case StateReady:
 		return true
@@ -122,10 +116,8 @@ func determineReadiness(reconciliationState ReconciliationState) bool {
 	panic("could not determine readiness")
 }
 
-func statusMessage(reconciliationState ReconciliationState, validationErrorMessage *string) string {
+func statusMessage(reconciliationState ReconciliationState) string {
 	switch reconciliationState {
-	case StateInvalid:
-		return *validationErrorMessage
 	case StatePending:
 		return "AuthPolicy pending due to missing Descendants."
 	case StateFailed:

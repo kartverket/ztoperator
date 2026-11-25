@@ -9,7 +9,7 @@ import (
 )
 
 func GetDesired(scope *model.Scope, objectMeta v1.ObjectMeta) *v1alpha4.EnvoyFilter {
-	if !scope.AuthPolicy.Spec.Enabled || scope.InvalidConfig || scope.AuthPolicy.Spec.AutoLogin == nil ||
+	if !scope.AuthPolicy.Spec.Enabled || scope.AuthPolicy.Spec.AutoLogin == nil ||
 		!scope.AuthPolicy.Spec.AutoLogin.Enabled {
 		return nil
 	}

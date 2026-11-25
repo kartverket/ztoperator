@@ -8,7 +8,6 @@ import (
 	"github.com/kartverket/ztoperator/internal/names"
 	"github.com/kartverket/ztoperator/internal/statusmanager"
 	"github.com/kartverket/ztoperator/pkg/constants"
-	"github.com/kartverket/ztoperator/pkg/helperfunctions"
 	"github.com/kartverket/ztoperator/pkg/model"
 	"github.com/kartverket/ztoperator/pkg/reconciliation"
 	"github.com/stretchr/testify/assert"
@@ -21,26 +20,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func TestDetermineReconciliationState_WithInvalidConfig_ReturnsStateInvalid(t *testing.T) {
-	// 1. Arrange
-	scope := &model.Scope{
-		InvalidConfig:          true,
-		ValidationErrorMessage: helperfunctions.Ptr("Invalid configuration"),
-		Descendants:            []model.Descendant[client.Object]{},
-	}
-	var controllerResources []reconciliation.ControllerResource
-
-	// 2. Act
-	result := statusmanager.DetermineReconciliationState(scope, controllerResources)
-
-	// 3. Assert
-	assert.Equal(t, statusmanager.StateInvalid, result)
-}
-
 func TestDetermineReconciliationState_WithMissingDescendants_ReturnsStatePending(t *testing.T) {
 	// 1. Arrange
 	scope := &model.Scope{
-		InvalidConfig: false,
 		Descendants: []model.Descendant[client.Object]{
 			{ID: "Secret-oauth-secret", Object: &v1.Secret{}},
 		},
@@ -61,7 +43,6 @@ func TestDetermineReconciliationState_WithErrors_ReturnsStateFailed(t *testing.T
 	// 1. Arrange
 	errorMsg := "Failed to create resource"
 	scope := &model.Scope{
-		InvalidConfig: false,
 		Descendants: []model.Descendant[client.Object]{
 			{
 				ID:           "Secret-oauth-secret",
@@ -85,7 +66,6 @@ func TestDetermineReconciliationState_WithValidConfigAndDescendantsAndNoErrors_R
 	// 1. Arrange
 	successMsg := "Created successfully"
 	scope := &model.Scope{
-		InvalidConfig: false,
 		Descendants: []model.Descendant[client.Object]{
 			{
 				ID:             "Secret-oauth-secret",
@@ -107,37 +87,10 @@ func TestDetermineReconciliationState_WithValidConfigAndDescendantsAndNoErrors_R
 
 // Test UpdateAuthPolicyStatus
 
-func TestDetermineReconciliationState_InvalidConfigTakesPrecedenceOverPendingAndFailed(t *testing.T) {
-	// 1. Arrange - Invalid config + missing descendants + errors
-	errorMsg := "Some error"
-	scope := &model.Scope{
-		InvalidConfig:          true,
-		ValidationErrorMessage: helperfunctions.Ptr("Invalid configuration"),
-		Descendants: []model.Descendant[client.Object]{
-			{
-				ID:           "Secret-oauth-secret",
-				Object:       &v1.Secret{},
-				ErrorMessage: &errorMsg,
-			},
-		},
-	}
-	controllerResources := []reconciliation.ControllerResource{
-		createMockReconcileAction("Secret", "oauth-secret", false),
-		createMockReconcileAction("RequestAuthentication", "my-auth", false),
-	}
-
-	// 2. Act
-	result := statusmanager.DetermineReconciliationState(scope, controllerResources)
-
-	// 3. Assert
-	assert.Equal(t, statusmanager.StateInvalid, result, "Invalid config should take precedence over other states")
-}
-
 func TestDetermineReconciliationState_PendingTakesPrecedenceOverFailed(t *testing.T) {
 	// 1. Arrange - Valid config + missing descendants + errors
 	errorMsg := "Some error"
 	scope := &model.Scope{
-		InvalidConfig: false,
 		Descendants: []model.Descendant[client.Object]{
 			{
 				ID:           "Secret-oauth-secret",
@@ -187,9 +140,8 @@ func TestUpdateAuthPolicyStatus_WithNoStatusChange_DoesNotUpdate(t *testing.T) {
 	fakeRecorder := events.NewFakeRecorder(10)
 
 	scope := &model.Scope{
-		AuthPolicy:    *authPolicy,
-		InvalidConfig: false,
-		Descendants:   []model.Descendant[client.Object]{},
+		AuthPolicy:  *authPolicy,
+		Descendants: []model.Descendant[client.Object]{},
 	}
 	controllerResources := []reconciliation.ControllerResource{}
 
@@ -231,8 +183,7 @@ func TestUpdateAuthPolicyStatus_WithSuccessfulStatusChange_RecordsNormalEvent(t 
 	// Create scope that will result in Ready state
 	successMsg := "Created"
 	scope := &model.Scope{
-		AuthPolicy:    *authPolicy,
-		InvalidConfig: false,
+		AuthPolicy: *authPolicy,
 		Descendants: []model.Descendant[client.Object]{
 			{
 				ID:             "Secret-test",
@@ -285,9 +236,8 @@ func TestUpdateAuthPolicyStatus_WithFailedStatusUpdate_RecordsWarningEvent(t *te
 	fakeRecorder := events.NewFakeRecorder(10)
 
 	scope := &model.Scope{
-		AuthPolicy:    *authPolicy,
-		InvalidConfig: false,
-		Descendants:   []model.Descendant[client.Object]{},
+		AuthPolicy:  *authPolicy,
+		Descendants: []model.Descendant[client.Object]{},
 	}
 	controllerResources := []reconciliation.ControllerResource{}
 
