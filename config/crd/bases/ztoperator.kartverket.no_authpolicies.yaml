@@ -593,6 +593,11 @@ spec:
                 format: int64
                 type: integer
               phase:
+                description: Phase is the observed lifecycle phase of an AuthPolicy.
+                enum:
+                - Pending
+                - Ready
+                - Failed
                 type: string
               ready:
                 type: boolean
